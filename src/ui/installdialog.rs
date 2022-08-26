@@ -1,0 +1,1 @@
+// TODO add a dialog where user can view `nix-env` and `nixos-rebuild` output

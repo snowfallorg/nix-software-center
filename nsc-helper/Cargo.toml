@@ -1,0 +1,12 @@
+[package]
+name = "nsc-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "3.2", features = ["derive"] }
+users = "0.11"
+
+[[bin]]
+name = "nsc-helper"
+path = "src/main.rs"

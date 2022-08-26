@@ -1,0 +1,6 @@
+.envrc
+/.direnv
+/.vscode
+/result
+/src/config.rs
+/target

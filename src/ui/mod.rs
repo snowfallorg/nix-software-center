@@ -1,0 +1,16 @@
+pub mod window;
+pub mod windowloading;
+pub mod pkgtile;
+pub mod categories;
+pub mod pkgpage;
+pub mod screenshotfactory;
+pub mod installworker;
+pub mod searchpage;
+pub mod installedpage;
+pub mod updatepage;
+pub mod updatedialog;
+pub mod updateworker;
+pub mod about;
+pub mod preferencespage;
+pub mod categorypage;
+pub mod categorytile;
