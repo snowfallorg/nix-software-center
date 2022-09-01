@@ -5,6 +5,15 @@ global_conf.set_quoted('PROFILE', profile)
 global_conf.set_quoted('VERSION', version + version_suffix)
 global_conf.set_quoted('GETTEXT_PACKAGE', gettext_package)
 global_conf.set_quoted('LOCALEDIR', localedir)
+
+gnome = import('gnome')
+resources = gnome.compile_resources(
+  'resources',
+  'resources.gresource.xml',
+  gresource_bundle: true,
+  source_dir: meson.current_build_dir()
+)
+
 config = configure_file(
   input: 'config.rs.in',
   output: 'config.rs',

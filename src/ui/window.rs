@@ -488,7 +488,7 @@ impl Component for AppModel {
         installedvs.set_name(Some("installed"));
         searchvs.set_name(Some("search"));
         updatesvs.set_name(Some("updates"));
-        
+        frontvs.set_icon_name(Some("compass"));
         ComponentParts { model, widgets }
     }
 

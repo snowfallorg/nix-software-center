@@ -31,6 +31,7 @@ enum SubCommands {
         #[clap(short, long)]
         rebuild: bool,
         /// Path to the flake file
+        #[clap(short, long)]
         flakepath: String,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,

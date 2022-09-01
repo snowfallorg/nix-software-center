@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/dev/vlinkz/NixSoftwareCenter/">
+    <file preprocess="xml-stripblanks" alias="icons/scalable/emblems/compass-symbolic.svg">../data/icons/compass-symbolic.svg</file>
+  </gresource>
+</gresources>
