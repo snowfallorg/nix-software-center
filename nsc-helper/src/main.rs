@@ -25,7 +25,16 @@ enum SubCommands {
         rebuild: bool,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
-    }
+    },
+    Flake {
+        /// Whether to rebuild the system after updating flake
+        #[clap(short, long)]
+        rebuild: bool,
+        /// Path to the flake file
+        flakepath: String,
+        /// Run `nixos-rebuild` with the given arguments
+        arguments: Vec<String>,
+    },
 }
 
 fn main() {
@@ -88,6 +97,24 @@ fn main() {
                     }
                 },
             }
+        },
+        SubCommands::Flake { rebuild: dorebuild, flakepath, arguments } => {
+            match dorebuild {
+                true => match rebuild(arguments) {
+                    Ok(_) => (),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        std::process::exit(1);
+                    }
+                },
+                false => match flake(&flakepath) {
+                    Ok(_) => (),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        std::process::exit(1);
+                    }
+                },
+            } 
         }
     }
 }
@@ -125,10 +152,28 @@ fn channel() -> Result<(), Box<dyn Error>> {
     if x.success() {
         Ok(())
     } else {
-        eprintln!("nixos-rebuild failed with exit code {}", x.code().unwrap());
+        eprintln!("nix-channel failed with exit code {}", x.code().unwrap());
         Err(Box::new(io::Error::new(
             io::ErrorKind::Other,
             "nix-channel failed",
+        )))
+    }
+}
+
+fn flake(path: &str) -> Result<(), Box<dyn Error>> {
+    let mut cmd = Command::new("nix")
+        .arg("flake")
+        .arg("upgrade")
+        .arg(path)
+        .spawn()?;
+    let x = cmd.wait()?;
+    if x.success() {
+        Ok(())
+    } else {
+        eprintln!("nix flake failed with exit code {}", x.code().unwrap());
+        Err(Box::new(io::Error::new(
+            io::ErrorKind::Other,
+            "nix flake failed",
         )))
     }
 }

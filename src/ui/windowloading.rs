@@ -1,9 +1,13 @@
 use super::window::AppMsg;
+use super::window::SystemPkgs;
 use crate::parse::cache::checkcache;
+use crate::parse::packages::readflakesyspkgs;
 use crate::parse::packages::readpkgs;
-use crate::parse::packages::readsyspkgs;
+use crate::parse::packages::readlegacysyspkgs;
 use crate::parse::packages::Package;
+use crate::parse::packages::readprofilepkgs;
 use crate::ui::categories::PkgCategory;
+use crate::ui::window::UserPkgs;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use relm4::adw::prelude::*;
@@ -15,7 +19,7 @@ pub struct WindowAsyncHandler;
 
 #[derive(Debug)]
 pub enum WindowAsyncHandlerMsg {
-    CheckCache(CacheReturn),
+    CheckCache(CacheReturn, SystemPkgs, UserPkgs),
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,7 +39,7 @@ impl Worker for WindowAsyncHandler {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
-            WindowAsyncHandlerMsg::CheckCache(cr) => {
+            WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs) => {
                 println!("CHECK CACHE");
                 relm4::spawn(async move {
                     match checkcache() {
@@ -65,19 +69,47 @@ impl Worker for WindowAsyncHandler {
                         }
                     };
 
-                    let newpkgs = match readsyspkgs() {
-                        Ok(newpkgs) => newpkgs,
-                        Err(_) => {
-                            println!("FAILED TO LOAD NEW PKGS");
-                            sender.output(AppMsg::LoadError(
-                                String::from("Could not load new packages"),
-                                String::from(
-                                    "Try connecting to the internet or launching the application again",
-                                ),
-                            ));
-                            return;
+                    println!("SYSTEM PKGS {:?}", syspkgs);
+                    let newpkgs = match syspkgs {
+                        SystemPkgs::Legacy => {
+                            match readlegacysyspkgs() {
+                                Ok(newpkgs) => newpkgs,
+                                Err(_) => {
+                                    println!("FAILED TO LOAD NEW PKGS");
+                                    sender.output(AppMsg::LoadError(
+                                        String::from("Could not load new packages"),
+                                        String::from(
+                                            "Try connecting to the internet or launching the application again",
+                                        ),
+                                    ));
+                                    return;
+                                }
+                            }
+                        }
+                        SystemPkgs::Flake => {
+                            match readflakesyspkgs() {
+                                Ok(newpkgs) => newpkgs,
+                                Err(_) => {
+                                    println!("FAILED TO LOAD NEW PKGS");
+                                    sender.output(AppMsg::LoadError(
+                                        String::from("Could not load new packages"),
+                                        String::from(
+                                            "Try connecting to the internet or launching the application again",
+                                        ),
+                                    ));
+                                    return;
+                                }
+                            }
                         }
                     };
+                    // println!("SYSPKGS: {:#?}", syspkgs);
+
+                    let profilepkgs = match userpkgs {
+                        UserPkgs::Env => None,
+                        UserPkgs::Profile => if let Ok(r) = readprofilepkgs() { Some(r) } else { None },
+                    };
+                    // println!("PROFILEPKGS: {:?}", profilepkgs);
+
 
                     println!("GOT PKGS");
 
@@ -380,7 +412,7 @@ impl Worker for WindowAsyncHandler {
                     println!("SEND INIT");
                     match cr {
                         CacheReturn::Init => {
-                            sender.output(AppMsg::Initialize(pkgs, recpicks, newpkgs, catpicks, catpkgs));
+                            sender.output(AppMsg::Initialize(pkgs, recpicks, newpkgs, catpicks, catpkgs, profilepkgs));
                         }
                         CacheReturn::Update => {
                             sender.output(AppMsg::ReloadUpdateItems(pkgs, newpkgs));

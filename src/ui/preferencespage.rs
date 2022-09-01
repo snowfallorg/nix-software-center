@@ -5,12 +5,15 @@ use adw::prelude::*;
 use relm4::*;
 use relm4_components::open_dialog::*;
 
+#[tracker::track]
 #[derive(Debug)]
 pub struct PreferencesPageModel {
     hidden: bool,
     configpath: PathBuf,
     flake: Option<(PathBuf, String)>,
+    #[tracker::no_eq]
     open_dialog: Controller<OpenDialog>,
+    #[tracker::no_eq]
     flake_file_dialog: Controller<OpenDialog>,
 }
 
@@ -74,13 +77,13 @@ impl SimpleComponent for PreferencesPageModel {
                                     sender.input(PreferencesPageMsg::Open);
                                 }
                             },
-                            gtk::Button {
-                                add_css_class: "flat",
-                                set_icon_name: "view-refresh-symbolic",
-                                connect_clicked[sender] => move |_| {
-                                    sender.input(PreferencesPageMsg::SetConfigPath(PathBuf::from("/etc/nixos/configuration.nix")));
-                                }
-                            }
+                            // gtk::Button {
+                            //     add_css_class: "flat",
+                            //     set_icon_name: "view-refresh-symbolic",
+                            //     connect_clicked[sender] => move |_| {
+                            //         sender.input(PreferencesPageMsg::SetConfigPath(PathBuf::from("/etc/nixos/configuration.nix")));
+                            //     }
+                            // }
                         }
                     },
                     add = &adw::ActionRow {
@@ -94,7 +97,10 @@ impl SimpleComponent for PreferencesPageModel {
                                     sender.input(PreferencesPageMsg::SetFlake(None));
                                 }
                                 gtk::Inhibit(false)
-                            }
+                            } @switched,
+                            #[track(model.changed(PreferencesPageModel::flake()))]
+                            #[block_signal(switched)]
+                            set_state: model.flake.is_some()
                         }
                     },
                     add = &adw::ActionRow {
@@ -133,13 +139,13 @@ impl SimpleComponent for PreferencesPageModel {
                                     sender.input(PreferencesPageMsg::OpenFlake);
                                 }
                             },
-                            gtk::Button {
-                                add_css_class: "flat",
-                                set_icon_name: "user-trash-symbolic",
-                                connect_clicked[sender] => move |_| {
-                                    sender.input(PreferencesPageMsg::SetFlakePath(PathBuf::new()));
-                                }
-                            }
+                            // gtk::Button {
+                            //     add_css_class: "flat",
+                            //     set_icon_name: "user-trash-symbolic",
+                            //     connect_clicked[sender] => move |_| {
+                            //         sender.input(PreferencesPageMsg::SetFlakePath(PathBuf::new()));
+                            //     }
+                            // }
                         }
                     },
                     add = &adw::EntryRow {
@@ -148,7 +154,10 @@ impl SimpleComponent for PreferencesPageModel {
                         set_title: "Flake arguments (--flake path/to/flake.nix#<THIS ENTRY>)",
                         connect_changed[sender] => move |x| {
                             sender.input(PreferencesPageMsg::SetFlakeArg(x.text().to_string()));
-                        }
+                        } @flakeentry,
+                        #[track(model.changed(PreferencesPageModel::flake()))]
+                        #[block_signal(flakeentry)]
+                        set_text: &model.flake.as_ref().map(|(_, a)| a.to_string()).unwrap_or_default()
                     }
 
                 }
@@ -181,6 +190,7 @@ impl SimpleComponent for PreferencesPageModel {
             flake: None,
             open_dialog,
             flake_file_dialog,
+            tracker: 0,
         };
 
         let widgets = view_output!();
@@ -189,10 +199,11 @@ impl SimpleComponent for PreferencesPageModel {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+        self.reset();
         match msg {
             PreferencesPageMsg::Show(path, flake) => {
                 self.configpath = path;
-                self.flake = flake;
+                self.set_flake(flake);
                 self.hidden = false;
                 println!("FLAKE {:?}", self.flake);
             }

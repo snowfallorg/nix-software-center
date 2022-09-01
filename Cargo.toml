@@ -30,7 +30,6 @@ reqwest = { version = "0.11", features = ["blocking"] }
 sha256 = "1.0"
 image = "0.24"
 spdx = "0.9"
-# { git = "https://github.com/EmbarkStudios/spdx", version = "0.8" }
 edit-distance = "2.1"
 ijson = "0.1"
 strum = "0.24"

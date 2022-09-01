@@ -1,6 +1,6 @@
 use crate::{parse::{cache::channelver, config::{getconfig, NscConfig}}, APPINFO};
 
-use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, UpdateDialogMsg}, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg}};
+use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, UpdateDialogMsg}, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}};
 use adw::prelude::*;
 use relm4::{factory::*, gtk::pango, *};
 use std::{path::Path, convert::identity};
@@ -18,6 +18,8 @@ pub struct UpdatePageModel {
     #[tracker::no_eq]
     updateworker: WorkerController<UpdateAsyncHandler>,
     config: NscConfig,
+    systype: SystemPkgs,
+    usertype: UserPkgs,
     updatetracker: u8,
 }
 
@@ -37,9 +39,15 @@ pub enum UpdatePageMsg {
     FailedWorking,
 }
 
+pub struct UpdatePageInit {
+    pub window: gtk::Window,
+    pub systype: SystemPkgs,
+    pub usertype: UserPkgs,
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for UpdatePageModel {
-    type InitParams = gtk::Window;
+    type InitParams = UpdatePageInit;
     type Input = UpdatePageMsg;
     type Output = AppMsg;
     type Widgets = UpdatePageWidgets;
@@ -178,7 +186,10 @@ impl SimpleComponent for UpdatePageModel {
                             gtk::Label {
                                 set_halign: gtk::Align::Start,
                                 add_css_class: "title-4",
-                                set_label: "User (nix-env)",
+                                set_label: match model.usertype {
+                                    UserPkgs::Env => "User (nix-env)",
+                                    UserPkgs::Profile => "User (nix profile)",
+                                }
                             },
                             gtk::Button {
                                 add_css_class: "suggested-action",
@@ -263,15 +274,15 @@ impl SimpleComponent for UpdatePageModel {
     }
 
     fn init(
-        parent_window: Self::InitParams,
+        initparams: Self::InitParams,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let updatedialog = UpdateDialogModel::builder()
-            .launch(parent_window.upcast())
+            .launch(initparams.window.upcast())
             .forward(sender.input_sender(), identity);
         let updateworker = UpdateAsyncHandler::builder()
-            .detach_worker(())
+            .detach_worker(UpdateAsyncHandlerInit { syspkgs: initparams.systype.clone(), userpkgs: initparams.usertype.clone() })
             .forward(sender.input_sender(), identity);
 
         let config = getconfig();
@@ -285,6 +296,8 @@ impl SimpleComponent for UpdatePageModel {
             updatedialog,
             updateworker,
             config,
+            systype: initparams.systype,
+            usertype: initparams.usertype,
             tracker: 0,
         };
 
@@ -304,6 +317,8 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(self.config.clone()));
             }
             UpdatePageMsg::Update(updateuserlist, updatesystemlist) => {
+                println!("UPDATEUSERLIST: {:?}", updateuserlist);
+                println!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
                 self.channelupdate = channelver().unwrap_or(None);
                 self.update_updatetracker(|_| ());
                 let mut updateuserlist_guard = self.updateuserlist.guard();

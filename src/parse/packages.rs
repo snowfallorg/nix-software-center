@@ -156,23 +156,29 @@ pub struct AppScreenshotImage {
     pub url: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct FlakeJson {
+    pname: IString,
+    version: IString,
+}
+
 pub async fn readpkgs() -> Result<HashMap<String, Package>,  Box<dyn Error + Send + Sync>> {
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/packages.json", cachedir);
-    let file = File::open(cachefile).unwrap();
+    let file = File::open(cachefile)?;
     let reader = BufReader::new(file);
-    let pkgbase: PackageBase = simd_json::serde::from_reader(reader).unwrap();
+    let pkgbase: PackageBase = simd_json::serde::from_reader(reader)?;
     let mut pkgs = pkgbase.packages;
     println!("APPDATADIR {}", APPINFO);
-    let appdata = File::open(&format!("{}/xmls/nixos_x86_64_linux.yml.gz", APPINFO)).unwrap();
+    let appdata = File::open(&format!("{}/xmls/nixos_x86_64_linux.yml.gz", APPINFO))?;
     let appreader = BufReader::new(appdata);
     let mut d = GzDecoder::new(appreader);
     let mut s = String::new();
-    d.read_to_string(&mut s).unwrap();
+    d.read_to_string(&mut s)?;
     let mut files = s.split("\n---\n").collect::<Vec<_>>();
     files.remove(0);
     for f in files {
-        let appstream: AppData = serde_yaml::from_str(f).unwrap();
+        let appstream: AppData = serde_yaml::from_str(f)?;
         if let Some(p) = pkgs.get_mut(&appstream.package.to_string()) {
             p.appdata = Some(appstream);
         }
@@ -180,11 +186,32 @@ pub async fn readpkgs() -> Result<HashMap<String, Package>,  Box<dyn Error + Sen
     Ok(pkgs)
 }
 
-pub fn readsyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+pub fn readlegacysyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/syspackages.json", cachedir);
     let file = File::open(cachefile)?;
     let reader = BufReader::new(file);
-    let newpkgs: HashMap<String, String> = simd_json::serde::from_reader(reader).unwrap();
+    let newpkgs: HashMap<String, String> = simd_json::serde::from_reader(reader)?;
     Ok(newpkgs)
+}
+
+pub fn readflakesyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+    println!("READFLAKESYSPKGS");
+    let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
+    let cachefile = format!("{}/syspackages.json", cachedir);
+    let file = File::open(cachefile)?;
+    let reader = BufReader::new(file);
+    let newpkgs: HashMap<String, FlakeJson> = simd_json::serde::from_reader(reader)?;
+    let newpkgs = newpkgs.into_iter().filter_map(|(k, v)| if let Some(pkg) = k.strip_prefix("legacyPackages.x86_64-linux.") { Some((pkg.to_string(), v.version.to_string())) } else { None }).collect::<HashMap<_, _>>();
+    Ok(newpkgs)
+}
+
+pub fn readprofilepkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+    let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
+    let cachefile = format!("{}/profilepackages.json", cachedir);
+    let file = File::open(cachefile)?;
+    let reader = BufReader::new(file);
+    let profilepkgs: HashMap<String, FlakeJson> = simd_json::serde::from_reader(reader)?;
+    let profilepkgs = profilepkgs.into_iter().filter_map(|(k, v)| if let Some(pkg) = k.strip_prefix("legacyPackages.x86_64-linux.") { Some((pkg.to_string(), v.version.to_string())) } else { None }).collect::<HashMap<_, _>>();
+    Ok(profilepkgs)
 }

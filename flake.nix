@@ -48,6 +48,7 @@
           buildInputs = with pkgs; [
             cargo
             clippy
+            desktop-file-utils
             rust-analyzer
             rustc
             rustfmt
@@ -58,10 +59,13 @@
             gtk4
             gtksourceview5
             libadwaita-git
+            meson
+            ninja
             openssl
             pandoc
             pango
             pkgconfig
+            polkit
             wrapGAppsHook4
             nixos-appstream-data
           ];

@@ -9,6 +9,7 @@ use relm4::{factory::FactoryVecDeque, *};
 use sha256::digest;
 use std::collections::HashSet;
 use std::convert::identity;
+use std::io::Cursor;
 use std::process::Command;
 use std::{
     env,
@@ -27,6 +28,9 @@ use crate::parse::packages::StrOrVec;
 use crate::ui::installworker::InstallAsyncHandlerMsg;
 
 use super::installworker::InstallAsyncHandler;
+use super::installworker::InstallAsyncHandlerInit;
+use super::window::SystemPkgs;
+use super::window::UserPkgs;
 use super::{screenshotfactory::ScreenshotItem, window::AppMsg};
 
 #[tracker::track]
@@ -45,6 +49,9 @@ pub struct PkgModel {
     platforms: Vec<String>,
     maintainers: Vec<PkgMaintainer>,
     launchable: Option<Launch>,
+
+    syspkgtype: SystemPkgs,
+    userpkgtype: UserPkgs,
 
     #[tracker::no_eq]
     screenshots: FactoryVecDeque<ScreenshotItem>,
@@ -158,9 +165,15 @@ pub enum PkgAsyncMsg {
     SetError(String, usize),
 }
 
+#[derive(Debug)]
+pub struct PkgPageTypes {
+    pub syspkgs: SystemPkgs,
+    pub userpkgs: UserPkgs
+}
+
 #[relm4::component(pub)]
 impl Component for PkgModel {
-    type Init = ();
+    type Init = PkgPageTypes;
     type Input = PkgMsg;
     type Output = AppMsg;
     type Widgets = PkgWidgets;
@@ -188,12 +201,26 @@ impl Component for PkgModel {
                 },
                 pack_end = &gtk::MenuButton {
                     #[watch]
-                    set_label: match model.installtype {
-                        InstallType::User => "User (nix-env)",
-                        InstallType::System => "System (configuration.nix)",
+                    set_label: match model.userpkgtype {
+                        UserPkgs::Env => {
+                            match model.installtype {
+                                InstallType::User => "User (nix-env)",
+                                InstallType::System => "System (configuration.nix)",
+                            }
+                        }
+                        UserPkgs::Profile => {
+                            match model.installtype {
+                                InstallType::User => "User (nix profile)",
+                                InstallType::System => "System (configuration.nix)",
+                            }
+                        }
                     },
+                        
                     #[wrap(Some)]
-                    set_popover = &gtk::PopoverMenu::from_model(Some(&installtype)) {}
+                    set_popover = &gtk::PopoverMenu::from_model(Some(&match model.userpkgtype {
+                        UserPkgs::Env => installtype,
+                        UserPkgs::Profile => installprofiletype,
+                    })) {}
                 }
             },
             gtk::ScrolledWindow {
@@ -899,6 +926,10 @@ impl Component for PkgModel {
             "User (nix-env)" => NixEnvAction,
             "System (configuration.nix)" => NixSystemAction,
         },
+        installprofiletype: {
+            "User (nix-profile)" => NixProfileAction,
+            "System (configuration.nix)" => NixSystemAction,
+        },
         runaction: {
             "Run without installing" => LaunchAction,
             "Open interactive shell" => TermShellAction,
@@ -906,12 +937,12 @@ impl Component for PkgModel {
     }
 
     fn init(
-        (): Self::Init,
+        pkgtypes: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let installworker = InstallAsyncHandler::builder()
-            .detach_worker(())
+            .detach_worker(InstallAsyncHandlerInit { syspkgs: pkgtypes.syspkgs.clone(), userpkgs: pkgtypes.userpkgs.clone() })
             .forward(sender.input_sender(), identity);
         let config = getconfig();
         installworker.emit(InstallAsyncHandlerMsg::SetConfig(config.clone()));
@@ -936,6 +967,8 @@ impl Component for PkgModel {
             // installinguserpkgs: HashSet::new(),
             // installingsystempkgs: HashSet::new(),
             // removinguserpkgs: HashSet::new(),
+            syspkgtype: pkgtypes.syspkgs,
+            userpkgtype: pkgtypes.userpkgs,
             workqueue: HashSet::new(),
             launchable: None,
             tracker: 0,
@@ -962,6 +995,15 @@ impl Component for PkgModel {
             })
         };
 
+        let nixprofile: RelmAction<NixProfileAction> = {
+            let sender = sender.clone();
+            RelmAction::new_stateless(move |_| {
+                println!("NIX PROFILE!");
+                sender.input(PkgMsg::SetInstallType(InstallType::User));
+                // sender.input(AppMsg::Increment);
+            })
+        };
+
         let nixsystem: RelmAction<NixSystemAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
@@ -972,6 +1014,7 @@ impl Component for PkgModel {
         };
 
         group.add_action(nixenv);
+        group.add_action(nixprofile);
         group.add_action(nixsystem);
 
         let actions = group.into_action_group();
@@ -1124,6 +1167,7 @@ impl Component for PkgModel {
                         let sha = digest(&url);
                         let scrnpath = format!("{}/screenshots/{}", cachedir, sha);
                         let pkg = self.pkg.clone();
+
                         sender.command(move |out, shutdown| {
                             let url = url.clone();
                             let home = home.clone();
@@ -1135,8 +1179,8 @@ impl Component for PkgModel {
                                     if Path::new(&format!("{}.png", scrnpath)).exists() {
                                         out.send(PkgAsyncMsg::LoadScreenshot(pkg, i, format!("{}.png", scrnpath)));
                                     } else {
-                                        match reqwest::blocking::get(&url) {
-                                            Ok(mut response) => {
+                                        match reqwest::get(&url).await {
+                                            Ok(response) => {
                                                 if response.status().is_success() {
                                                     if !Path::new(&format!(
                                                         "{}/.cache/nix-software-center/screenshots",
@@ -1156,43 +1200,49 @@ impl Component for PkgModel {
                                                         }
                                                     }
                                                     if let Ok(mut file) = File::create(&scrnpath) {
-                                                        if response.copy_to(&mut file).is_ok() {
-                                                            fn openimg(scrnpath: &str) -> Result<(), Box<dyn Error>> {
-                                                                // let mut reader = Reader::new(Cursor::new(imgdata.buffer())).with_guessed_format().expect("Cursor io never fails");
-                                                                let img = if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Png) {
-                                                                    x
-                                                                } else if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Jpeg) {
-                                                                    x
-                                                                } else if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::WebP) {
-                                                                    x
-                                                                } else {
-                                                                    let imgdata = BufReader::new(File::open(scrnpath)?);
-                                                                    let format = image::guess_format(imgdata.buffer())?;
-                                                                    image::load(imgdata, format)?
-                                                                };
-                                                                let scaled = img.resize(640, 360, FilterType::Lanczos3);
-                                                                let mut output = File::create(&format!("{}.png", scrnpath))?;
-                                                                scaled.write_to(&mut output, ImageFormat::Png)?;
-                                                                if let Err(e) = fs::remove_file(&scrnpath) {
-                                                                    eprintln!("{}", e);
-                                                                }
-                                                                Ok(())
-                                                            }
-
-                                                            match openimg(&scrnpath) {
-                                                                Ok(_) => {
-                                                                    out.send(PkgAsyncMsg::LoadScreenshot(
-                                                                        pkg, i, format!("{}.png", scrnpath),
-                                                                    ));
-                                                                }
-                                                                Err(_) => {
+                                                        if let Ok(b) = response.bytes().await {
+                                                            let mut content =  Cursor::new(b);
+                                                            if std::io::copy(&mut content, &mut file).is_ok() {
+                                                                fn openimg(scrnpath: &str) -> Result<(), Box<dyn Error>> {
+                                                                    // let mut reader = Reader::new(Cursor::new(imgdata.buffer())).with_guessed_format().expect("Cursor io never fails");
+                                                                    let img = if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Png) {
+                                                                        x
+                                                                    } else if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Jpeg) {
+                                                                        x
+                                                                    } else if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::WebP) {
+                                                                        x
+                                                                    } else {
+                                                                        let imgdata = BufReader::new(File::open(scrnpath)?);
+                                                                        let format = image::guess_format(imgdata.buffer())?;
+                                                                        image::load(imgdata, format)?
+                                                                    };
+                                                                    let scaled = img.resize(640, 360, FilterType::Lanczos3);
+                                                                    let mut output = File::create(&format!("{}.png", scrnpath))?;
+                                                                    scaled.write_to(&mut output, ImageFormat::Png)?;
                                                                     if let Err(e) = fs::remove_file(&scrnpath) {
                                                                         eprintln!("{}", e);
                                                                     }
-                                                                    out.send(PkgAsyncMsg::SetError(pkg, i));
+                                                                    Ok(())
+                                                                }
+    
+                                                                match openimg(&scrnpath) {
+                                                                    Ok(_) => {
+                                                                        out.send(PkgAsyncMsg::LoadScreenshot(
+                                                                            pkg, i, format!("{}.png", scrnpath),
+                                                                        ));
+                                                                    }
+                                                                    Err(_) => {
+                                                                        if let Err(e) = fs::remove_file(&scrnpath) {
+                                                                            eprintln!("{}", e);
+                                                                        }
+                                                                        out.send(PkgAsyncMsg::SetError(pkg, i));
+                                                                    }
                                                                 }
                                                             }
                                                         }
+                                                    } else {
+                                                        out.send(PkgAsyncMsg::SetError(pkg, i));
+                                                        eprintln!("Error: {}", response.status());    
                                                     }
                                                 } else {
                                                     out.send(PkgAsyncMsg::SetError(pkg, i));
@@ -1361,7 +1411,8 @@ impl Component for PkgModel {
                                 self.installedsystempkgs.remove(&work.pkg);
                                 // sender.output(AppMsg::RemoveSystemPkg(work.pkg));
                             }
-                        }
+                        };
+                        sender.output(AppMsg::UpdateUpdatePkgs);
                     }
                 }
                 sender.output(AppMsg::UpdatePkgs(None));
@@ -1465,6 +1516,7 @@ impl Component for PkgModel {
 
 relm4::new_action_group!(ModeActionGroup, "mode");
 relm4::new_stateless_action!(NixEnvAction, ModeActionGroup, "env");
+relm4::new_stateless_action!(NixProfileAction, ModeActionGroup, "profile");
 relm4::new_stateless_action!(NixSystemAction, ModeActionGroup, "system");
 
 relm4::new_action_group!(RunActionGroup, "run");

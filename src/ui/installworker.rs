@@ -1,6 +1,7 @@
 use crate::parse::config::NscConfig;
 
 use super::pkgpage::{InstallType, PkgAction, PkgMsg, WorkPkg};
+use super::window::{UserPkgs, SystemPkgs};
 use relm4::*;
 use std::error::Error;
 use std::path::Path;
@@ -17,6 +18,8 @@ pub struct InstallAsyncHandler {
     systemconfig: String,
     flakeargs: Option<String>,
     pid: Option<u32>,
+    syspkgs: SystemPkgs,
+    userpkgs: UserPkgs,
 }
 
 #[derive(Debug)]
@@ -27,18 +30,26 @@ pub enum InstallAsyncHandlerMsg {
     SetPid(Option<u32>),
 }
 
+#[derive(Debug)]
+pub struct InstallAsyncHandlerInit {
+    pub syspkgs: SystemPkgs,
+    pub userpkgs: UserPkgs,
+}
+
 impl Worker for InstallAsyncHandler {
-    type InitParams = ();
+    type InitParams = InstallAsyncHandlerInit;
     type Input = InstallAsyncHandlerMsg;
     type Output = PkgMsg;
 
-    fn init(_params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
+    fn init(params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
         Self {
             process: None,
             work: None,
             systemconfig: String::new(),
             flakeargs: None,
             pid: None,
+            syspkgs: params.syspkgs,
+            userpkgs: params.userpkgs,
             tracker: 0,
         }
     }
@@ -61,91 +72,188 @@ impl Worker for InstallAsyncHandler {
                         match work.action {
                             PkgAction::Install => {
                                 println!("Installing user package: {}", work.pkg);
-                                self.process = Some(relm4::spawn(async move {
-                                    let mut p = tokio::process::Command::new("nix-env")
-                                        .arg("-iA")
-                                        .arg(format!("nixos.{}", work.pkg))
-                                        .kill_on_drop(true)
-                                        .stdout(Stdio::piped())
-                                        .stderr(Stdio::piped())
-                                        .spawn()
-                                        .expect("Failed to run nix-env");
-
-                                    let stderr = p.stderr.take().unwrap();
-                                    let reader = tokio::io::BufReader::new(stderr);
-
-                                    let mut lines = reader.lines();
-                                    while let Ok(Some(line)) = lines.next_line().await {
-                                        println!("CAUGHT LINE: {}", line);
-                                    }
-
-                                    match p.wait().await {
-                                        Ok(o) => {
-                                            if o.success() {
-                                                println!(
-                                                    "Removed user package: {} success",
-                                                    work.pkg
-                                                );
-                                                // println!("{}", String::from_utf8_lossy(&pstdout));
-                                                sender.output(PkgMsg::FinishedProcess(work))
-                                            } else {
-                                                println!(
-                                                    "Removed user package: {} failed",
-                                                    work.pkg
-                                                );
-                                                // println!("{}", String::from_utf8_lossy(&p.stderr));
-                                                sender.output(PkgMsg::FailedProcess(work));
+                                println!("{:?}", self.userpkgs);
+                                match self.userpkgs {
+                                    UserPkgs::Env => {
+                                        self.process = Some(relm4::spawn(async move {
+                                            let mut p = tokio::process::Command::new("nix-env")
+                                                .arg("-iA")
+                                                .arg(format!("nixos.{}", work.pkg))
+                                                .kill_on_drop(true)
+                                                .stdout(Stdio::piped())
+                                                .stderr(Stdio::piped())
+                                                .spawn()
+                                                .expect("Failed to run nix-env");
+        
+                                            let stderr = p.stderr.take().unwrap();
+                                            let reader = tokio::io::BufReader::new(stderr);
+        
+                                            let mut lines = reader.lines();
+                                            while let Ok(Some(line)) = lines.next_line().await {
+                                                println!("CAUGHT LINE: {}", line);
                                             }
-                                        }
-                                        Err(e) => {
-                                            println!("Error removing user package: {}", e);
-                                            sender.output(PkgMsg::FailedProcess(work));
-                                        }
+        
+                                            match p.wait().await {
+                                                Ok(o) => {
+                                                    if o.success() {
+                                                        println!(
+                                                            "Removed user package: {} success",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
+                                                        sender.output(PkgMsg::FinishedProcess(work))
+                                                    } else {
+                                                        println!(
+                                                            "Removed user package: {} failed",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
+                                                        sender.output(PkgMsg::FailedProcess(work));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Error removing user package: {}", e);
+                                                    sender.output(PkgMsg::FailedProcess(work));
+                                                }
+                                            }
+                                        }));       
                                     }
-                                }));
+                                    UserPkgs::Profile => {
+                                        self.process = Some(relm4::spawn(async move {
+                                            let mut p = tokio::process::Command::new("nix")
+                                                .arg("profile")
+                                                .arg("install")
+                                                .arg(format!("nixpkgs#{}", work.pkg))
+                                                .kill_on_drop(true)
+                                                .stdout(Stdio::piped())
+                                                .stderr(Stdio::piped())
+                                                .spawn()
+                                                .expect("Failed to run nix profile");
+        
+                                            let stderr = p.stderr.take().unwrap();
+                                            let reader = tokio::io::BufReader::new(stderr);
+        
+                                            let mut lines = reader.lines();
+                                            while let Ok(Some(line)) = lines.next_line().await {
+                                                println!("CAUGHT LINE: {}", line);
+                                            }
+        
+                                            match p.wait().await {
+                                                Ok(o) => {
+                                                    if o.success() {
+                                                        println!(
+                                                            "Removed user package: {} success",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
+                                                        sender.output(PkgMsg::FinishedProcess(work))
+                                                    } else {
+                                                        println!(
+                                                            "Removed user package: {} failed",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
+                                                        sender.output(PkgMsg::FailedProcess(work));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Error removing user package: {}", e);
+                                                    sender.output(PkgMsg::FailedProcess(work));
+                                                }
+                                            }
+                                        }));
+                                    }
+                                }
                             }
                             PkgAction::Remove => {
                                 println!("Removing user package: {}", work.pkg);
-                                self.process = Some(relm4::spawn(async move {
-                                    let mut p = tokio::process::Command::new("nix-env")
-                                        .arg("-e")
-                                        .arg(&work.pname)
-                                        .kill_on_drop(true)
-                                        .stdout(Stdio::piped())
-                                        .stderr(Stdio::piped())
-                                        .spawn()
-                                        .expect("Failed to run nix-env");
-                                    let stderr = p.stderr.take().unwrap();
-                                    let reader = tokio::io::BufReader::new(stderr);
-
-                                    let mut lines = reader.lines();
-                                    while let Ok(Some(line)) = lines.next_line().await {
-                                        println!("CAUGHT LINE: {}", line);
-                                    }
-                                    match p.wait().await {
-                                        Ok(o) => {
-                                            if o.success() {
-                                                println!(
-                                                    "Removed user package: {} success",
-                                                    work.pkg
-                                                );
-                                                // println!("{}", String::from_utf8_lossy(&pstdout));
-                                                sender.output(PkgMsg::FinishedProcess(work))
-                                            } else {
-                                                println!(
-                                                    "Removed user package: {} failed",
-                                                    work.pkg
-                                                );
-                                                // println!("{}", String::from_utf8_lossy(&p.stderr));
-                                                sender.output(PkgMsg::FailedProcess(work));
+                                match self.userpkgs {
+                                    UserPkgs::Env => {
+                                        self.process = Some(relm4::spawn(async move {
+                                            let mut p = tokio::process::Command::new("nix-env")
+                                                .arg("-e")
+                                                .arg(&work.pname)
+                                                .kill_on_drop(true)
+                                                .stdout(Stdio::piped())
+                                                .stderr(Stdio::piped())
+                                                .spawn()
+                                                .expect("Failed to run nix-env");
+                                            let stderr = p.stderr.take().unwrap();
+                                            let reader = tokio::io::BufReader::new(stderr);
+        
+                                            let mut lines = reader.lines();
+                                            while let Ok(Some(line)) = lines.next_line().await {
+                                                println!("CAUGHT LINE: {}", line);
                                             }
-                                        }
-                                        Err(e) => {
-                                            println!("Error removing user package: {}", e);
-                                            sender.output(PkgMsg::FailedProcess(work));
-                                        }
+                                            match p.wait().await {
+                                                Ok(o) => {
+                                                    if o.success() {
+                                                        println!(
+                                                            "Removed user package: {} success",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
+                                                        sender.output(PkgMsg::FinishedProcess(work))
+                                                    } else {
+                                                        println!(
+                                                            "Removed user package: {} failed",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
+                                                        sender.output(PkgMsg::FailedProcess(work));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Error removing user package: {}", e);
+                                                    sender.output(PkgMsg::FailedProcess(work));
+                                                }
+                                            }
+                                        }));
                                     }
-                                }));
+                                    UserPkgs::Profile => {
+                                        self.process = Some(relm4::spawn(async move {
+                                            let mut p = tokio::process::Command::new("nix")
+                                                .arg("profile")
+                                                .arg("remove")
+                                                .arg(&format!("legacyPackages.x86_64-linux.{}", work.pkg))
+                                                .kill_on_drop(true)
+                                                .stdout(Stdio::piped())
+                                                .stderr(Stdio::piped())
+                                                .spawn()
+                                                .expect("Failed to run nix profile");
+                                            let stderr = p.stderr.take().unwrap();
+                                            let reader = tokio::io::BufReader::new(stderr);
+        
+                                            let mut lines = reader.lines();
+                                            while let Ok(Some(line)) = lines.next_line().await {
+                                                println!("CAUGHT LINE: {}", line);
+                                            }
+                                            match p.wait().await {
+                                                Ok(o) => {
+                                                    if o.success() {
+                                                        println!(
+                                                            "Removed user package: {} success",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
+                                                        sender.output(PkgMsg::FinishedProcess(work))
+                                                    } else {
+                                                        println!(
+                                                            "Removed user package: {} failed",
+                                                            work.pkg
+                                                        );
+                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
+                                                        sender.output(PkgMsg::FailedProcess(work));
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Error removing user package: {}", e);
+                                                    sender.output(PkgMsg::FailedProcess(work));
+                                                }
+                                            }
+                                        }));
+                                    }
+                                }
                             }
                         }
                     }
@@ -276,8 +384,8 @@ async fn installsys(
     let exe = match std::env::current_exe() {
         Ok(mut e) => {
             e.pop(); // root/bin
-                     // e.pop(); // root/
-                     // e.push("libexec"); // root/libexec
+            e.pop(); // root/
+            e.push("libexec"); // root/libexec
             e.push("nsc-helper");
             let x = e.to_string_lossy().to_string();
             println!("CURRENT PATH {}", x);
