@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>@app-id@</id>
   <metadata_license>CC-BY-SA-4.0</metadata_license>
-  <project_license>GPL-3.0-or-later</project_license>
+  <project_license>GPL-3.0</project_license>
   <name>Nix Software Center</name>
   <summary>A simple application to manage your NixOS packages.</summary>
   <description>
