@@ -489,6 +489,8 @@ impl Component for AppModel {
         searchvs.set_name(Some("search"));
         updatesvs.set_name(Some("updates"));
         frontvs.set_icon_name(Some("compass"));
+        installedvs.set_icon_name(Some("selection-mode"));
+        updatesvs.set_icon_name(Some("emblem-synchronizing-symbolic"));
         ComponentParts { model, widgets }
     }
 

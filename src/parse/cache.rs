@@ -11,6 +11,8 @@ use std::{
     process::Command,
 };
 
+use crate::ui::window::{SystemPkgs, UserPkgs};
+
 #[derive(Serialize, Deserialize, Debug)]
 struct NewPackageBase {
     packages: HashMap<String, NewPackage>,
@@ -21,11 +23,20 @@ struct NewPackage {
     version: IString,
 }
 
-pub fn checkcache() -> Result<(), Box<dyn Error>> {
-    // setuplegacypkgscache().unwrap();
-    // setupupdatecache().unwrap();
-    // setupnewestver().unwrap();
-    setupflakepkgscache()?;
+pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs) -> Result<(), Box<dyn Error>> {
+    match syspkgs {
+        SystemPkgs::Legacy => {
+            setuplegacypkgscache().unwrap();
+            setupupdatecache().unwrap();
+            setupnewestver().unwrap();
+        }
+        SystemPkgs::Flake => {
+            setupflakepkgscache()?;
+        }
+    }
+    if userpkgs == UserPkgs::Profile {
+        setupprofilepkgscache()?;
+    }
     Ok(())
 }
 
@@ -172,13 +183,15 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
     if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists() {
         fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
     }
-    
-    let vout = Command::new("nixos-version")
-        .arg("--json")
-        .output()?;
-    
+
+    let vout = Command::new("nixos-version").arg("--json").output()?;
+
     let versiondata: Value = serde_json::from_str(&String::from_utf8_lossy(&vout.stdout))?;
-    let rev = versiondata.get("nixpkgsRevision").unwrap().as_str().unwrap();
+    let rev = versiondata
+        .get("nixpkgsRevision")
+        .unwrap()
+        .as_str()
+        .unwrap();
     let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".");
@@ -214,23 +227,13 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
-    fn writeprofilepkgs(outfile: &str) -> Result<(), Box<dyn Error>> {
-        let output = Command::new("nix")
-            .arg("search")
-            .arg("nixpkgs")
-            .arg("--json")
-            .output()?;
-        let mut file = fs::File::create(outfile)?;
-        file.write_all(&output.stdout)?;
-        Ok(())
-    }
-
     if !Path::new(&format!("{}/flakever.txt", &cachedir)).exists() {
         let mut sysver = fs::File::create(format!("{}/flakever.txt", &cachedir))?;
         sysver.write_all(rev.as_bytes())?;
         writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
     } else {
-        let oldver = fs::read_to_string(&Path::new(format!("{}/flakever.txt", &cachedir).as_str()))?;
+        let oldver =
+            fs::read_to_string(&Path::new(format!("{}/flakever.txt", &cachedir).as_str()))?;
         let sysver = rev;
         if oldver != sysver {
             println!("OLD FLAKEVER: {}, != NEW: {}", oldver, sysver);
@@ -243,41 +246,6 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
     if !Path::new(&format!("{}/syspackages.json", &cachedir)).exists() {
         writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
     }
-
-
-
-    // Check nix profile nixpkgs version
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("request")
-        .build()?;
-    let response = client.get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixpkgs-unstable").send()?;
-    if response.status().is_success() {
-        let profilerevjson = response.text()?;
-        let profilerevdata: Value = serde_json::from_str(&profilerevjson)?;
-        let profilerev = profilerevdata.get("sha").unwrap().as_str().unwrap();
-        println!("PROFILE REV {}", profilerev);
-
-        if !Path::new(&format!("{}/profilever.txt", &cachedir)).exists() {
-            let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
-            sysver.write_all(profilerev.as_bytes())?;
-            writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
-        } else {
-            let oldver = fs::read_to_string(&Path::new(format!("{}/profilever.txt", &cachedir).as_str()))?;
-            let sysver = profilerev;
-            if oldver != sysver {
-                println!("OLD PROFILEVER: {}, != NEW: {}", oldver, sysver);
-                let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
-                sysver.write_all(profilerev.as_bytes())?;
-                writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
-            } else {
-                println!("PROFILEVER UP TO DATE");
-            }
-        }
-    }
-    if !Path::new(&format!("{}/profilepackages.json", &cachedir)).exists() {
-        writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
-    }
-
 
     // Check newest nixpkgs version
     let revurl = format!("https://channels.nixos.org/nixos-{}/git-revision", relver);
@@ -295,35 +263,61 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
             dl = true;
         }
         let mut sysver = fs::File::create(format!("{}/newver.txt", &cachedir))?;
-            sysver.write_all(newrev.as_bytes())?;
-        // if !Path::new(&format!("{}/newver.txt", &cachedir)).exists() {
-        // }
+        sysver.write_all(newrev.as_bytes())?;
     }
 
-    
-
-    // if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists()
-    //     && fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))? == dlver
-    //     && Path::new(format!("{}/packages.json", &cachedir).as_str()).exists()
-    // {
-    //     return Ok(());
-    // } else {
-    //     let oldver = fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))?;
-    //     let sysver = &dlver;
-    //     // Change to debug msg
-    //     println!("OLD: {}, != NEW: {}", oldver, sysver);
-    // }
-    // if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists() {
-    //     fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
-    // }
-    // let mut sysver = fs::File::create(format!("{}/chnver.txt", &cachedir))?;
-    // sysver.write_all(dlver.as_bytes())?;
-
-
-
     let outfile = format!("{}/packages.json", &cachedir);
-    if dl  {
+    if dl {
         dlfile(&url, &outfile)?;
+    }
+    Ok(())
+}
+
+fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
+    let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
+    fn writeprofilepkgs(outfile: &str) -> Result<(), Box<dyn Error>> {
+        let output = Command::new("nix")
+            .arg("search")
+            .arg("nixpkgs")
+            .arg("--json")
+            .output()?;
+        let mut file = fs::File::create(outfile)?;
+        file.write_all(&output.stdout)?;
+        Ok(())
+    }
+    // Check nix profile nixpkgs version
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("request")
+        .build()?;
+    let response = client
+        .get("https://api.github.com/repos/NixOS/nixpkgs/commits/nixpkgs-unstable")
+        .send()?;
+    if response.status().is_success() {
+        let profilerevjson = response.text()?;
+        let profilerevdata: Value = serde_json::from_str(&profilerevjson)?;
+        let profilerev = profilerevdata.get("sha").unwrap().as_str().unwrap();
+        println!("PROFILE REV {}", profilerev);
+
+        if !Path::new(&format!("{}/profilever.txt", &cachedir)).exists() {
+            let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
+            sysver.write_all(profilerev.as_bytes())?;
+            writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
+        } else {
+            let oldver =
+                fs::read_to_string(&Path::new(format!("{}/profilever.txt", &cachedir).as_str()))?;
+            let sysver = profilerev;
+            if oldver != sysver {
+                println!("OLD PROFILEVER: {}, != NEW: {}", oldver, sysver);
+                let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
+                sysver.write_all(profilerev.as_bytes())?;
+                writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
+            } else {
+                println!("PROFILEVER UP TO DATE");
+            }
+        }
+    }
+    if !Path::new(&format!("{}/profilepackages.json", &cachedir)).exists() {
+        writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
     }
     Ok(())
 }
@@ -332,18 +326,18 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
 // nix-env -f /nix/store/sjmq1gphj1arbzf4aqqnygd9pf4hkfkf-source -qa --json > packages.json
 fn setupupdatecache() -> Result<(), Box<dyn Error>> {
     let vout = Command::new("nix-instantiate")
-    .arg("-I")
-    .arg("nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos")
-    .arg("<nixpkgs/lib>")
-    .arg("-A")
-    .arg("version")
-    .arg("--eval")
-    .arg("--json")
-    .output()?;
+        .arg("-I")
+        .arg("nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos")
+        .arg("<nixpkgs/lib>")
+        .arg("-A")
+        .arg("version")
+        .arg("--eval")
+        .arg("--json")
+        .output()?;
 
-let dlver = String::from_utf8_lossy(&vout.stdout)
-    .to_string()
-    .replace('"', "");
+    let dlver = String::from_utf8_lossy(&vout.stdout)
+        .to_string()
+        .replace('"', "");
     // let dlver = fs::read_to_string("/run/current-system/nixos-version")?;
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();

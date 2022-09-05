@@ -82,40 +82,42 @@ fn main() {
             }
         },
         SubCommands::Channel { rebuild: dorebuild, arguments } => {
-            match dorebuild {
-                true => match rebuild(arguments) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        eprintln!("{}", err);
-                        std::process::exit(1);
+            match channel() {
+                Ok(_) => {
+                    if dorebuild {
+                        match rebuild(arguments) {
+                            Ok(_) => (),
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                std::process::exit(1);
+                            }
+                        }
                     }
                 },
-                false => match channel() {
-                    Ok(_) => (),
-                    Err(err) => {
-                        eprintln!("{}", err);
-                        std::process::exit(1);
-                    }
-                },
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(1);
+                }
             }
         },
         SubCommands::Flake { rebuild: dorebuild, flakepath, arguments } => {
-            match dorebuild {
-                true => match rebuild(arguments) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        eprintln!("{}", err);
-                        std::process::exit(1);
+            match flake(&flakepath) {
+                Ok(_) => {
+                    if dorebuild {
+                        match rebuild(arguments) {
+                            Ok(_) => (),
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                std::process::exit(1);
+                            }
+                        }
                     }
                 },
-                false => match flake(&flakepath) {
-                    Ok(_) => (),
-                    Err(err) => {
-                        eprintln!("{}", err);
-                        std::process::exit(1);
-                    }
-                },
-            } 
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 }
@@ -164,7 +166,7 @@ fn channel() -> Result<(), Box<dyn Error>> {
 fn flake(path: &str) -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::new("nix")
         .arg("flake")
-        .arg("upgrade")
+        .arg("update")
         .arg(path)
         .spawn()?;
     let x = cmd.wait()?;

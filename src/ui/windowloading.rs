@@ -41,8 +41,10 @@ impl Worker for WindowAsyncHandler {
         match msg {
             WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs) => {
                 println!("CHECK CACHE");
+                let syspkgs2 = syspkgs.clone();
+                let userpkgs2 = userpkgs.clone();
                 relm4::spawn(async move {
-                    match checkcache() {
+                    match checkcache(syspkgs2, userpkgs2) {
                         Ok(_) => {}
                         Err(_) => {
                             println!("FAILED TO CHECK CACHE");

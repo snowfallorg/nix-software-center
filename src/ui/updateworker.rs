@@ -110,7 +110,10 @@ impl Worker for UpdateAsyncHandler {
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
                     println!("STARTED");
-                    let result = runcmd(NscCmd::Rebuild, systenconfig, flakeargs, syspkgs).await;
+                    let result = match syspkgs {
+                        SystemPkgs::Legacy => runcmd(NscCmd::Rebuild, systenconfig, flakeargs, syspkgs).await,
+                        SystemPkgs::Flake => runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await,
+                    };
                     match result {
                         Ok(true) => {
                             println!("REBUILD DONE");
@@ -150,24 +153,14 @@ impl Worker for UpdateAsyncHandler {
                 let userpkgs = self.userpkgs.clone();
                 relm4::spawn(async move {
                     println!("STARTED");
-                    // if syspkgs == SystemPkgs::Flake {
-                    //     if let Some(fa) = &flakeargs {
-                    //         match updateflake(fa.split('#').collect::<Vec<_>>().first().unwrap().to_string()).await {
-                    //             Ok(true) => {
-                    //                 println!("FLAKE DONE");
-                    //             }
-                    //             _ => {
-                    //                 println!("FLAKE FAILED");
-                    //                 sender.output(UpdatePageMsg::FailedWorking);
-                    //             }
-                    //         }
-                    //     }
-                    // }
                     let result = runcmd(NscCmd::All, systemconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
                             println!("ALL pkexec DONE");
-                            match updateenv().await {
+                            match match userpkgs {
+                                UserPkgs::Env => updateenv().await,
+                                UserPkgs::Profile => updateprofile().await,
+                            } {
                                 Ok(true) => {
                                     println!("ALL DONE");
                                     sender.output(UpdatePageMsg::DoneWorking);
@@ -251,7 +244,7 @@ async fn runcmd(
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
                 .spawn()?,
-            SystemPkgs::Flake => tokio::process::Command::new("pkexec")
+            SystemPkgs::Flake => { println!("ALL FLAKE UPDATE!!!!!!!!!!!!!!!!!!!!!!"); tokio::process::Command::new("pkexec")
                 .arg(&exe)
                 .arg("flake")
                 .arg("--rebuild")
@@ -261,7 +254,7 @@ async fn runcmd(
                 .arg("switch")
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
-                .spawn()?,
+                .spawn()? },
         },
     };
 
