@@ -325,20 +325,7 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
 // nix-instantiate --eval -E '(builtins.getFlake "/home/victor/nix").inputs.nixpkgs.outPath'
 // nix-env -f /nix/store/sjmq1gphj1arbzf4aqqnygd9pf4hkfkf-source -qa --json > packages.json
 fn setupupdatecache() -> Result<(), Box<dyn Error>> {
-    let vout = Command::new("nix-instantiate")
-        .arg("-I")
-        .arg("nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos")
-        .arg("<nixpkgs/lib>")
-        .arg("-A")
-        .arg("version")
-        .arg("--eval")
-        .arg("--json")
-        .output()?;
-
-    let dlver = String::from_utf8_lossy(&vout.stdout)
-        .to_string()
-        .replace('"', "");
-    // let dlver = fs::read_to_string("/run/current-system/nixos-version")?;
+    let dlver = fs::read_to_string("/run/current-system/nixos-version")?;
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();
 
