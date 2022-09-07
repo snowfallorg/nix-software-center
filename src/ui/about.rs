@@ -33,7 +33,7 @@ impl SimpleComponent for AboutPageModel {
             set_developer_name: "Victor Fuentes",
             set_version: env!("CARGO_PKG_VERSION"),
             set_issue_url: "https://github.com/vlinkz/nix-software-center/issues",
-            set_license_type: gtk::License::MitX11,
+            set_license_type: gtk::License::Gpl30,
             set_website: "https://github.com/vlinkz/nix-software-center",
             set_developers: &["Victor Fuentes https://github.com/vlinkz"],
         }

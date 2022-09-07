@@ -34,6 +34,7 @@ edit-distance = "2.1"
 ijson = "0.1"
 strum = "0.24"
 strum_macros = "0.24"
+which = "4.3"
 
 [workspace]
 members = [".", "nsc-helper"]

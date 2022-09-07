@@ -155,6 +155,8 @@ pub enum PkgMsg {
     FinishedProcess(WorkPkg),
     FailedProcess(WorkPkg),
     Launch,
+    NixRun,
+    NixShell,
     SetInstallType(InstallType),
     AddToQueue(WorkPkg),
 }
@@ -1024,18 +1026,18 @@ impl Component for PkgModel {
 
         let rungroup = RelmActionGroup::<RunActionGroup>::new();
         let launchaction: RelmAction<LaunchAction> = {
-            let _sender = sender.clone();
+            let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
                 println!("LAUNCH!");
-                // sender.input(AppMsg::Increment);
+                sender.input(PkgMsg::NixRun);
             })
         };
 
         let termaction: RelmAction<TermShellAction> = {
-            let _sender = sender;
+            let sender = sender;
             RelmAction::new_stateless(move |_| {
                 println!("TERM!");
-                // sender.input(AppMsg::Increment);
+                sender.input(PkgMsg::NixShell)
             })
         };
 
@@ -1490,6 +1492,65 @@ impl Component for PkgModel {
                     }
                 }
             }
+            PkgMsg::NixRun => {
+                println!("NIXRUN!");
+                if let Some(l) = &self.launchable {
+                    match l {
+                        Launch::GtkApp(x) => {
+                            match self.userpkgtype {
+                                UserPkgs::Env => {
+                                    let _ = Command::new("nix-shell")
+                                        .arg("-p")
+                                        .arg(&self.pkg)
+                                        .arg("--command")
+                                        .arg(&format!("XDG_DATA_DIRS=$XDG_DATA_DIRS:$buildInputs/share gtk-launch {}", x))
+                                        .spawn();
+                                }
+                                UserPkgs::Profile => {
+                                    let _ = Command::new("nix")
+                                        .arg("shell")
+                                        .arg(&format!("nixpkgs#{}", self.pkg))
+                                        .arg("--command")
+                                        .arg(&format!("env XDG_DATA_DIRS=$XDG_DATA_DIRS:$(nix eval nixpkgs#{}.outPath --raw)/share gtk-launch {}", self.pkg, x))
+                                        .spawn();
+                                }
+                            }
+                        }
+                        Launch::TerminalApp(x) => {
+                            let cmd = match self.userpkgtype {
+                                UserPkgs::Env => {
+                                    format!("nix-shell -p {} --command \"{}; $SHELL\"", self.pkg, x)
+                                }
+                                UserPkgs::Profile => {
+                                    format!("nix shell nixpkgs#{} --command \"{}; $SHELL\"", self.pkg, x)
+                                }
+                            };
+                            launchterm(&cmd);
+                        }
+                    }
+                } else {
+                    let cmd = match self.userpkgtype {
+                        UserPkgs::Env => {
+                            format!("nix-shell -p {} --command \"{}; $SHELL\"", self.pkg, self.pname)
+                        }
+                        UserPkgs::Profile => {
+                            format!("nix shell nixpkgs#{} --command \"{}; $SHELL\"", self.pkg, self.pname)
+                        }
+                    };
+                    launchterm(&cmd);
+                }
+            }
+            PkgMsg::NixShell => {
+                let cmd = match self.userpkgtype {
+                    UserPkgs::Env => {
+                        format!("nix-shell -p {}", self.pkg)
+                    }
+                    UserPkgs::Profile => {
+                        format!("nix shell nixpkgs#{}", self.pkg)
+                    }
+                };
+                launchterm(&cmd);
+            }
             PkgMsg::SetInstallType(t) => {
                 self.set_installtype(t);
             }
@@ -1511,6 +1572,33 @@ impl Component for PkgModel {
                 sender.input(PkgMsg::SetError(pkg, i));
             }
         }
+    }
+}
+
+fn launchterm(cmd: &str) {
+    if which::which("kgx").is_ok() {
+        println!("LAUNCHING WITH KGX");
+        let _ = Command::new("kgx").arg("-e").arg(&cmd).spawn();
+    } else if which::which("gnome-terminal").is_ok() {
+        let _ = Command::new("gnome-terminal").arg("--").arg(&cmd).spawn();
+    } else if which::which("konsole").is_ok() {
+        let _ = Command::new("konsole").arg("-e").arg(&cmd).spawn();
+    } else if which::which("mate-terminal").is_ok() {
+        let _ = Command::new("mate-terminal").arg("-e").arg(&cmd).spawn();
+    } else if which::which("xfce4-terminal").is_ok() {
+        let _ = Command::new("xfce4-terminal").arg("-e").arg(&cmd).spawn();
+    } else if which::which("tilix").is_ok() {
+        let _ = Command::new("tilix").arg("-e").arg(&cmd).spawn();
+    } else if which::which("terminology").is_ok() {
+        let _ = Command::new("terminology").arg("-e").arg(&cmd).spawn();
+    } else if which::which("alacritty").is_ok() {
+        let _ = Command::new("alacritty").arg("-e").arg(&cmd).spawn();
+    } else if which::which("urxvt").is_ok() {
+        let _ = Command::new("urxvt").arg("-e").arg(&cmd).spawn();
+    } else if which::which("xterm").is_ok() {
+        let _ = Command::new("xterm").arg("-e").arg(&cmd).spawn();
+    } else {
+        eprintln!("No terminal detected!")
     }
 }
 
