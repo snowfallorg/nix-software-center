@@ -1,6 +1,7 @@
 use super::window::AppMsg;
 use super::window::SystemPkgs;
 use crate::parse::cache::checkcache;
+use crate::parse::config::NscConfig;
 use crate::parse::packages::readflakesyspkgs;
 use crate::parse::packages::readpkgs;
 use crate::parse::packages::readlegacysyspkgs;
@@ -20,7 +21,7 @@ pub struct WindowAsyncHandler;
 
 #[derive(Debug)]
 pub enum WindowAsyncHandlerMsg {
-    CheckCache(CacheReturn, SystemPkgs, UserPkgs),
+    CheckCache(CacheReturn, SystemPkgs, UserPkgs, NscConfig),
 }
 
 #[derive(Debug, PartialEq)]
@@ -40,12 +41,13 @@ impl Worker for WindowAsyncHandler {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
-            WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs) => {
+            WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs, config) => {
                 info!("WindowAsyncHandlerMsg::CheckCache");
                 let syspkgs2 = syspkgs.clone();
                 let userpkgs2 = userpkgs.clone();
+                let config = config.clone();
                 relm4::spawn(async move {
-                    match checkcache(syspkgs2, userpkgs2) {
+                    match checkcache(syspkgs2, userpkgs2, config) {
                         Ok(_) => {}
                         Err(_) => {
                             warn!("FAILED TO CHECK CACHE");

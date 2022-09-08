@@ -438,7 +438,7 @@ impl Component for AppModel {
             tracker: 0,
         };
 
-        model.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, model.syspkgtype.clone(), model.userpkgtype.clone()));
+        model.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, model.syspkgtype.clone(), model.userpkgtype.clone(), model.config.clone()));
         let recbox = model.recommendedapps.widget();
         let categorybox = model.categories.widget();
         let viewstack = &model.viewstack;
@@ -491,10 +491,10 @@ impl Component for AppModel {
         match msg {
             AppMsg::TryLoad => {
                 self.busy = true;
-                self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, self.syspkgtype.clone(), self.userpkgtype.clone(), self.config.clone()));
             }
             AppMsg::ReloadUpdate => {
-                self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Update, self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Update, self.syspkgtype.clone(), self.userpkgtype.clone(), self.config.clone()));
             }
             AppMsg::Close => {
                 self.application.quit();

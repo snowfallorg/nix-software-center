@@ -14,6 +14,8 @@ use std::{
 
 use crate::ui::window::{SystemPkgs, UserPkgs};
 
+use super::config::NscConfig;
+
 #[derive(Serialize, Deserialize, Debug)]
 struct NewPackageBase {
     packages: HashMap<String, NewPackage>,
@@ -24,7 +26,7 @@ struct NewPackage {
     version: IString,
 }
 
-pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs) -> Result<(), Box<dyn Error>> {
+pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs, config: NscConfig) -> Result<(), Box<dyn Error>> {
     match syspkgs {
         SystemPkgs::Legacy => {
             setuplegacypkgscache()?;
@@ -32,7 +34,7 @@ pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs) -> Result<(), Box<dyn
             setupnewestver()?;
         }
         SystemPkgs::Flake => {
-            setupflakepkgscache()?;
+            setupflakepkgscache(config)?;
         }
     }
     if userpkgs == UserPkgs::Profile {
@@ -170,7 +172,7 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
+fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
 
     // First remove legacy files
@@ -204,11 +206,11 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
         fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
     }
 
-    fn writesyspkgs(outfile: &str) -> Result<(), Box<dyn Error>> {
+    fn writesyspkgs(outfile: &str, inputpath: &str) -> Result<(), Box<dyn Error>> {
         let output = Command::new("nix")
             .arg("search")
             .arg("--inputs-from")
-            .arg("/home/victor/nix")
+            .arg(inputpath)
             .arg("nixpkgs")
             .arg("--json")
             .output()?;
@@ -217,10 +219,11 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
+    let flakepath = config.flake.map(|x| x.strip_suffix("/flake.nix").unwrap_or(x.as_str()).to_string()).unwrap_or_else(|| String::from("/etc/nixos"));
     if !Path::new(&format!("{}/flakever.txt", &cachedir)).exists() {
         let mut sysver = fs::File::create(format!("{}/flakever.txt", &cachedir))?;
         sysver.write_all(rev.as_bytes())?;
-        writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
+        writesyspkgs(&format!("{}/syspackages.json", &cachedir), &flakepath)?;
     } else {
         let oldver =
             fs::read_to_string(&Path::new(format!("{}/flakever.txt", &cachedir).as_str()))?;
@@ -229,12 +232,12 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
             info!("OLD FLAKEVER: {}, != NEW: {}", oldver, sysver);
             let mut sysver = fs::File::create(format!("{}/flakever.txt", &cachedir))?;
             sysver.write_all(rev.as_bytes())?;
-            writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
+            writesyspkgs(&format!("{}/syspackages.json", &cachedir), &flakepath)?;
         }
     }
 
     if !Path::new(&format!("{}/syspackages.json", &cachedir)).exists() {
-        writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
+        writesyspkgs(&format!("{}/syspackages.json", &cachedir), &flakepath)?;
     }
 
     // Check newest nixpkgs version
@@ -312,7 +315,7 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// nix-instantiate --eval -E '(builtins.getFlake "/home/victor/nix").inputs.nixpkgs.outPath'
+// nix-instantiate --eval -E '(builtins.getFlake "/home/user/nix").inputs.nixpkgs.outPath'
 // nix-env -f /nix/store/sjmq1gphj1arbzf4aqqnygd9pf4hkfkf-source -qa --json > packages.json
 fn setupupdatecache() -> Result<(), Box<dyn Error>> {
     let dlver = fs::read_to_string("/run/current-system/nixos-version")?;
