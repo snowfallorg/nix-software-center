@@ -1511,6 +1511,8 @@ impl Component for PkgModel {
                                         .arg("shell")
                                         .arg(&format!("nixpkgs#{}", self.pkg))
                                         .arg("--command")
+                                        .arg("bash")
+                                        .arg("-c")
                                         .arg(&format!("env XDG_DATA_DIRS=$XDG_DATA_DIRS:$(nix eval nixpkgs#{}.outPath --raw)/share gtk-launch {}", self.pkg, x))
                                         .spawn();
                                 }
@@ -1522,7 +1524,7 @@ impl Component for PkgModel {
                                     format!("nix-shell -p {} --command \"{}; $SHELL\"", self.pkg, x)
                                 }
                                 UserPkgs::Profile => {
-                                    format!("nix shell nixpkgs#{} --command \"{}; $SHELL\"", self.pkg, x)
+                                    format!("nix shell nixpkgs#{} --command bash -c \"{}; $SHELL\"", self.pkg, x)
                                 }
                             };
                             launchterm(&cmd);
@@ -1534,7 +1536,7 @@ impl Component for PkgModel {
                             format!("nix-shell -p {} --command \"{}; $SHELL\"", self.pkg, self.pname)
                         }
                         UserPkgs::Profile => {
-                            format!("nix shell nixpkgs#{} --command \"{}; $SHELL\"", self.pkg, self.pname)
+                            format!("nix shell nixpkgs#{} --command bash -c \"{}; $SHELL\"", self.pkg, self.pname)
                         }
                     };
                     launchterm(&cmd);

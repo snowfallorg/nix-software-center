@@ -401,7 +401,7 @@ impl Component for AppModel {
             .launch(())
             .forward(sender.input_sender(), identity);
         let installedpage = InstalledPageModel::builder()
-            .launch(())
+            .launch(userpkgtype.clone())
             .forward(sender.input_sender(), identity);
         let updatepage = UpdatePageModel::builder()
         // ADD FLAKE DETECTION

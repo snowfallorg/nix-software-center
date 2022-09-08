@@ -12,6 +12,7 @@ pub struct InstalledPageModel {
     installeduserlist: FactoryVecDeque<InstalledItemModel>,
     #[tracker::no_eq]
     installedsystemlist: FactoryVecDeque<InstalledItemModel>,
+    userpkgtype: UserPkgs,
     updatetracker: u8,
 }
 
@@ -25,7 +26,7 @@ pub enum InstalledPageMsg {
 
 #[relm4::component(pub)]
 impl SimpleComponent for InstalledPageModel {
-    type InitParams = ();
+    type InitParams = UserPkgs;
     type Input = InstalledPageMsg;
     type Output = AppMsg;
     type Widgets = InstalledPageWidgets;
@@ -44,7 +45,10 @@ impl SimpleComponent for InstalledPageModel {
                     gtk::Label {
                         set_halign: gtk::Align::Start,
                         add_css_class: "title-4",
-                        set_label: "User (nix-env)",
+                        set_label: match model.userpkgtype {
+                            UserPkgs::Env => "User (nix-env)",
+                            UserPkgs::Profile => "User (nix profile)",
+                        },
                     },
                     #[local_ref]
                     installeduserlist -> gtk::ListBox {
@@ -55,7 +59,6 @@ impl SimpleComponent for InstalledPageModel {
                             if let Some(i) = listbox.index_of_child(row) {
                                 sender.input(InstalledPageMsg::OpenRow(i as usize, InstallType::User))
                             }
-                            // sender.input(InstalledPageMsg::OpenRow(row.clone(), InstallType::User));
                         }
                     },
                     gtk::Label {
@@ -72,7 +75,6 @@ impl SimpleComponent for InstalledPageModel {
                             if let Some(i) = listbox.index_of_child(row) {
                                 sender.input(InstalledPageMsg::OpenRow(i as usize, InstallType::System))
                             }
-                            // sender.input(InstalledPageMsg::OpenRow(row.clone(), InstallType::System));
                         }
                     }
                 }
@@ -81,7 +83,7 @@ impl SimpleComponent for InstalledPageModel {
     }
 
     fn init(
-        (): Self::InitParams,
+        userpkgtype: Self::InitParams,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -89,6 +91,7 @@ impl SimpleComponent for InstalledPageModel {
             installeduserlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
             installedsystemlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
             updatetracker: 0,
+            userpkgtype,
             tracker: 0
         };
 
@@ -125,15 +128,6 @@ impl SimpleComponent for InstalledPageModel {
                                 sender.output(AppMsg::OpenPkg(pkg.to_string()));
                             }
                         }
-                        // for (i, child) in installeduserlist_guard.widget().iter_children().enumerate() {
-                        //     if child == row {
-                        //         if let Some(item) = installeduserlist_guard.get(i) {
-                        //             if let Some(pkg) = &item.item.pkg {
-                        //                 sender.output(AppMsg::OpenPkg(pkg.to_string()));
-                        //             }
-                        //         }
-                        //     }
-                        // }
                     }
                     InstallType::System => {
                         let installedsystemlist_guard = self.installedsystemlist.guard();
@@ -142,15 +136,6 @@ impl SimpleComponent for InstalledPageModel {
                                 sender.output(AppMsg::OpenPkg(pkg.to_string()));
                             }
                         }
-                        // for (i, child) in installedsystemlist_guard.widget().iter_children().enumerate() {
-                        //     if child == row {
-                        //         if let Some(item) = installedsystemlist_guard.get(i) {
-                        //             if let Some(pkg) = &item.item.pkg {
-                        //                 sender.output(AppMsg::OpenPkg(pkg.to_string()));
-                        //             }
-                        //         }
-                        //     }
-                        // }
                     }
                 }
             }
