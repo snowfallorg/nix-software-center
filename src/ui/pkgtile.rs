@@ -68,7 +68,6 @@ impl FactoryComponent for PkgTile {
                 gtk::Button {
                     add_css_class: "card",
                     connect_clicked[sender, pkg = self.pkg.clone()] => move |_| {
-                        println!("CLICKED");
                         sender.output(PkgTileMsg::Open(pkg.to_string()))
                     },
                     gtk::Box {

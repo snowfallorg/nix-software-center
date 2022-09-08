@@ -3,6 +3,7 @@ use ijson::IString;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::{self, fs::File, collections::HashMap, error::Error, env, io::BufReader};
+use log::*;
 
 use crate::APPINFO;
 
@@ -169,7 +170,7 @@ pub async fn readpkgs() -> Result<HashMap<String, Package>,  Box<dyn Error + Sen
     let reader = BufReader::new(file);
     let pkgbase: PackageBase = simd_json::serde::from_reader(reader)?;
     let mut pkgs = pkgbase.packages;
-    println!("APPDATADIR {}", APPINFO);
+    debug!("APPDATADIR {}", APPINFO);
     let appdata = File::open(&format!("{}/xmls/nixos_x86_64_linux.yml.gz", APPINFO))?;
     let appreader = BufReader::new(appdata);
     let mut d = GzDecoder::new(appreader);
@@ -196,7 +197,6 @@ pub fn readlegacysyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + S
 }
 
 pub fn readflakesyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
-    println!("READFLAKESYSPKGS");
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/syspackages.json", cachedir);
     let file = File::open(cachefile)?;

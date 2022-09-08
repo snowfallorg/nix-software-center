@@ -20,6 +20,7 @@ use std::{
     path::Path,
     time::Duration,
 };
+use log::*;
 
 use crate::parse::config::NscConfig;
 use crate::parse::config::getconfig;
@@ -327,7 +328,6 @@ impl Component for PkgModel {
                                                                 #[watch]
                                                                 set_sensitive: model.launchable.is_some(),
                                                                 connect_clicked[sender] => move |_| {
-                                                                    println!("SENT LAUNCH");
                                                                     sender.input(PkgMsg::Launch)
                                                                 }
                                                             },
@@ -362,7 +362,6 @@ impl Component for PkgModel {
                                                             set_width_request: 105,
                                                             connect_clicked[sender] => move |_| {
                                                                 sender.input(PkgMsg::InstallUser);
-                                                                println!("CLICKED INSTALL!!!");
                                                             },
                                                             // #[watch]
                                                             // set_visible: !model.installeduserpkgs.contains(&model.pname) && !model.installinguserpkgs.contains(&model.pkg),
@@ -415,7 +414,6 @@ impl Component for PkgModel {
                                                                 #[watch]
                                                                 set_sensitive: model.launchable.is_some(),
                                                                 connect_clicked[sender] => move |_| {
-                                                                    println!("SENT LAUNCH");
                                                                     sender.input(PkgMsg::Launch)
                                                                 }
                                                             },
@@ -450,7 +448,6 @@ impl Component for PkgModel {
                                                             set_width_request: 105,
                                                             connect_clicked[sender] => move |_| {
                                                                 sender.input(PkgMsg::InstallSystem);
-                                                                println!("CLICKED INSTALL!!!");
                                                             },
                                                             // #[watch]
                                                             // set_visible: !model.installedsystempkgs.contains(&model.pname) && !model.installingsystempkgs.contains(&model.pkg),
@@ -919,10 +916,6 @@ impl Component for PkgModel {
         }
     }
 
-    fn post_view() {
-        println!("INSTALL TYPE {:?}", model.installtype)
-    }
-
     menu! {
         installtype: {
             "User (nix-env)" => NixEnvAction,
@@ -991,27 +984,21 @@ impl Component for PkgModel {
         let nixenv: RelmAction<NixEnvAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
-                println!("NIX ENV!");
                 sender.input(PkgMsg::SetInstallType(InstallType::User));
-                // sender.input(AppMsg::Increment);
             })
         };
 
         let nixprofile: RelmAction<NixProfileAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
-                println!("NIX PROFILE!");
                 sender.input(PkgMsg::SetInstallType(InstallType::User));
-                // sender.input(AppMsg::Increment);
             })
         };
 
         let nixsystem: RelmAction<NixSystemAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
-                println!("NIX SYSTEM!");
                 sender.input(PkgMsg::SetInstallType(InstallType::System));
-                // sender.input(AppMsg::Increment);
             })
         };
 
@@ -1028,7 +1015,6 @@ impl Component for PkgModel {
         let launchaction: RelmAction<LaunchAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
-                println!("LAUNCH!");
                 sender.input(PkgMsg::NixRun);
             })
         };
@@ -1036,7 +1022,6 @@ impl Component for PkgModel {
         let termaction: RelmAction<TermShellAction> = {
             let sender = sender;
             RelmAction::new_stateless(move |_| {
-                println!("TERM!");
                 sender.input(PkgMsg::NixShell)
             })
         };
@@ -1118,7 +1103,7 @@ impl Component for PkgModel {
                     }
                     let mut pango = html2pango::markup_html(&input)
                         .unwrap_or_else(|_| {
-                            println!("BAD PANGO");
+                            warn!("Pango failed to parse description");
                             input.to_string()
                         })
                         .trim()
@@ -1222,7 +1207,7 @@ impl Component for PkgModel {
                                                                     let mut output = File::create(&format!("{}.png", scrnpath))?;
                                                                     scaled.write_to(&mut output, ImageFormat::Png)?;
                                                                     if let Err(e) = fs::remove_file(&scrnpath) {
-                                                                        eprintln!("{}", e);
+                                                                        warn!("{}", e);
                                                                     }
                                                                     Ok(())
                                                                 }
@@ -1235,7 +1220,7 @@ impl Component for PkgModel {
                                                                     }
                                                                     Err(_) => {
                                                                         if let Err(e) = fs::remove_file(&scrnpath) {
-                                                                            eprintln!("{}", e);
+                                                                            warn!("{}", e);
                                                                         }
                                                                         out.send(PkgAsyncMsg::SetError(pkg, i));
                                                                     }
@@ -1244,16 +1229,16 @@ impl Component for PkgModel {
                                                         }
                                                     } else {
                                                         out.send(PkgAsyncMsg::SetError(pkg, i));
-                                                        eprintln!("Error: {}", response.status());    
+                                                        warn!("Error: {}", response.status());    
                                                     }
                                                 } else {
                                                     out.send(PkgAsyncMsg::SetError(pkg, i));
-                                                    eprintln!("Error: {}", response.status());
+                                                    warn!("Error: {}", response.status());
                                                 }
                                             }
                                             Err(e) => {
                                                 out.send(PkgAsyncMsg::SetError(pkg, i));
-                                                eprintln!("Error: {}", e);
+                                                warn!("Error: {}", e);
                                             }
                                         }
                                     }
@@ -1264,23 +1249,18 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::LoadScreenshot(pkg, i, u) => {
-                println!("LOAD SCREENSHOT {}", u);
-                // let mut scrn_guard = self.screenshots.guard();
-                // println!("GOT GUARD");
+                info!("PkgMsg::LoadScreenshot {}", u);
                 if pkg == self.pkg {
                     let mut scrn_guard = self.screenshots.guard();
                     if let Some(mut scrn_widget) = scrn_guard.get_mut(i) {
                         scrn_widget.path = Some(u);
-                        println!("GOT PATH")
+                        trace!("GOT PATH")
                     } else {
-                        println!("NO SCRN WIDGET")
+                        trace!("NO SCRN WIDGET")
                     }
                 } else {
-                    println!("WRONG PACKAGE")
+                    trace!("WRONG PACKAGE")
                 }
-
-                // println!("LOADED SCREENSHOT");
-                // scrn_guard.drop();
             }
             PkgMsg::SetError(pkg, i) => {
                 if pkg == self.pkg {
@@ -1298,7 +1278,7 @@ impl Component for PkgModel {
                     if let Err(e) =
                         gio::AppInfo::launch_default_for_uri(u, gio::AppLaunchContext::NONE)
                     {
-                        eprintln!("error: {}", e);
+                        warn!("error: {}", e);
                     }
                 }
             }
@@ -1313,7 +1293,6 @@ impl Component for PkgModel {
                 sender.output(AppMsg::FrontPage)
             }
             PkgMsg::InstallUser => {
-                println!("INSTALL USER");
                 let w = WorkPkg {
                     pkg: self.pkg.to_string(),
                     pname: self.pname.to_string(),
@@ -1323,13 +1302,11 @@ impl Component for PkgModel {
                     notify: None,
                 };
                 self.workqueue.insert(w.clone());
-                // self.installinguserpkgs.insert(self.pkg.clone());
                 if self.workqueue.len() == 1 {
                     self.installworker.emit(InstallAsyncHandlerMsg::Process(w));
                 }
             }
             PkgMsg::RemoveUser => {
-                println!("REMOVE USER");
                 let w = WorkPkg {
                     pkg: self.pkg.to_string(),
                     pname: self.pname.to_string(),
@@ -1339,7 +1316,6 @@ impl Component for PkgModel {
                     notify: None,
                 };
                 self.workqueue.insert(w.clone());
-                // self.installinguserpkgs.insert(self.pkg.clone());
                 if self.workqueue.len() == 1 {
                     self.installworker.emit(InstallAsyncHandlerMsg::Process(w));
                 }
@@ -1374,14 +1350,12 @@ impl Component for PkgModel {
             }
             PkgMsg::FinishedProcess(work) => {
                 self.workqueue.remove(&work);
-                println!("FINISHED PROCESS");
-                println!("WORK QUEUE: {}", self.workqueue.len());
+                trace!("WORK QUEUE: {}", self.workqueue.len());
                 match work.pkgtype {
                     InstallType::User => {
                         match work.action {
                             PkgAction::Install => {
                                 self.installeduserpkgs.insert(work.pname.clone());
-                                // sender.output(AppMsg::AddUserPkg(work.pname));
                                 if self.launchable.is_none() {
                                     if let Ok(o) = Command::new("command").arg("-v").arg(&self.pname).output() {
                                         if o.status.success() {
@@ -1392,7 +1366,6 @@ impl Component for PkgModel {
                             }
                             PkgAction::Remove => {
                                 self.installeduserpkgs.remove(&work.pname);
-                                // sender.output(AppMsg::RemoveUserPkg(work.pname));
                             }
                         }
                     }
@@ -1400,7 +1373,6 @@ impl Component for PkgModel {
                         match work.action {
                             PkgAction::Install => {
                                 self.installedsystempkgs.insert(work.pkg.clone());
-                                // sender.output(AppMsg::AddSystemPkg(work.pkg));
                                 if self.launchable.is_none() {
                                     if let Ok(o) = Command::new("command").arg("-v").arg(&self.pname).output() {
                                         if o.status.success() {
@@ -1411,7 +1383,6 @@ impl Component for PkgModel {
                             }
                             PkgAction::Remove => {
                                 self.installedsystempkgs.remove(&work.pkg);
-                                // sender.output(AppMsg::RemoveSystemPkg(work.pkg));
                             }
                         };
                         sender.output(AppMsg::UpdateUpdatePkgs);
@@ -1493,7 +1464,6 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::NixRun => {
-                println!("NIXRUN!");
                 if let Some(l) = &self.launchable {
                     match l {
                         Launch::GtkApp(x) => {
@@ -1579,7 +1549,6 @@ impl Component for PkgModel {
 
 fn launchterm(cmd: &str) {
     if which::which("kgx").is_ok() {
-        println!("LAUNCHING WITH KGX");
         let _ = Command::new("kgx").arg("-e").arg(&cmd).spawn();
     } else if which::which("gnome-terminal").is_ok() {
         let _ = Command::new("gnome-terminal").arg("--").arg(&cmd).spawn();
@@ -1600,7 +1569,7 @@ fn launchterm(cmd: &str) {
     } else if which::which("xterm").is_ok() {
         let _ = Command::new("xterm").arg("-e").arg(&cmd).spawn();
     } else {
-        eprintln!("No terminal detected!")
+        error!("No terminal detected!")
     }
 }
 

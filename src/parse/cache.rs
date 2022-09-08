@@ -1,4 +1,5 @@
 use ijson::IString;
+use log::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -26,9 +27,9 @@ struct NewPackage {
 pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs) -> Result<(), Box<dyn Error>> {
     match syspkgs {
         SystemPkgs::Legacy => {
-            setuplegacypkgscache().unwrap();
-            setupupdatecache().unwrap();
-            setupnewestver().unwrap();
+            setuplegacypkgscache()?;
+            setupupdatecache()?;
+            setupnewestver()?;
         }
         SystemPkgs::Flake => {
             setupflakepkgscache()?;
@@ -49,7 +50,7 @@ pub fn uptodatelegacy() -> Result<Option<(String, String)>, Box<dyn Error>> {
         .trim()
         .to_string();
     if oldversion == newversion {
-        println!("System is up to date");
+        info!("System is up to date");
         Ok(None)
     } else {
         Ok(Some((oldversion, newversion)))
@@ -65,12 +66,11 @@ pub fn uptodateflake() -> Result<Option<(String, String)>, Box<dyn Error>> {
         .trim()
         .to_string();
     if oldversion == newversion {
-        println!("System is up to date");
+        info!("System is up to date");
         Ok(None)
     } else {
-        println!("OLD {:?} != NEW {:?}", oldversion, newversion);
+        info!("OLD {:?} != NEW {:?}", oldversion, newversion);
         if let (Some(oldv), Some(newv)) = (oldversion.get(..8), newversion.get(..8)) {
-            println!("OLD {:?} != NEW {:?}", oldv, newv);
             Ok(Some((oldv.to_string(), newv.to_string())))
         } else {
             Ok(Some((oldversion, newversion)))
@@ -87,10 +87,10 @@ pub fn channelver() -> Result<Option<(String, String)>, Box<dyn Error>> {
         .trim()
         .to_string();
     if oldversion == newversion {
-        println!("Channels match");
+        info!("Channels match");
         Ok(None)
     } else {
-        println!("chnver {:?} != newver {:?}", oldversion, newversion);
+        info!("chnver {:?} != newver {:?}", oldversion, newversion);
         Ok(Some((oldversion, newversion)))
     }
 }
@@ -104,10 +104,10 @@ pub fn flakever() -> Result<Option<(String, String)>, Box<dyn Error>> {
         .trim()
         .to_string();
     if oldversion == newversion {
-        println!("Flake hashes match");
+        info!("Flake hashes match");
         Ok(None)
     } else {
-        println!("flakever {:?} != newver {:?}", oldversion, newversion);
+        info!("flakever {:?} != newver {:?}", oldversion, newversion);
         Ok(Some((oldversion, newversion)))
     }
 }
@@ -140,9 +140,6 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
         relver, dlver
     );
 
-    println!("VERSION {}", relver);
-    // let response = reqwest::blocking::get(url)?;
-    // if let Some(latest) = response.url().to_string().split('/').last() {
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
     if !Path::new(&cachedir).exists() {
         fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
@@ -161,8 +158,7 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
     } else {
         let oldver = fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))?;
         let sysver = &dlver;
-        // Change to debug msg
-        println!("OLD: {}, != NEW: {}", oldver, sysver);
+        info!("OLD: {}, != NEW: {}", oldver, sysver);
     }
     if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists() {
         fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
@@ -171,12 +167,10 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
     sysver.write_all(dlver.as_bytes())?;
     let outfile = format!("{}/packages.json", &cachedir);
     dlfile(&url, &outfile)?;
-    // }
     Ok(())
 }
 
 fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
-    println!("SETUP FLAKES CACHE");
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
 
     // First remove legacy files
@@ -195,7 +189,6 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
     let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".");
-    println!("RELVER {}", relver);
     if relver == "22.11" {
         relver = "unstable".to_string();
     }
@@ -206,9 +199,6 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
         relver
     );
 
-    println!("VERSION {}", relver);
-    // let response = reqwest::blocking::get(url)?;
-    // if let Some(latest) = response.url().to_string().split('/').last() {
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
     if !Path::new(&cachedir).exists() {
         fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
@@ -236,7 +226,7 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
             fs::read_to_string(&Path::new(format!("{}/flakever.txt", &cachedir).as_str()))?;
         let sysver = rev;
         if oldver != sysver {
-            println!("OLD FLAKEVER: {}, != NEW: {}", oldver, sysver);
+            info!("OLD FLAKEVER: {}, != NEW: {}", oldver, sysver);
             let mut sysver = fs::File::create(format!("{}/flakever.txt", &cachedir))?;
             sysver.write_all(rev.as_bytes())?;
             writesyspkgs(&format!("{}/syspackages.json", &cachedir))?;
@@ -253,7 +243,7 @@ fn setupflakepkgscache() -> Result<(), Box<dyn Error>> {
     let mut dl = false;
     if response.status().is_success() {
         let newrev = response.text()?;
-        println!("NEW REV: {}", newrev);
+        info!("NEW REV: {}", newrev);
         if Path::new(&format!("{}/newver.txt", &cachedir)).exists() {
             let oldrev = fs::read_to_string(&format!("{}/newver.txt", &cachedir))?;
             if oldrev != newrev {
@@ -296,7 +286,7 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
         let profilerevjson = response.text()?;
         let profilerevdata: Value = serde_json::from_str(&profilerevjson)?;
         let profilerev = profilerevdata.get("sha").unwrap().as_str().unwrap();
-        println!("PROFILE REV {}", profilerev);
+        info!("PROFILE REV {}", profilerev);
 
         if !Path::new(&format!("{}/profilever.txt", &cachedir)).exists() {
             let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
@@ -307,12 +297,12 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
                 fs::read_to_string(&Path::new(format!("{}/profilever.txt", &cachedir).as_str()))?;
             let sysver = profilerev;
             if oldver != sysver {
-                println!("OLD PROFILEVER: {}, != NEW: {}", oldver, sysver);
+                info!("OLD PROFILEVER: {}, != NEW: {}", oldver, sysver);
                 let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
                 sysver.write_all(profilerev.as_bytes())?;
                 writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
             } else {
-                println!("PROFILEVER UP TO DATE");
+                info!("PROFILEVER UP TO DATE");
             }
         }
     }
@@ -340,7 +330,6 @@ fn setupupdatecache() -> Result<(), Box<dyn Error>> {
         relver, dlver
     );
 
-    println!("VERSION {}", relver);
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
     if !Path::new(&cachedir).exists() {
         fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
@@ -359,8 +348,7 @@ fn setupupdatecache() -> Result<(), Box<dyn Error>> {
     } else {
         let oldver = fs::read_to_string(&Path::new(format!("{}/sysver.txt", &cachedir).as_str()))?;
         let sysver = &dlver;
-        // Change to debug msg
-        println!("OLD: {}, != NEW: {}", oldver, sysver);
+        info!("OLD: {}, != NEW: {}", oldver, sysver);
     }
     if Path::new(format!("{}/sysver.txt", &cachedir).as_str()).exists() {
         fs::remove_file(format!("{}/sysver.txt", &cachedir).as_str())?;
@@ -389,7 +377,6 @@ fn setupnewestver() -> Result<(), Box<dyn Error>> {
     if version.len() >= 8 && &version[5..8] == "pre" {
         relver = "unstable".to_string();
     }
-    println!("VERSION {}", relver);
     let response = reqwest::blocking::get(format!("https://channels.nixos.org/nixos-{}", relver))?;
     if let Some(latest) = response.url().to_string().split('/').last() {
         let latest = latest.strip_prefix("nixos-").unwrap_or(latest);
@@ -412,8 +399,7 @@ fn setupnewestver() -> Result<(), Box<dyn Error>> {
             let oldver =
                 fs::read_to_string(&Path::new(format!("{}/newver.txt", &cachedir).as_str()))?;
             let newver = latest;
-            // Change to debug msg
-            println!("OLD: {}, != NEW: {}", oldver, newver);
+            info!("OLD: {}, != NEW: {}", oldver, newver);
         }
         if Path::new(format!("{}/newver.txt", &cachedir).as_str()).exists() {
             fs::remove_file(format!("{}/newver.txt", &cachedir).as_str())?;
@@ -425,7 +411,7 @@ fn setupnewestver() -> Result<(), Box<dyn Error>> {
 }
 
 fn dlfile(url: &str, path: &str) -> Result<(), Box<dyn Error>> {
-    println!("Downloading {}", url);
+    trace!("Downloading {}", url);
     let response = reqwest::blocking::get(url)?;
     if response.status().is_success() {
         let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);

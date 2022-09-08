@@ -149,7 +149,6 @@ impl SimpleComponent for CategoryPageModel {
                 sender.output(AppMsg::OpenPkg(pkg))
             }
             CategoryPageMsg::Open(category, catrec, catall) => {
-                println!("CategoryPageMsg::Open");
                 self.set_category(category);
                 let mut recapps_guard = self.recommendedapps.guard();
                 recapps_guard.clear();
@@ -164,7 +163,6 @@ impl SimpleComponent for CategoryPageModel {
                 self.busy = false;
             }
             CategoryPageMsg::Loading(category) => {
-                println!("CATEGORY PAGE LOADING {}", category);
                 self.set_category(category);
                 self.busy = true;
             }

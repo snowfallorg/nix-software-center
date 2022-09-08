@@ -1,6 +1,7 @@
 use relm4::*;
 use std::{error::Error, path::Path, process::Stdio};
 use tokio::io::AsyncBufReadExt;
+use log::*;
 
 use crate::parse::config::NscConfig;
 
@@ -71,15 +72,13 @@ impl Worker for UpdateAsyncHandler {
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
-                    println!("STARTED");
                     let result = runcmd(NscCmd::Channel, systenconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
-                            println!("CHANNEL DONE");
                             sender.output(UpdatePageMsg::DoneWorking);
                         }
                         _ => {
-                            println!("CHANNEL FAILED");
+                            warn!("UPDATE CHANNEL FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -90,15 +89,13 @@ impl Worker for UpdateAsyncHandler {
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
-                    println!("STARTED");
                     let result = runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
-                            println!("ALL DONE");
                             sender.output(UpdatePageMsg::DoneWorking);
                         }
                         _ => {
-                            println!("ALL FAILED");
+                            warn!("UPDATE CHANNEL AND SYSTEM FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -109,18 +106,16 @@ impl Worker for UpdateAsyncHandler {
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
-                    println!("STARTED");
                     let result = match syspkgs {
                         SystemPkgs::Legacy => runcmd(NscCmd::Rebuild, systenconfig, flakeargs, syspkgs).await,
                         SystemPkgs::Flake => runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await,
                     };
                     match result {
                         Ok(true) => {
-                            println!("REBUILD DONE");
                             sender.output(UpdatePageMsg::DoneWorking);
                         }
                         _ => {
-                            println!("REBUILD FAILED");
+                            warn!("REBUILD FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -129,18 +124,16 @@ impl Worker for UpdateAsyncHandler {
             UpdateAsyncHandlerMsg::UpdateUserPkgs => {
                 let userpkgs = self.userpkgs.clone();
                 relm4::spawn(async move {
-                    println!("STARTED");
                     let result = match userpkgs {
                         UserPkgs::Env => updateenv().await,
                         UserPkgs::Profile => updateprofile().await,
                     };
                     match result {
                         Ok(true) => {
-                            println!("USER DONE");
                             sender.output(UpdatePageMsg::DoneWorking);
                         }
                         _ => {
-                            println!("USER FAILED");
+                            warn!("UPDATE USER FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -152,27 +145,24 @@ impl Worker for UpdateAsyncHandler {
                 let syspkgs = self.syspkgs.clone();
                 let userpkgs = self.userpkgs.clone();
                 relm4::spawn(async move {
-                    println!("STARTED");
                     let result = runcmd(NscCmd::All, systemconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
-                            println!("ALL pkexec DONE");
                             match match userpkgs {
                                 UserPkgs::Env => updateenv().await,
                                 UserPkgs::Profile => updateprofile().await,
                             } {
                                 Ok(true) => {
-                                    println!("ALL DONE");
                                     sender.output(UpdatePageMsg::DoneWorking);
                                 }
                                 _ => {
-                                    println!("ALL FAILED");
+                                    warn!("UPDATE ALL FAILED");
                                     sender.output(UpdatePageMsg::FailedWorking);
                                 }
                             }
                         }
                         _ => {
-                            println!("ALL FAILED");
+                            warn!("UPDATE ALL FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -195,7 +185,7 @@ async fn runcmd(
             e.push("libexec"); // root/libexec
             e.push("nsc-helper");
             let x = e.to_string_lossy().to_string();
-            println!("CURRENT PATH {}", x);
+            info!("nsc-helper path: {}", x);
             if Path::new(&x).is_file() {
                 x
             } else {
@@ -244,7 +234,7 @@ async fn runcmd(
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
                 .spawn()?,
-            SystemPkgs::Flake => { println!("ALL FLAKE UPDATE!!!!!!!!!!!!!!!!!!!!!!"); tokio::process::Command::new("pkexec")
+            SystemPkgs::Flake => tokio::process::Command::new("pkexec")
                 .arg(&exe)
                 .arg("flake")
                 .arg("--rebuild")
@@ -254,26 +244,20 @@ async fn runcmd(
                 .arg("switch")
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
-                .spawn()? },
+                .spawn()?,
         },
     };
 
-    println!("SENT INPUT");
     let stderr = cmd.stderr.take().unwrap();
     let reader = tokio::io::BufReader::new(stderr);
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("CAUGHT REBUILD LINE: {}", line);
+        trace!("CAUGHT REBUILD LINE: {}", line);
     }
-    println!("READER DONE");
     if cmd.wait().await?.success() {
-        println!("SUCCESS");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(true)
     } else {
-        println!("FAILURE");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(false)
     }
 }
@@ -284,22 +268,16 @@ async fn updateenv() -> Result<bool, Box<dyn Error + Send + Sync>> {
         .stderr(Stdio::piped())
         .spawn()?;
 
-    println!("SENT INPUT");
     let stderr = cmd.stderr.take().unwrap();
     let reader = tokio::io::BufReader::new(stderr);
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("CAUGHT NIXENV LINE: {}", line);
+        trace!("CAUGHT NIXENV LINE: {}", line);
     }
-    println!("READER DONE");
     if cmd.wait().await?.success() {
-        println!("SUCCESS");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(true)
     } else {
-        println!("FAILURE");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(false)
     }
 }
@@ -314,22 +292,16 @@ async fn updateprofile() -> Result<bool, Box<dyn Error + Send + Sync>> {
         .stderr(Stdio::piped())
         .spawn()?;
 
-    println!("SENT INPUT");
     let stderr = cmd.stderr.take().unwrap();
     let reader = tokio::io::BufReader::new(stderr);
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("CAUGHT NIX PROFILE LINE: {}", line);
+        trace!("CAUGHT NIX PROFILE LINE: {}", line);
     }
-    println!("READER DONE");
     if cmd.wait().await?.success() {
-        println!("SUCCESS");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(true)
     } else {
-        println!("FAILURE");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(false)
     }
 }

@@ -14,6 +14,7 @@ use relm4::adw::prelude::*;
 use relm4::*;
 use std::{collections::HashMap, env};
 use strum::IntoEnumIterator;
+use log::*;
 
 pub struct WindowAsyncHandler;
 
@@ -40,14 +41,14 @@ impl Worker for WindowAsyncHandler {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs) => {
-                println!("CHECK CACHE");
+                info!("WindowAsyncHandlerMsg::CheckCache");
                 let syspkgs2 = syspkgs.clone();
                 let userpkgs2 = userpkgs.clone();
                 relm4::spawn(async move {
                     match checkcache(syspkgs2, userpkgs2) {
                         Ok(_) => {}
                         Err(_) => {
-                            println!("FAILED TO CHECK CACHE");
+                            warn!("FAILED TO CHECK CACHE");
                             sender.output(AppMsg::LoadError(
                                 String::from("Could not load cache"),
                                 String::from(
@@ -60,7 +61,7 @@ impl Worker for WindowAsyncHandler {
                     let pkgs = match readpkgs().await {
                         Ok(pkgs) => pkgs,
                         Err(_) => {
-                            println!("FAILED TO LOAD PKGS");
+                            warn!("FAILED TO LOAD PKGS");
                             sender.output(AppMsg::LoadError(
                                 String::from("Could not load packages"),
                                 String::from(
@@ -71,13 +72,12 @@ impl Worker for WindowAsyncHandler {
                         }
                     };
 
-                    println!("SYSTEM PKGS {:?}", syspkgs);
                     let newpkgs = match syspkgs {
                         SystemPkgs::Legacy => {
                             match readlegacysyspkgs() {
                                 Ok(newpkgs) => newpkgs,
                                 Err(_) => {
-                                    println!("FAILED TO LOAD NEW PKGS");
+                                    warn!("FAILED TO LOAD NEW PKGS");
                                     sender.output(AppMsg::LoadError(
                                         String::from("Could not load new packages"),
                                         String::from(
@@ -92,7 +92,7 @@ impl Worker for WindowAsyncHandler {
                             match readflakesyspkgs() {
                                 Ok(newpkgs) => newpkgs,
                                 Err(_) => {
-                                    println!("FAILED TO LOAD NEW PKGS");
+                                    warn!("FAILED TO LOAD NEW PKGS");
                                     sender.output(AppMsg::LoadError(
                                         String::from("Could not load new packages"),
                                         String::from(
@@ -104,16 +104,11 @@ impl Worker for WindowAsyncHandler {
                             }
                         }
                     };
-                    // println!("SYSPKGS: {:#?}", syspkgs);
 
                     let profilepkgs = match userpkgs {
                         UserPkgs::Env => None,
                         UserPkgs::Profile => if let Ok(r) = readprofilepkgs() { Some(r) } else { None },
                     };
-                    // println!("PROFILEPKGS: {:?}", profilepkgs);
-
-
-                    println!("GOT PKGS");
 
                     let mut recpicks = vec![];
                     let mut catpicks: HashMap<PkgCategory, Vec<String>> = HashMap::new();
@@ -121,7 +116,6 @@ impl Worker for WindowAsyncHandler {
 
 
                     if cr == CacheReturn::Init {
-                        println!("INIT");
                         let desktopenv = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
                         let appdatapkgs = pkgs
                             .iter()
@@ -185,7 +179,6 @@ impl Worker for WindowAsyncHandler {
                             recpicks.push(p.to_string());
                         }
                         for category in PkgCategory::iter() {
-                            println!("CATEGORY: {}", category);
                             desktoppicks.shuffle(&mut rng);
                             let mut cvec = vec![];
                             let mut allvec = vec![];
@@ -360,8 +353,6 @@ impl Worker for WindowAsyncHandler {
                                 }
                             }
 
-                            println!("{} PICKS {:#?}", category, cvec);
-
                             let catagortypkgs = pkgs
                             .iter()
                             .filter(|(x, _)| {
@@ -392,7 +383,6 @@ impl Worker for WindowAsyncHandler {
                                 }
                             }
 
-                            println!("{} ALL {:#?}", category, allvec);
                             cvec.shuffle(&mut rng);
                             allvec.sort_by_key(|x| x.to_lowercase());
                             catpicks.insert(category.clone(), cvec);
@@ -411,7 +401,6 @@ impl Worker for WindowAsyncHandler {
                         recpicks.shuffle(&mut rng);
                     }
 
-                    println!("SEND INIT");
                     match cr {
                         CacheReturn::Init => {
                             sender.output(AppMsg::Initialize(pkgs, recpicks, newpkgs, catpicks, catpkgs, profilepkgs));

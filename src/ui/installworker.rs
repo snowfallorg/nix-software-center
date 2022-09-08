@@ -8,6 +8,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::{fs, io};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use log::*;
 
 #[tracker::track]
 #[derive(Debug)]
@@ -71,8 +72,7 @@ impl Worker for InstallAsyncHandler {
                     InstallType::User => {
                         match work.action {
                             PkgAction::Install => {
-                                println!("Installing user package: {}", work.pkg);
-                                println!("{:?}", self.userpkgs);
+                                info!("Installing user package: {}", work.pkg);
                                 match self.userpkgs {
                                     UserPkgs::Env => {
                                         self.process = Some(relm4::spawn(async move {
@@ -90,29 +90,27 @@ impl Worker for InstallAsyncHandler {
         
                                             let mut lines = reader.lines();
                                             while let Ok(Some(line)) = lines.next_line().await {
-                                                println!("CAUGHT LINE: {}", line);
+                                                trace!("CAUGHT LINE: {}", line);
                                             }
         
                                             match p.wait().await {
                                                 Ok(o) => {
                                                     if o.success() {
-                                                        println!(
+                                                        info!(
                                                             "Removed user package: {} success",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
                                                         sender.output(PkgMsg::FinishedProcess(work))
                                                     } else {
-                                                        println!(
+                                                        warn!(
                                                             "Removed user package: {} failed",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
                                                         sender.output(PkgMsg::FailedProcess(work));
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    println!("Error removing user package: {}", e);
+                                                    warn!("Error removing user package: {}", e);
                                                     sender.output(PkgMsg::FailedProcess(work));
                                                 }
                                             }
@@ -135,29 +133,27 @@ impl Worker for InstallAsyncHandler {
         
                                             let mut lines = reader.lines();
                                             while let Ok(Some(line)) = lines.next_line().await {
-                                                println!("CAUGHT LINE: {}", line);
+                                                trace!("CAUGHT LINE: {}", line);
                                             }
         
                                             match p.wait().await {
                                                 Ok(o) => {
                                                     if o.success() {
-                                                        println!(
+                                                        info!(
                                                             "Removed user package: {} success",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
                                                         sender.output(PkgMsg::FinishedProcess(work))
                                                     } else {
-                                                        println!(
+                                                        warn!(
                                                             "Removed user package: {} failed",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
                                                         sender.output(PkgMsg::FailedProcess(work));
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    println!("Error removing user package: {}", e);
+                                                    warn!("Error removing user package: {}", e);
                                                     sender.output(PkgMsg::FailedProcess(work));
                                                 }
                                             }
@@ -166,7 +162,7 @@ impl Worker for InstallAsyncHandler {
                                 }
                             }
                             PkgAction::Remove => {
-                                println!("Removing user package: {}", work.pkg);
+                                info!("Removing user package: {}", work.pkg);
                                 match self.userpkgs {
                                     UserPkgs::Env => {
                                         self.process = Some(relm4::spawn(async move {
@@ -183,28 +179,26 @@ impl Worker for InstallAsyncHandler {
         
                                             let mut lines = reader.lines();
                                             while let Ok(Some(line)) = lines.next_line().await {
-                                                println!("CAUGHT LINE: {}", line);
+                                                trace!("CAUGHT LINE: {}", line);
                                             }
                                             match p.wait().await {
                                                 Ok(o) => {
                                                     if o.success() {
-                                                        println!(
+                                                        info!(
                                                             "Removed user package: {} success",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
                                                         sender.output(PkgMsg::FinishedProcess(work))
                                                     } else {
-                                                        println!(
+                                                        warn!(
                                                             "Removed user package: {} failed",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
                                                         sender.output(PkgMsg::FailedProcess(work));
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    println!("Error removing user package: {}", e);
+                                                    warn!("Error removing user package: {}", e);
                                                     sender.output(PkgMsg::FailedProcess(work));
                                                 }
                                             }
@@ -226,28 +220,26 @@ impl Worker for InstallAsyncHandler {
         
                                             let mut lines = reader.lines();
                                             while let Ok(Some(line)) = lines.next_line().await {
-                                                println!("CAUGHT LINE: {}", line);
+                                                trace!("CAUGHT LINE: {}", line);
                                             }
                                             match p.wait().await {
                                                 Ok(o) => {
                                                     if o.success() {
-                                                        println!(
+                                                        info!(
                                                             "Removed user package: {} success",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&pstdout));
                                                         sender.output(PkgMsg::FinishedProcess(work))
                                                     } else {
-                                                        println!(
+                                                        warn!(
                                                             "Removed user package: {} failed",
                                                             work.pkg
                                                         );
-                                                        // println!("{}", String::from_utf8_lossy(&p.stderr));
                                                         sender.output(PkgMsg::FailedProcess(work));
-                                                    }
-                                                }
+                                                                       }                             }
+
                                                 Err(e) => {
-                                                    println!("Error removing user package: {}", e);
+                                                    warn!("Error removing user package: {}", e);
                                                     sender.output(PkgMsg::FailedProcess(work));
                                                 }
                                             }
@@ -259,7 +251,7 @@ impl Worker for InstallAsyncHandler {
                     }
                     InstallType::System => match work.action {
                         PkgAction::Install => {
-                            println!("Installing system package: {}", work.pkg);
+                            info!("Installing system package: {}", work.pkg);
                             self.process = Some(relm4::spawn(async move {
                                 match installsys(
                                     work.pkg.to_string(),
@@ -279,13 +271,13 @@ impl Worker for InstallAsyncHandler {
                                     }
                                     Err(e) => {
                                         sender.output(PkgMsg::FailedProcess(work));
-                                        println!("Error installing system package: {}", e);
+                                        warn!("Error installing system package: {}", e);
                                     }
                                 }
                             }));
                         }
                         PkgAction::Remove => {
-                            println!("Removing system package: {}", work.pkg);
+                            info!("Removing system package: {}", work.pkg);
                             self.process = Some(relm4::spawn(async move {
                                 match installsys(
                                     work.pkg.to_string(),
@@ -305,7 +297,7 @@ impl Worker for InstallAsyncHandler {
                                     }
                                     Err(e) => {
                                         sender.output(PkgMsg::FailedProcess(work));
-                                        println!("Error removing system package: {}", e);
+                                        warn!("Error removing system package: {}", e);
                                     }
                                 }
                             }));
@@ -314,16 +306,7 @@ impl Worker for InstallAsyncHandler {
                 }
             }
             InstallAsyncHandlerMsg::CancelProcess => {
-                println!("CANCELING PROCESS");
-                // if let Some(p) = self.pid {
-                //     println!("Killing process: {}", p);
-                //     Command::new("pkexec")
-                //         .arg("kill")
-                //         .arg("-INT")
-                //         .arg(p.to_string())
-                //         .spawn()
-                //         .expect("Failed to kill process");
-                // }
+                info!("CANCELING PROCESS");
                 if let Some(p) = &mut self.process {
                     p.abort()
                 }
@@ -388,7 +371,7 @@ async fn installsys(
             e.push("libexec"); // root/libexec
             e.push("nsc-helper");
             let x = e.to_string_lossy().to_string();
-            println!("CURRENT PATH {}", x);
+            info!("nsc-helper path: {}", x);
             if Path::new(&x).is_file() {
                 x
             } else {
@@ -397,13 +380,6 @@ async fn installsys(
         }
         Err(_) => String::from("nsc-helper"),
     };
-
-    println!("EXECUTING {}", exe);
-
-    // let rebuildargs = match flakeargs {
-    //     Some(x) => format!("--flake {}", x),//.split(' ').map(|x| x.to_string()).collect::<Vec<String>>(),
-    //     None => String::default(),
-    // };
 
     let rebuildargs = if let Some(x) = flakeargs {
         let mut v = vec![String::from("--flake")];
@@ -416,7 +392,6 @@ async fn installsys(
     } else {
         vec![]
     };
-    println!("Rebuild args: {:?}", rebuildargs);
 
     let mut cmd = tokio::process::Command::new("pkexec")
         .arg(&exe)
@@ -433,22 +408,16 @@ async fn installsys(
     // sender.input(InstallAsyncHandlerMsg::SetPid(cmd.id()));
 
     cmd.stdin.take().unwrap().write_all(out.as_bytes()).await?;
-    println!("SENT INPUT");
     let stderr = cmd.stderr.take().unwrap();
     let reader = tokio::io::BufReader::new(stderr);
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("CAUGHT LINE: {}", line);
+        trace!("CAUGHT LINE: {}", line);
     }
-    println!("READER DONE");
     if cmd.wait().await?.success() {
-        println!("SUCCESS");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(true)
     } else {
-        println!("FAILURE");
-        // sender.input(InstallAsyncHandlerMsg::SetPid(None));
         Ok(false)
     }
 }

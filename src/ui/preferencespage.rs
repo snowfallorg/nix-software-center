@@ -205,7 +205,6 @@ impl SimpleComponent for PreferencesPageModel {
                 self.configpath = path;
                 self.set_flake(flake);
                 self.hidden = false;
-                println!("FLAKE {:?}", self.flake);
             }
             PreferencesPageMsg::Open => self.open_dialog.emit(OpenDialogMsg::Open),
             PreferencesPageMsg::OpenFlake => self.flake_file_dialog.emit(OpenDialogMsg::Open),
@@ -215,7 +214,6 @@ impl SimpleComponent for PreferencesPageModel {
             }
             PreferencesPageMsg::SetFlake(flake) => {
                 self.flake = flake;
-                println!("FLAKE {:?}", self.flake);
                 sender.input(PreferencesPageMsg::ModifyFlake)
             }
             PreferencesPageMsg::SetFlakePath(path) => {
@@ -223,7 +221,6 @@ impl SimpleComponent for PreferencesPageModel {
                     path,
                     self.flake.as_ref().map(|x| x.1.clone()).unwrap_or_default(),
                 ));
-                println!("FLAKE {:?}", self.flake);
                 sender.input(PreferencesPageMsg::ModifyFlake)
             }
             PreferencesPageMsg::SetFlakeArg(arg) => {
@@ -231,7 +228,6 @@ impl SimpleComponent for PreferencesPageModel {
                     self.flake.as_ref().map(|x| x.0.clone()).unwrap_or_default(),
                     arg,
                 ));
-                println!("FLAKE {:?}", self.flake);
                 sender.input(PreferencesPageMsg::ModifyFlake)
             }
             PreferencesPageMsg::ModifyFlake => {

@@ -4,6 +4,7 @@ use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, U
 use adw::prelude::*;
 use relm4::{factory::*, gtk::pango, *};
 use std::{path::Path, convert::identity};
+use log::*;
 
 #[tracker::track]
 #[derive(Debug)]
@@ -317,8 +318,9 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(self.config.clone()));
             }
             UpdatePageMsg::Update(updateuserlist, updatesystemlist) => {
-                println!("UPDATEUSERLIST: {:?}", updateuserlist);
-                println!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
+                info!("UpdatePageMsg::Update");
+                debug!("UPDATEUSERLIST: {:?}", updateuserlist);
+                debug!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
                 self.channelupdate = channelver().unwrap_or(None);
                 self.update_updatetracker(|_| ());
                 let mut updateuserlist_guard = self.updateuserlist.guard();
@@ -363,10 +365,8 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::RebuildSystem);
             }
             UpdatePageMsg::UpdateUser(pkg) => {
-                println!("UPDATE USER PKG: {}", pkg);
-                eprintln!("unimplemented");
-                // self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating user...")));
-                // self.updateworker.emit(UpdateAsyncHandlerMsg::RebuildUser);
+                info!("UPDATE USER PKG: {}", pkg);
+                warn!("unimplemented");
             }
             UpdatePageMsg::UpdateAllUser => {
                 self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating all user packages...")));
