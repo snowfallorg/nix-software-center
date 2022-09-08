@@ -4,13 +4,13 @@
 }:
 let
   libadwaita-git = pkgs.libadwaita.overrideAttrs (oldAttrs: rec {
-    version = "1.2.beta";
+    version = "1.2.rc";
     src = pkgs.fetchFromGitLab {
       domain = "gitlab.gnome.org";
       owner = "GNOME";
       repo = "libadwaita";
       rev = version;
-      hash = "sha256-QBblkeNAgfHi5YQxaV9ceqNDyDIGu8d6pvLcT6apm6o=";
+      hash = "sha256-p7nsaAqrzQKeUiu7aGlgoKu0AH9KV/sMsVcLLpgl4Lo=";
     };
   });
   nixos-appstream-data = (import (pkgs.fetchFromGitHub {
@@ -28,7 +28,7 @@ in pkgs.stdenv.mkDerivation rec {
   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-EI9zULrlN+GvtDO0PvtAEA1YjJAbK+SDZ8NSRZf+2Rw=";
+    hash = "sha256-c21JMLq1m5bLhmZihCbOjAr8WShDimaAjYISpai8oXE=";
   };
 
   nativeBuildInputs = with pkgs; [
@@ -59,10 +59,6 @@ in pkgs.stdenv.mkDerivation rec {
     desktop-file-utils
     nixos-appstream-data
   ];
-
-  # mesonFlags = [
-  #   "-Dprofile=development"
-  # ];
 
   patchPhase = ''
     substituteInPlace ./src/lib.rs \

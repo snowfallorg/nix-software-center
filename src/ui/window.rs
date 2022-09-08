@@ -5,7 +5,7 @@ use adw::prelude::*;
 use edit_distance;
 use serde_json::Value;
 use spdx::Expression;
-use crate::{parse::{packages::{Package, LicenseEnum, Platform}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageTypes}, APPINFO};
+use crate::{parse::{packages::{Package, LicenseEnum, Platform}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageTypes}, APPINFO, config};
 
 use super::{
     categories::{PkgGroup, PkgCategory},
@@ -102,10 +102,6 @@ pub enum AppMsg {
     UpdateInstalledPkgs,
     UpdateUpdatePkgs,
     UpdateCategoryPkgs,
-    // AddUserPkg(String),
-    // RemoveUserPkg(String),
-    // AddSystemPkg(String),
-    // RemoveSystemPkg(String),
     SetSearch(bool),
     SetVsBar(bool),
     SetVsChild(String),
@@ -116,7 +112,6 @@ pub enum AppMsg {
     RemoveInstalledBusy(WorkPkg),
     OpenCategoryPage(PkgCategory),
     LoadCategory(PkgCategory)
-    // OpenWithScrnshots(String, Option<Vec<String>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -167,11 +162,13 @@ impl Component for AppModel {
                         set_valign: gtk::Align::Center,
                         set_hexpand: true,
                         set_vexpand: true,
-                        gtk::Spinner {
-                            set_spinning: true,
-                            set_height_request: 80,
+                        set_spacing: 15,
+                        gtk::Image {
+                            set_icon_name: Some(config::APP_ID),
+                            set_pixel_size: 192,
                         },
                         gtk::Label {
+                            add_css_class: "title-1",
                             set_label: "Loading...",
                         },
                     }

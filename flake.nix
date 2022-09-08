@@ -11,13 +11,13 @@
           inherit system;
         };
         libadwaita-git = pkgs.libadwaita.overrideAttrs (oldAttrs: rec {
-          version = "1.2.beta";
+          version = "1.2.rc";
           src = pkgs.fetchFromGitLab {
             domain = "gitlab.gnome.org";
             owner = "GNOME";
             repo = "libadwaita";
             rev = version;
-            hash = "sha256-QBblkeNAgfHi5YQxaV9ceqNDyDIGu8d6pvLcT6apm6o=";
+            hash = "sha256-p7nsaAqrzQKeUiu7aGlgoKu0AH9KV/sMsVcLLpgl4Lo=";
           };
         });
         nixos-appstream-data = pkgs.fetchFromGitHub {

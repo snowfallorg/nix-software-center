@@ -8,7 +8,7 @@ default-run = "nix-software-center"
 relm4 = { git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.2", features = ["all"]  }
 relm4-components = { package = "relm4-components", git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.2"}
 adw = { package = "libadwaita", git = "https://gitlab.gnome.org/World/Rust/libadwaita-rs", features = ["v1_2"] }
-tokio = { version = "1.20", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
+tokio = { version = "1.21", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
 sourceview5 = { git = "https://gitlab.gnome.org/World/Rust/sourceview5-rs/", rev = "6082210f7d1fc32b100bd9c714e9521eecacb3f7", features = ["v5_4"] }
 tracker = "0.1"
 
@@ -24,7 +24,7 @@ brotli = "3.3"
 log = "0.4"
 pretty_env_logger = "0.4"
 flate2 = "1.0"
-quick-xml = { version = "0.23", features = ["serialize"] }
+quick-xml = { version = "0.24", features = ["serialize"] }
 rand = "0.8"
 reqwest = { version = "0.11", features = ["blocking"] }
 sha256 = "1.0"
