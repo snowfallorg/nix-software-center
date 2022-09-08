@@ -9,14 +9,14 @@
     <p>A simple software center to install and manage Nix packages, built with libadwaita, GTK4, and Relm4.</p>
   </description>
   <screenshots>
-    <!-- <screenshot type="default">
-      <image>https://raw.githubusercontent.com/vlinkz/nixos-conf-editor/main/data/screenshots/listviewlight.png</image>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/vlinkz/nix-software-center/main/data/screenshots/frontpage-light.png</image>
       <caption>Main window</caption>
     </screenshot>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/vlinkz/nixos-conf-editor/main/data/screenshots/optionlight2.png</image>
-      <caption>Option Selection</caption>
-    </screenshot> -->
+      <image>https://raw.githubusercontent.com/vlinkz/nix-software-center/main/data/screenshots/application-light.png</image>
+      <caption>Application Page</caption>
+    </screenshot>
   </screenshots>
   <url type="homepage">https://github.com/vlinkz/nix-software-center</url>
   <url type="bugtracker">https://github.com/vlinkz/nix-software-center/issues</url>

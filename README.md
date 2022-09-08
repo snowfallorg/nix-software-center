@@ -11,10 +11,18 @@ Nix Software Center
 
 A graphical app store for Nix built with [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita), [GTK4](https://www.gtk.org/), and [Relm4](https://relm4.org/). Heavily inspired by [GNOME Software](https://gitlab.gnome.org/GNOME/gnome-software).
 
-<img src="data/screenshots/frontpage-light.png#gh-light-mode-only"/>
-<img src="data/screenshots/frontpage-dark.png#gh-dark-mode-only"/> 
+<img src="data/screenshots/overview-light.png#gh-light-mode-only"/>
+<img src="data/screenshots/overview-dark.png#gh-dark-mode-only"/> 
 
 </div>
+
+# Features
+- Install packages to `configuration.nix`
+  - Flakes support can be enabled in the preferences menu
+- Install packages with `nix profile` or `nix-env`
+- Show updates for all installed packages
+- Search for packages
+- Launch applications without installing via `nix-shell` and `nix run`
 
 ## NixOS Installation
 
@@ -23,7 +31,7 @@ Head of `configuration.nix`
 ```nix
 { config, pkgs, lib, ... }:
 let
-  nixos-conf-editor = (import (pkgs.fetchFromGitHub {
+  nix-software-center = (import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
     rev = "0.0.1";
@@ -69,6 +77,22 @@ nix --extra-experimental-features "nix-command flakes" run github:vlinkz/nix-sof
 ```bash
 RUST_LOG=nix_software_center=trace nix-software-center
 ```
+
+## Screenshots
+<p align="middle">
+  <img src="data/screenshots/frontpage-light.png#gh-light-mode-only"/>
+  <img src="data/screenshots/frontpage-dark.png#gh-dark-mode-only"/> 
+</p>
+
+<p align="middle">
+  <img src="data/screenshots/application-light.png#gh-light-mode-only"/>
+  <img src="data/screenshots/application-dark.png#gh-dark-mode-only"/> 
+</p>
+
+<p align="middle">
+  <img src="data/screenshots/searchpage-light.png#gh-light-mode-only"/>
+  <img src="data/screenshots/searchpage-dark.png#gh-dark-mode-only"/> 
+</p>
 
 ## Licenses
 
