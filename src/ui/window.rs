@@ -5,14 +5,14 @@ use adw::prelude::*;
 use edit_distance;
 use serde_json::Value;
 use spdx::Expression;
-use crate::{parse::{packages::{Package, LicenseEnum, Platform}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageTypes}, APPINFO, config};
+use crate::{parse::{packages::{Package, LicenseEnum, Platform}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg}, APPINFO, config};
 use log::*;
 
 use super::{
     categories::{PkgGroup, PkgCategory},
     pkgtile::PkgTile,
     pkgpage::{PkgModel, PkgMsg, PkgInitModel, self, InstallType, WorkPkg},
-    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg, CacheReturn}, searchpage::{SearchPageModel, SearchPageMsg, SearchItem}, installedpage::{InstalledPageModel, InstalledPageMsg}, updatepage::{UpdatePageModel, UpdatePageMsg, UpdateItem, UpdatePageInit}, about::{AboutPageModel, AboutPageMsg}, preferencespage::{PreferencesPageModel, PreferencesPageMsg}, categorypage::{CategoryPageModel, CategoryPageMsg}, categorytile::CategoryTile,
+    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg, CacheReturn}, searchpage::{SearchPageModel, SearchPageMsg, SearchItem}, installedpage::{InstalledPageModel, InstalledPageMsg}, updatepage::{UpdatePageModel, UpdatePageMsg, UpdateItem, UpdatePageInit}, about::{AboutPageModel, AboutPageMsg}, preferencespage::{PreferencesPageModel, PreferencesPageMsg}, categorypage::{CategoryPageModel, CategoryPageMsg}, categorytile::CategoryTile, welcome::WelcomeModel,
 };
 
 #[derive(PartialEq)]
@@ -91,6 +91,7 @@ pub enum AppMsg {
     UpdateFlake(Option<String>),
     TryLoad,
     ReloadUpdate,
+    LoadConfig(NscConfig),
     Close,
     LoadError(String, String),
     Initialize(HashMap<String, Package>, Vec<String>, HashMap<String, String>, HashMap<PkgCategory, Vec<String>>, HashMap<PkgCategory, Vec<String>>, Option<HashMap<String, String>> /* profile pkgs */),
@@ -375,6 +376,18 @@ impl Component for AppModel {
         debug!("userpkgtype: {:?}", userpkgtype);
         debug!("syspkgtype: {:?}", syspkgtype);
 
+        let (config, welcome) = if let Some(config) = getconfig() {
+            debug!("Got config: {:?}", config);
+            (config, false)
+        } else {
+            // Show welcome page
+            debug!("No config found");
+            (NscConfig {
+                systemconfig: String::from("/etc/nixos/configuration.nix"),
+                flake: None,
+            }, true)
+        };
+
         let windowloading = WindowAsyncHandler::builder()
             .detach_worker(())
             .forward(sender.input_sender(), identity);
@@ -382,9 +395,10 @@ impl Component for AppModel {
             .launch(root.clone().upcast())
             .forward(sender.input_sender(), identity);
         let pkgpage = PkgModel::builder()
-            .launch(PkgPageTypes {
+            .launch(PkgPageInit {
                 userpkgs: userpkgtype.clone(),
                 syspkgs: syspkgtype.clone(),
+                config: config.clone(),
             })
             .forward(sender.input_sender(), identity);
         let searchpage = SearchPageModel::builder()
@@ -397,11 +411,9 @@ impl Component for AppModel {
             .launch(userpkgtype.clone())
             .forward(sender.input_sender(), identity);
         let updatepage = UpdatePageModel::builder()
-            .launch(UpdatePageInit { window: root.clone().upcast(), systype: syspkgtype.clone(), usertype: userpkgtype.clone() })
+            .launch(UpdatePageInit { window: root.clone().upcast(), systype: syspkgtype.clone(), usertype: userpkgtype.clone(), config: config.clone() })
             .forward(sender.input_sender(), identity);
         let viewstack = adw::ViewStack::new();
-
-        let config = getconfig();
 
         let model = AppModel {
             application,
@@ -438,7 +450,14 @@ impl Component for AppModel {
             tracker: 0,
         };
 
-        model.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, model.syspkgtype.clone(), model.userpkgtype.clone(), model.config.clone()));
+        if welcome {
+            let welcomepage = WelcomeModel::builder()
+                .launch(root.clone().upcast())
+                .forward(sender.input_sender(), identity);
+            welcomepage.emit(WelcomeMsg::Show);
+        } else {
+            model.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, model.syspkgtype.clone(), model.userpkgtype.clone(), model.config.clone()));
+        }
         let recbox = model.recommendedapps.widget();
         let categorybox = model.categories.widget();
         let viewstack = &model.viewstack;
@@ -495,6 +514,15 @@ impl Component for AppModel {
             }
             AppMsg::ReloadUpdate => {
                 self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Update, self.syspkgtype.clone(), self.userpkgtype.clone(), self.config.clone()));
+            }
+            AppMsg::LoadConfig(config) => {
+                self.config = config;
+                if let Err(e) = editconfig(self.config.clone()) {
+                    warn!("Error editing config: {}", e);
+                }
+                self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
+                self.updatepage.emit(UpdatePageMsg::UpdateConfig(self.config.clone()));
+                self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(CacheReturn::Init, self.syspkgtype.clone(), self.userpkgtype.clone(), self.config.clone()));
             }
             AppMsg::Close => {
                 self.application.quit();

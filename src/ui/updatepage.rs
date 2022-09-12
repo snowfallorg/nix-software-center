@@ -1,4 +1,4 @@
-use crate::{parse::{cache::channelver, config::{getconfig, NscConfig}}, APPINFO};
+use crate::{parse::{cache::channelver, config::NscConfig}, APPINFO};
 
 use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, UpdateDialogMsg}, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}};
 use adw::prelude::*;
@@ -44,6 +44,7 @@ pub struct UpdatePageInit {
     pub window: gtk::Window,
     pub systype: SystemPkgs,
     pub usertype: UserPkgs,
+    pub config: NscConfig,
 }
 
 #[relm4::component(pub)]
@@ -286,7 +287,7 @@ impl SimpleComponent for UpdatePageModel {
             .detach_worker(UpdateAsyncHandlerInit { syspkgs: initparams.systype.clone(), userpkgs: initparams.usertype.clone() })
             .forward(sender.input_sender(), identity);
 
-        let config = getconfig();
+        let config = initparams.config;
         updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(config.clone()));
 
         let model = UpdatePageModel {

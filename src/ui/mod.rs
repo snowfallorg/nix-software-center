@@ -14,3 +14,4 @@ pub mod about;
 pub mod preferencespage;
 pub mod categorypage;
 pub mod categorytile;
+pub mod welcome;

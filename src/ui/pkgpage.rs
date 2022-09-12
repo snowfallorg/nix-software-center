@@ -23,7 +23,6 @@ use std::{
 use log::*;
 
 use crate::parse::config::NscConfig;
-use crate::parse::config::getconfig;
 use crate::parse::packages::PkgMaintainer;
 use crate::parse::packages::StrOrVec;
 use crate::ui::installworker::InstallAsyncHandlerMsg;
@@ -169,14 +168,15 @@ pub enum PkgAsyncMsg {
 }
 
 #[derive(Debug)]
-pub struct PkgPageTypes {
+pub struct PkgPageInit {
     pub syspkgs: SystemPkgs,
-    pub userpkgs: UserPkgs
+    pub userpkgs: UserPkgs,
+    pub config: NscConfig,
 }
 
 #[relm4::component(pub)]
 impl Component for PkgModel {
-    type Init = PkgPageTypes;
+    type Init = PkgPageInit;
     type Input = PkgMsg;
     type Output = AppMsg;
     type Widgets = PkgWidgets;
@@ -932,14 +932,14 @@ impl Component for PkgModel {
     }
 
     fn init(
-        pkgtypes: Self::Init,
+        initparams: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let installworker = InstallAsyncHandler::builder()
-            .detach_worker(InstallAsyncHandlerInit { syspkgs: pkgtypes.syspkgs.clone(), userpkgs: pkgtypes.userpkgs.clone() })
+            .detach_worker(InstallAsyncHandlerInit { syspkgs: initparams.syspkgs.clone(), userpkgs: initparams.userpkgs.clone() })
             .forward(sender.input_sender(), identity);
-        let config = getconfig();
+        let config = initparams.config;
         installworker.emit(InstallAsyncHandlerMsg::SetConfig(config.clone()));
         let model = PkgModel {
             config,
@@ -962,8 +962,8 @@ impl Component for PkgModel {
             // installinguserpkgs: HashSet::new(),
             // installingsystempkgs: HashSet::new(),
             // removinguserpkgs: HashSet::new(),
-            syspkgtype: pkgtypes.syspkgs,
-            userpkgtype: pkgtypes.userpkgs,
+            syspkgtype: initparams.syspkgs,
+            userpkgtype: initparams.userpkgs,
             workqueue: HashSet::new(),
             launchable: None,
             tracker: 0,
