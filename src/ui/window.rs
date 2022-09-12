@@ -378,7 +378,19 @@ impl Component for AppModel {
 
         let (config, welcome) = if let Some(config) = getconfig() {
             debug!("Got config: {:?}", config);
-            (config, false)
+            if !Path::new(&config.systemconfig).exists() {
+                warn!("Invalid system config path: {}", config.systemconfig);
+                (config, true)
+            } else if let Some(flakepath) = &config.flake {
+                if !Path::new(&flakepath).exists() {
+                    warn!("Invalid flake path: {}", flakepath);
+                    (config, true)
+                } else {
+                    (config, false)
+                }
+            } else {
+                (config, false)
+            }
         } else {
             // Show welcome page
             debug!("No config found");
