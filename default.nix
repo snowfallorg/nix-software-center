@@ -1,25 +1,27 @@
-{
-  pkgs ? import <nixpkgs> {},
-  lib ? import <nixpkgs/lib>,
+{ pkgs ? import <nixpkgs> { }
+, lib ? import <nixpkgs/lib>
 }:
 let
   libadwaita-git = pkgs.libadwaita.overrideAttrs (oldAttrs: rec {
-    version = "1.2.rc";
+    version = "1.2.0";
     src = pkgs.fetchFromGitLab {
       domain = "gitlab.gnome.org";
       owner = "GNOME";
       repo = "libadwaita";
       rev = version;
-      hash = "sha256-p7nsaAqrzQKeUiu7aGlgoKu0AH9KV/sMsVcLLpgl4Lo=";
+      hash = "sha256-3lH7Vi9M8k+GSrCpvruRpLrIpMoOakKbcJlaAc/FK+U=";
     };
   });
-  nixos-appstream-data = (import (pkgs.fetchFromGitHub {
-    owner = "vlinkz";
-    repo = "nixos-appstream-data";
-    rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
-    hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
-  }) {stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
-in pkgs.stdenv.mkDerivation rec {
+  nixos-appstream-data = (import
+    (pkgs.fetchFromGitHub {
+      owner = "vlinkz";
+      repo = "nixos-appstream-data";
+      rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
+      hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
+    })
+    { stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
+in
+pkgs.stdenv.mkDerivation rec {
   pname = "nix-software-center";
   version = "0.0.1";
 
