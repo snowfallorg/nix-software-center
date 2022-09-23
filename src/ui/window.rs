@@ -349,33 +349,6 @@ impl Component for AppModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
 
-        let userpkgtype = if let Ok(h) = std::env::var("HOME") {
-            if Path::new(&format!("{}/.nix-profile/manifest.json", h)).exists() {
-                UserPkgs::Profile
-            } else {
-                UserPkgs::Env
-            }
-        } else {
-            UserPkgs::Env
-        };
-
-        let syspkgtype = match fs::read_to_string("/run/current-system/nixos-version") {
-            Ok(s) => {
-                if let Some(last) = s.split('.').last() {
-                    if last.len() == 7 {
-                        SystemPkgs::Flake
-                    } else {
-                        SystemPkgs::Legacy
-                    }
-                } else {
-                    SystemPkgs::Legacy
-                }
-            }
-            Err(_) => SystemPkgs::Legacy,
-        };
-        debug!("userpkgtype: {:?}", userpkgtype);
-        debug!("syspkgtype: {:?}", syspkgtype);
-
         let (config, welcome) = if let Some(config) = getconfig() {
             debug!("Got config: {:?}", config);
             if !Path::new(&config.systemconfig).exists() {
@@ -399,6 +372,46 @@ impl Component for AppModel {
                 flake: None,
             }, true)
         };
+
+        let userpkgtype = if let Ok(h) = std::env::var("HOME") {
+            
+            if Path::new(&format!("{}/.nix-profile/manifest.json", h)).exists()
+            || !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists()
+            || !Path::new(&format!("{}/.nix-profile/manifest.nix", h)).exists()
+            || if let Ok(m) = fs::read_to_string(&format!("{}/.nix-profile/manifest.nix", h)) {
+                m == "[ ]"
+            } else {
+                false
+            }
+            {
+                UserPkgs::Profile
+            } else {
+                UserPkgs::Env
+            }
+        } else {
+            UserPkgs::Env
+        };
+
+        let syspkgtype = match fs::read_to_string("/run/current-system/nixos-version") {
+            Ok(s) => {
+                if !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists() || config.flake.is_some() {
+                    SystemPkgs::Flake
+                } else if let Some(last) = s.split('.').last() {
+                    if last.len() == 7 || last == "dirty" || last == "git" {
+                        SystemPkgs::Flake
+                    } else {
+                        SystemPkgs::Legacy
+                    }
+                } else {
+                    SystemPkgs::Legacy
+                }
+            }
+            Err(_) => SystemPkgs::Legacy,
+        };
+        debug!("userpkgtype: {:?}", userpkgtype);
+        debug!("syspkgtype: {:?}", syspkgtype);
+
+
 
         let windowloading = WindowAsyncHandler::builder()
             .detach_worker(())
