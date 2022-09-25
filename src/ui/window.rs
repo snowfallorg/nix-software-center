@@ -31,6 +31,7 @@ enum MainPage {
 pub enum SystemPkgs {
     Legacy,
     Flake,
+    None,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -87,8 +88,8 @@ pub struct AppModel {
 
 #[derive(Debug)]
 pub enum AppMsg {
-    UpdateSysconfig(String),
-    UpdateFlake(Option<String>),
+    UpdateSysconfig(Option<String>),
+    UpdateFlake(Option<String>, Option<String>),
     TryLoad,
     ReloadUpdate,
     LoadConfig(NscConfig),
@@ -351,25 +352,31 @@ impl Component for AppModel {
 
         let (config, welcome) = if let Some(config) = getconfig() {
             debug!("Got config: {:?}", config);
-            if !Path::new(&config.systemconfig).exists() {
-                warn!("Invalid system config path: {}", config.systemconfig);
-                (config, true)
-            } else if let Some(flakepath) = &config.flake {
+            let mut out = false;
+            if let Some(configpath) = &config.systemconfig {
+                if !Path::new(configpath).exists() {
+                    warn!("Invalid system config path: {}", configpath);
+                    out = true
+                }
+            }
+            if let Some(flakepath) = &config.flake {
                 if !Path::new(&flakepath).exists() {
                     warn!("Invalid flake path: {}", flakepath);
-                    (config, true)
+                    out = true
                 } else {
-                    (config, false)
+                    out = false
                 }
             } else {
-                (config, false)
+                out = false
             }
+            (config, out)
         } else {
             // Show welcome page
             debug!("No config found");
             (NscConfig {
-                systemconfig: String::from("/etc/nixos/configuration.nix"),
+                systemconfig: None,
                 flake: None,
+                flakearg: None,
             }, true)
         };
 
@@ -392,22 +399,27 @@ impl Component for AppModel {
             UserPkgs::Env
         };
 
-        let syspkgtype = match fs::read_to_string("/run/current-system/nixos-version") {
-            Ok(s) => {
-                if !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists() || config.flake.is_some() {
-                    SystemPkgs::Flake
-                } else if let Some(last) = s.split('.').last() {
-                    if last.len() == 7 || last == "dirty" || last == "git" {
+        let syspkgtype = if config.systemconfig.is_none() {
+            SystemPkgs::None
+        } else {
+            match fs::read_to_string("/run/current-system/nixos-version") {
+                Ok(s) => {
+                    if !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists() || config.flake.is_some() {
                         SystemPkgs::Flake
+                    } else if let Some(last) = s.split('.').last() {
+                        if last.len() == 7 || last == "dirty" || last == "git" {
+                            SystemPkgs::Flake
+                        } else {
+                            SystemPkgs::Legacy
+                        }
                     } else {
                         SystemPkgs::Legacy
                     }
-                } else {
-                    SystemPkgs::Legacy
                 }
+                Err(_) => SystemPkgs::None,
             }
-            Err(_) => SystemPkgs::Legacy,
         };
+
         debug!("userpkgtype: {:?}", userpkgtype);
         debug!("syspkgtype: {:?}", syspkgtype);
 
@@ -433,7 +445,7 @@ impl Component for AppModel {
             .launch(())
             .forward(sender.input_sender(), identity);
         let installedpage = InstalledPageModel::builder()
-            .launch(userpkgtype.clone())
+            .launch((syspkgtype.clone(), userpkgtype.clone()))
             .forward(sender.input_sender(), identity);
         let updatepage = UpdatePageModel::builder()
             .launch(UpdatePageInit { window: root.clone().upcast(), systype: syspkgtype.clone(), usertype: userpkgtype.clone(), config: config.clone() })
@@ -558,26 +570,55 @@ impl Component for AppModel {
             }
             AppMsg::UpdateSysconfig(systemconfig) => {
                 self.config = NscConfig {
-                    systemconfig,
+                    systemconfig: systemconfig.clone(),
                     flake: self.config.flake.clone(),
+                    flakearg: self.config.flakearg.clone(),
                 };
                 if editconfig(self.config.clone()).is_err() {
                     warn!("Failed to update config");
                 }
+
+                if systemconfig.is_some() {
+                    if self.syspkgtype == SystemPkgs::None {
+                        if self.config.flake.is_some() {
+                            self.syspkgtype = SystemPkgs::Flake;
+                        } else {
+                            self.syspkgtype = SystemPkgs::Legacy;
+                        }
+                    }
+                } else {
+                    self.syspkgtype = SystemPkgs::None;
+                }
+
                 self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
                 self.updatepage.emit(UpdatePageMsg::UpdateConfig(self.config.clone()));
-                sender.input(AppMsg::UpdatePkgs(None))
+                self.pkgpage.emit(PkgMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.updatepage.emit(UpdatePageMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.installedpage.emit(InstalledPageMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                sender.input(AppMsg::UpdatePkgs(None));
+
             }
-            AppMsg::UpdateFlake(flake) => {
+            AppMsg::UpdateFlake(flake, flakearg) => {
                 self.config = NscConfig {
                     systemconfig: self.config.systemconfig.clone(),
-                    flake,
+                    flake: flake.clone(),
+                    flakearg,
                 };
                 if editconfig(self.config.clone()).is_err() {
                     warn!("Failed to update config");
                 }
+
+                if flake.is_some() {
+                    self.syspkgtype = SystemPkgs::Flake;
+                } else {
+                    self.syspkgtype = SystemPkgs::Legacy;
+                }
+
                 self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
                 self.updatepage.emit(UpdatePageMsg::UpdateConfig(self.config.clone()));
+                self.pkgpage.emit(PkgMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.updatepage.emit(UpdatePageMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.installedpage.emit(InstalledPageMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
             }
             AppMsg::Initialize(pkgs, recommendedapps, syspkgs, categoryrec, categoryall, profilepkgs) => {
                 self.syspkgs = syspkgs;
@@ -938,11 +979,15 @@ impl Component for AppModel {
                     Ok(pcurrpkgs)
                 }
 
-                let systempkgs = match getsystempkgs(&self.config.systemconfig) {
-                    Ok(x) => x,
-                    Err(_) => {
-                        self.installedsystempkgs.clone()
+                let systempkgs = if let Some(sysconfig) = &self.config.systemconfig {
+                    match getsystempkgs(sysconfig) {
+                        Ok(x) => x,
+                        Err(_) => {
+                            self.installedsystempkgs.clone()
+                        }
                     }
+                } else {
+                    HashSet::new()
                 };
 
                 let userpkgs = match self.userpkgtype {
@@ -1221,6 +1266,7 @@ impl Component for AppModel {
                             })
                         }
                     }
+                    SystemPkgs::None => {}
                 }
                 self.updatepage.emit(UpdatePageMsg::Update(updateuseritems, updatesystemitems));
             }
@@ -1321,18 +1367,19 @@ impl Component for AppModel {
                 let preferencespage = PreferencesPageModel::builder()
                     .launch(self.mainwindow.clone().upcast())
                     .forward(sender.input_sender(), identity);
-                if let Some(flake) = &self.config.flake {
-                    let flakeparts = flake.split('#').collect::<Vec<&str>>();
-                    if let Some(p) = flakeparts.first() {
-                        let path = PathBuf::from(p);
-                        let args = flakeparts.get(1).unwrap_or(&"").to_string();
-                        preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), Some((path, args))))
-                    } else {
-                        preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
-                    }
-                } else {
-                    preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
-                }
+                preferencespage.emit(PreferencesPageMsg::Show(self.config.clone()));
+                // if let Some(flake) = &self.config.flake {
+                //     let flakeparts = flake.split('#').collect::<Vec<&str>>();
+                //     if let Some(p) = flakeparts.first() {
+                //         let path = PathBuf::from(p);
+                //         let args = flakeparts.get(1).unwrap_or(&"").to_string();
+                //         preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), Some((path, args))))
+                //     } else {
+                //         preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
+                //     }
+                // } else {
+                //     preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
+                // }
             }
             AppMsg::AddInstalledToWorkQueue(work) => {
                 let p = match work.pkgtype {

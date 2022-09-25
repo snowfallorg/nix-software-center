@@ -27,6 +27,7 @@ pub struct UpdatePageModel {
 #[derive(Debug)]
 pub enum UpdatePageMsg {
     UpdateConfig(NscConfig),
+    UpdatePkgTypes(SystemPkgs, UserPkgs),
     Update(Vec<UpdateItem>, Vec<UpdateItem>),
     OpenRow(usize, InstallType),
     UpdateSystem,
@@ -317,6 +318,11 @@ impl SimpleComponent for UpdatePageModel {
             UpdatePageMsg::UpdateConfig(config) => {
                 self.config = config;
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(self.config.clone()));
+            }
+            UpdatePageMsg::UpdatePkgTypes(systype, usertype) => {
+                self.systype = systype.clone();
+                self.usertype = usertype.clone();
+                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdatePkgTypes(self.systype.clone(), self.usertype.clone()));
             }
             UpdatePageMsg::Update(updateuserlist, updatesystemlist) => {
                 info!("UpdatePageMsg::Update");

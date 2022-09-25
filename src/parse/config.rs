@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub struct NscConfig {
-    pub systemconfig: String,
+    pub systemconfig: Option<String>,
     pub flake: Option<String>,
+    pub flakearg: Option<String>,
 }
 
 pub fn getconfig() -> Option<NscConfig> {

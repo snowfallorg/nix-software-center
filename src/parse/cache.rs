@@ -36,7 +36,14 @@ pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs, config: NscConfig) ->
         SystemPkgs::Flake => {
             setupflakepkgscache(config)?;
         }
+        SystemPkgs::None => {}
     }
+
+    if userpkgs == UserPkgs::Env && syspkgs != SystemPkgs::Legacy {
+        setupupdatecache()?;
+        setupnewestver()?;
+    }
+
     if userpkgs == UserPkgs::Profile {
         setupprofilepkgscache()?;
     }
@@ -318,7 +325,12 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
 // nix-instantiate --eval -E '(builtins.getFlake "/home/user/nix").inputs.nixpkgs.outPath'
 // nix-env -f /nix/store/sjmq1gphj1arbzf4aqqnygd9pf4hkfkf-source -qa --json > packages.json
 fn setupupdatecache() -> Result<(), Box<dyn Error>> {
-    let dlver = fs::read_to_string("/run/current-system/nixos-version")?;
+    let output = Command::new("nix-instantiate")
+        .arg("--eval")
+        .arg("-E")
+        .arg("with import <nixpkgs> {}; pkgs.lib.version")
+        .output()?;
+    let dlver = String::from_utf8(output.stdout)?.replace("\"", "");
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();
 
@@ -373,8 +385,12 @@ fn setupupdatecache() -> Result<(), Box<dyn Error>> {
 }
 
 fn setupnewestver() -> Result<(), Box<dyn Error>> {
-    let version = fs::read_to_string("/run/current-system/nixos-version")?;
-
+    let output = Command::new("nix-instantiate")
+        .arg("--eval")
+        .arg("-E")
+        .arg("with import <nixpkgs> {}; pkgs.lib.version")
+        .output()?;
+    let version = String::from_utf8(output.stdout)?.replace("\"", "");
     let mut relver = version.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();
 
     if version.len() >= 8 && &version[5..8] == "pre" {

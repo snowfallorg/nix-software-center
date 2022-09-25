@@ -13,12 +13,14 @@ pub struct InstalledPageModel {
     #[tracker::no_eq]
     installedsystemlist: FactoryVecDeque<InstalledItemModel>,
     userpkgtype: UserPkgs,
+    systempkgtype: SystemPkgs,
     updatetracker: u8,
 }
 
 #[derive(Debug)]
 pub enum InstalledPageMsg {
     Update(Vec<InstalledItem>, Vec<InstalledItem>),
+    UpdatePkgTypes(SystemPkgs, UserPkgs),
     OpenRow(usize, InstallType),
     Remove(InstalledItem),
     UnsetBusy(WorkPkg),
@@ -26,7 +28,7 @@ pub enum InstalledPageMsg {
 
 #[relm4::component(pub)]
 impl SimpleComponent for InstalledPageModel {
-    type InitParams = UserPkgs;
+    type InitParams = (SystemPkgs, UserPkgs);
     type Input = InstalledPageMsg;
     type Output = AppMsg;
     type Widgets = InstalledPageWidgets;
@@ -43,6 +45,8 @@ impl SimpleComponent for InstalledPageModel {
                     set_margin_all: 15,
                     set_spacing: 15,
                     gtk::Label {
+                        #[watch]
+                        set_visible: !model.installeduserlist.is_empty(),
                         set_halign: gtk::Align::Start,
                         add_css_class: "title-4",
                         set_label: match model.userpkgtype {
@@ -52,6 +56,8 @@ impl SimpleComponent for InstalledPageModel {
                     },
                     #[local_ref]
                     installeduserlist -> gtk::ListBox {
+                        #[watch]
+                        set_visible: !model.installeduserlist.is_empty(),
                         set_valign: gtk::Align::Start,
                         add_css_class: "boxed-list",
                         set_selection_mode: gtk::SelectionMode::None,
@@ -62,12 +68,16 @@ impl SimpleComponent for InstalledPageModel {
                         }
                     },
                     gtk::Label {
+                        #[watch]
+                        set_visible: !model.installedsystemlist.is_empty(),
                         set_halign: gtk::Align::Start,
                         add_css_class: "title-4",
                         set_label: "System (configuration.nix)",
                     },
                     #[local_ref]
                     installedsystemlist -> gtk::ListBox {
+                        #[watch]
+                        set_visible: !model.installedsystemlist.is_empty(),
                         set_valign: gtk::Align::Start,
                         add_css_class: "boxed-list",
                         set_selection_mode: gtk::SelectionMode::None,
@@ -83,7 +93,7 @@ impl SimpleComponent for InstalledPageModel {
     }
 
     fn init(
-        userpkgtype: Self::InitParams,
+        (systempkgtype, userpkgtype): Self::InitParams,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -92,6 +102,7 @@ impl SimpleComponent for InstalledPageModel {
             installedsystemlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
             updatetracker: 0,
             userpkgtype,
+            systempkgtype,
             tracker: 0
         };
 
@@ -118,6 +129,10 @@ impl SimpleComponent for InstalledPageModel {
                 for installedsystem in installedsystemlist {
                     installedsystemlist_guard.push_back(installedsystem);
                 }
+            }
+            InstalledPageMsg::UpdatePkgTypes(systempkgtype, userpkgtype) => {
+                self.systempkgtype = systempkgtype;
+                self.userpkgtype = userpkgtype;
             }
             InstalledPageMsg::OpenRow(row, pkgtype) => {
                 match pkgtype {

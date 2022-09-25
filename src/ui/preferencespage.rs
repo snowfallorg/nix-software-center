@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::parse::config::NscConfig;
+
 use super::window::AppMsg;
 use adw::prelude::*;
 use relm4::*;
@@ -9,8 +11,9 @@ use relm4_components::open_dialog::*;
 #[derive(Debug)]
 pub struct PreferencesPageModel {
     hidden: bool,
-    configpath: PathBuf,
-    flake: Option<(PathBuf, String)>,
+    configpath: Option<PathBuf>,
+    flake: Option<PathBuf>,
+    flakearg: Option<String>,
     #[tracker::no_eq]
     open_dialog: Controller<OpenDialog>,
     #[tracker::no_eq]
@@ -19,13 +22,12 @@ pub struct PreferencesPageModel {
 
 #[derive(Debug)]
 pub enum PreferencesPageMsg {
-    Show(PathBuf, Option<(PathBuf, String)>),
+    Show(NscConfig),
     Open,
     OpenFlake,
-    SetConfigPath(PathBuf),
-    SetFlake(Option<(PathBuf, String)>),
-    SetFlakePath(PathBuf),
-    SetFlakeArg(String),
+    SetConfigPath(Option<PathBuf>),
+    SetFlakePath(Option<PathBuf>),
+    SetFlakeArg(Option<String>),
     ModifyFlake,
     Ignore,
 }
@@ -64,7 +66,7 @@ impl SimpleComponent for PreferencesPageModel {
                                     gtk::Label {
                                         #[watch]
                                         set_label: {
-                                            let x = model.configpath.file_name().unwrap_or_default().to_str().unwrap_or_default();
+                                            let x = if let Some(configpath)  = &model.configpath { configpath.file_name().unwrap_or_default().to_str().unwrap_or_default() } else { "(None)" };
                                             if x.is_empty() {
                                                 "(None)"
                                             } else {
@@ -77,13 +79,12 @@ impl SimpleComponent for PreferencesPageModel {
                                     sender.input(PreferencesPageMsg::Open);
                                 }
                             },
-                            // gtk::Button {
-                            //     add_css_class: "flat",
-                            //     set_icon_name: "view-refresh-symbolic",
-                            //     connect_clicked[sender] => move |_| {
-                            //         sender.input(PreferencesPageMsg::SetConfigPath(PathBuf::from("/etc/nixos/configuration.nix")));
-                            //     }
-                            // }
+                            gtk::Button {
+                                set_icon_name: "user-trash-symbolic",
+                                connect_clicked[sender] => move |_| {
+                                    sender.input(PreferencesPageMsg::SetConfigPath(None));
+                                }
+                            }
                         }
                     },
                     add = &adw::ActionRow {
@@ -92,9 +93,10 @@ impl SimpleComponent for PreferencesPageModel {
                             set_valign: gtk::Align::Center,
                             connect_state_set[sender] => move |_, b| {
                                 if b {
-                                    sender.input(PreferencesPageMsg::SetFlake(Some((PathBuf::new(), String::default()))));
+                                    sender.input(PreferencesPageMsg::SetFlakePath(Some(PathBuf::new())));
                                 } else {
-                                    sender.input(PreferencesPageMsg::SetFlake(None));
+                                    sender.input(PreferencesPageMsg::SetFlakePath(None));
+                                    sender.input(PreferencesPageMsg::SetFlakeArg(None));
                                 }
                                 gtk::Inhibit(false)
                             } @switched,
@@ -122,7 +124,7 @@ impl SimpleComponent for PreferencesPageModel {
                                     gtk::Label {
                                         #[watch]
                                         set_label: {
-                                            let x = if let Some((f, _)) = &model.flake {
+                                            let x = if let Some(f) = &model.flake {
                                                 f.file_name().unwrap_or_default().to_str().unwrap_or_default()
                                             } else {
                                                 ""
@@ -153,11 +155,17 @@ impl SimpleComponent for PreferencesPageModel {
                         set_visible: model.flake.is_some(),
                         set_title: "Flake arguments (--flake path/to/flake.nix#<THIS ENTRY>)",
                         connect_changed[sender] => move |x| {
-                            sender.input(PreferencesPageMsg::SetFlakeArg(x.text().to_string()));
+                            sender.input(PreferencesPageMsg::SetFlakeArg({
+                                let text = x.text().to_string();
+                                if text.is_empty() {
+                                    None
+                                } else {
+                                    Some(text)
+                                }}));
                         } @flakeentry,
                         #[track(model.changed(PreferencesPageModel::flake()))]
                         #[block_signal(flakeentry)]
-                        set_text: &model.flake.as_ref().map(|(_, a)| a.to_string()).unwrap_or_default()
+                        set_text: &model.flakearg.as_ref().unwrap_or(&String::new())
                     }
 
                 }
@@ -174,20 +182,21 @@ impl SimpleComponent for PreferencesPageModel {
             .transient_for_native(root)
             .launch(OpenDialogSettings::default())
             .forward(&sender.input, |response| match response {
-                OpenDialogResponse::Accept(path) => PreferencesPageMsg::SetConfigPath(path),
+                OpenDialogResponse::Accept(path) => PreferencesPageMsg::SetConfigPath(Some(path)),
                 OpenDialogResponse::Cancel => PreferencesPageMsg::Ignore,
             });
         let flake_file_dialog = OpenDialog::builder()
             .transient_for_native(root)
             .launch(OpenDialogSettings::default())
             .forward(&sender.input, |response| match response {
-                OpenDialogResponse::Accept(path) => PreferencesPageMsg::SetFlakePath(path),
+                OpenDialogResponse::Accept(path) => PreferencesPageMsg::SetFlakePath(Some(path)),
                 OpenDialogResponse::Cancel => PreferencesPageMsg::Ignore,
             });
         let model = PreferencesPageModel {
             hidden: true,
-            configpath: PathBuf::new(),
+            configpath: None,
             flake: None,
+            flakearg: None,
             open_dialog,
             flake_file_dialog,
             tracker: 0,
@@ -201,41 +210,28 @@ impl SimpleComponent for PreferencesPageModel {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         self.reset();
         match msg {
-            PreferencesPageMsg::Show(path, flake) => {
-                self.configpath = path;
-                self.set_flake(flake);
+            PreferencesPageMsg::Show(config) => {
+                self.configpath = config.systemconfig.as_ref().map(|x| PathBuf::from(x));
+                self.set_flake(config.flake.as_ref().map(|x| PathBuf::from(x)));
+                self.set_flakearg(config.flakearg.clone());
                 self.hidden = false;
             }
             PreferencesPageMsg::Open => self.open_dialog.emit(OpenDialogMsg::Open),
             PreferencesPageMsg::OpenFlake => self.flake_file_dialog.emit(OpenDialogMsg::Open),
             PreferencesPageMsg::SetConfigPath(path) => {
                 self.configpath = path.clone();
-                sender.output(AppMsg::UpdateSysconfig(path.to_string_lossy().to_string()));
-            }
-            PreferencesPageMsg::SetFlake(flake) => {
-                self.flake = flake;
-                sender.input(PreferencesPageMsg::ModifyFlake)
+                sender.output(AppMsg::UpdateSysconfig(path.map(|x| x.to_string_lossy().to_string())));
             }
             PreferencesPageMsg::SetFlakePath(path) => {
-                self.flake = Some((
-                    path,
-                    self.flake.as_ref().map(|x| x.1.clone()).unwrap_or_default(),
-                ));
+                self.flake = path;
                 sender.input(PreferencesPageMsg::ModifyFlake)
             }
             PreferencesPageMsg::SetFlakeArg(arg) => {
-                self.flake = Some((
-                    self.flake.as_ref().map(|x| x.0.clone()).unwrap_or_default(),
-                    arg,
-                ));
+                self.flakearg = arg;
                 sender.input(PreferencesPageMsg::ModifyFlake)
             }
             PreferencesPageMsg::ModifyFlake => {
-                let out = self
-                    .flake
-                    .as_ref()
-                    .map(|(path, arg)| format!("{}#{}", path.to_string_lossy(), arg));
-                sender.output(AppMsg::UpdateFlake(out.map(|x| x.strip_suffix('#').unwrap_or(&x).to_string())));
+                sender.output(AppMsg::UpdateFlake(self.flake.as_ref().map(|x| x.to_string_lossy().to_string()), self.flakearg.clone()));
             }
             _ => {}
         }

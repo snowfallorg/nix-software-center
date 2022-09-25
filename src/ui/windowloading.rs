@@ -109,6 +109,9 @@ impl Worker for WindowAsyncHandler {
                                 }
                             }
                         }
+                        SystemPkgs::None => {
+                            HashMap::new()
+                        }
                     };
 
                     let profilepkgs = match userpkgs {

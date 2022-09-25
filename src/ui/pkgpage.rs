@@ -136,6 +136,7 @@ pub struct PkgInitModel {
 #[derive(Debug)]
 pub enum PkgMsg {
     UpdateConfig(NscConfig),
+    UpdatePkgTypes(SystemPkgs, UserPkgs),
     Open(Box<PkgInitModel>),
     LoadScreenshot(String, usize, String),
     SetError(String, usize),
@@ -148,10 +149,6 @@ pub enum PkgMsg {
     RemoveSystem,
     Cancel,
     CancelFinished,
-    // FinishedInstallUser(String, String),
-    // FailedInstallUser(String, String),
-    // FinishedRemoveUser(String, String),
-    // FailedRemoveUser(String, String),
     FinishedProcess(WorkPkg),
     FailedProcess(WorkPkg),
     Launch,
@@ -203,6 +200,9 @@ impl Component for PkgModel {
                     set_label: &model.name
                 },
                 pack_end = &gtk::MenuButton {
+                    #[watch]
+                    set_visible: model.syspkgtype != SystemPkgs::None,
+
                     #[watch]
                     set_label: match model.userpkgtype {
                         UserPkgs::Env => {
@@ -1043,6 +1043,11 @@ impl Component for PkgModel {
             PkgMsg::UpdateConfig(config) => {
                 self.config = config.clone();
                 self.installworker.emit(InstallAsyncHandlerMsg::SetConfig(config));
+            }
+            PkgMsg::UpdatePkgTypes(syspkgs, userpkgs) => {
+                self.syspkgtype = syspkgs.clone();
+                self.userpkgtype = userpkgs.clone();
+                self.installworker.emit(InstallAsyncHandlerMsg::SetPkgTypes(syspkgs, userpkgs));
             }
             PkgMsg::Open(pkgmodel) => {
                 self.set_pkg(pkgmodel.pkg);

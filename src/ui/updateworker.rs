@@ -15,7 +15,7 @@ use super::{
 pub struct UpdateAsyncHandler {
     #[tracker::no_eq]
     process: Option<JoinHandle<()>>,
-    systemconfig: String,
+    systemconfig: Option<String>,
     flakeargs: Option<String>,
     syspkgs: SystemPkgs,
     userpkgs: UserPkgs,
@@ -24,6 +24,7 @@ pub struct UpdateAsyncHandler {
 #[derive(Debug)]
 pub enum UpdateAsyncHandlerMsg {
     UpdateConfig(NscConfig),
+    UpdatePkgTypes(SystemPkgs, UserPkgs),
 
     UpdateChannels,
     UpdateChannelsAndSystem,
@@ -53,7 +54,7 @@ impl Worker for UpdateAsyncHandler {
     fn init(params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
         Self {
             process: None,
-            systemconfig: String::default(),
+            systemconfig: None,
             flakeargs: None,
             syspkgs: params.syspkgs,
             userpkgs: params.userpkgs,
@@ -65,14 +66,26 @@ impl Worker for UpdateAsyncHandler {
         match msg {
             UpdateAsyncHandlerMsg::UpdateConfig(config) => {
                 self.systemconfig = config.systemconfig;
-                self.flakeargs = config.flake;
+                self.flakeargs = if let Some(flake) = config.flake {
+                    if let Some(flakearg) = config.flakearg {
+                        Some(format!("{}#{}", flake, flakearg))
+                    } else {
+                        Some(flake)
+                    }
+                } else {
+                    None
+                }
+            }
+            UpdateAsyncHandlerMsg::UpdatePkgTypes(syspkgs, userpkgs) => {
+                self.syspkgs = syspkgs;
+                self.userpkgs = userpkgs;
             }
             UpdateAsyncHandlerMsg::UpdateChannels => {
-                let systenconfig = self.systemconfig.clone();
+                let systemconfig = self.systemconfig.clone();
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
-                    let result = runcmd(NscCmd::Channel, systenconfig, flakeargs, syspkgs).await;
+                    let result = runcmd(NscCmd::Channel, systemconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
                             sender.output(UpdatePageMsg::DoneWorking);
@@ -102,13 +115,14 @@ impl Worker for UpdateAsyncHandler {
                 });
             }
             UpdateAsyncHandlerMsg::RebuildSystem => {
-                let systenconfig = self.systemconfig.clone();
+                let systemconfig = self.systemconfig.clone();
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
                     let result = match syspkgs {
-                        SystemPkgs::Legacy => runcmd(NscCmd::Rebuild, systenconfig, flakeargs, syspkgs).await,
-                        SystemPkgs::Flake => runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await,
+                        SystemPkgs::Legacy => runcmd(NscCmd::Rebuild, systemconfig, flakeargs, syspkgs).await,
+                        SystemPkgs::Flake => runcmd(NscCmd::All, systemconfig, flakeargs, syspkgs).await,
+                        SystemPkgs::None => Ok(true),
                     };
                     match result {
                         Ok(true) => {
@@ -174,7 +188,7 @@ impl Worker for UpdateAsyncHandler {
 
 async fn runcmd(
     cmd: NscCmd,
-    _systemconfig: String,
+    _systemconfig: Option<String>,
     flakeargs: Option<String>,
     syspkgs: SystemPkgs,
 ) -> Result<bool, Box<dyn Error + Send + Sync>> {
@@ -245,6 +259,7 @@ async fn runcmd(
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
                 .spawn()?,
+            SystemPkgs::None => return Ok(true),
         },
     };
 
@@ -286,7 +301,7 @@ async fn updateprofile() -> Result<bool, Box<dyn Error + Send + Sync>> {
     let mut cmd = tokio::process::Command::new("nix")
         .arg("profile")
         .arg("upgrade")
-        .arg("'.*'")
+        .arg(".*")
         // Allow updating potential unfree packages
         .arg("--impure")
         .stderr(Stdio::piped())

@@ -27,6 +27,7 @@ pub enum WelcomeMsg {
     Close,
     UpdateConfPath(PathBuf),
     UpdateFlakePath(PathBuf),
+    ClearConfPath,
     ClearFlakePath,
     OpenConf,
     OpenFlake,
@@ -102,6 +103,14 @@ impl SimpleComponent for WelcomeModel {
                                     sender.input(WelcomeMsg::OpenConf);
                                 }
                             },
+                            add_suffix = &gtk::Button {
+                                set_halign: gtk::Align::Center,
+                                set_valign: gtk::Align::Center,
+                                set_icon_name: "user-trash-symbolic",
+                                connect_clicked[sender] => move |_| {
+                                    sender.input(WelcomeMsg::ClearConfPath);
+                                }
+                            }
                         },
                     },
                     gtk::ListBox {
@@ -150,10 +159,8 @@ impl SimpleComponent for WelcomeModel {
                             }
                         },
                     },
-                    #[name(btn)]
+                    #[name(continuebtn)]
                     gtk::Button {
-                        #[watch]
-                        set_sensitive: model.confpath.is_some(),
                         add_css_class: "pill",
                         add_css_class: "suggested-action",
                         set_label: "Continue",
@@ -191,8 +198,6 @@ impl SimpleComponent for WelcomeModel {
                 OpenDialogResponse::Cancel => WelcomeMsg::Ignore,
         });
 
-
-
         let model = WelcomeModel {
             hidden: true,
             confpath: if Path::new("/etc/nixos/configuration.nix").exists() { Some(PathBuf::from("/etc/nixos/configuration.nix")) } else { None }, // parent_window.configpath.to_string(),
@@ -205,7 +210,7 @@ impl SimpleComponent for WelcomeModel {
 
         let widgets = view_output!();
 
-        widgets.btn.grab_focus();
+        widgets.continuebtn.grab_focus();
 
         ComponentParts { model, widgets }
     }
@@ -217,14 +222,13 @@ impl SimpleComponent for WelcomeModel {
                 self.hidden = false;
             }
             WelcomeMsg::Close => {
-                if let Some(confpath) = &self.confpath {
-                    let config = NscConfig {
-                        systemconfig: confpath.to_string_lossy().to_string(),
-                        flake: self.flakepath.as_ref().map(|x| x.to_string_lossy().to_string()),
-                    };
-                    sender.output(AppMsg::LoadConfig(config));
-                    self.hidden = true;
-                }
+                let config = NscConfig {
+                    systemconfig: self.confpath.as_ref().map(|x| x.to_string_lossy().to_string()),
+                    flake: self.flakepath.as_ref().map(|x| x.to_string_lossy().to_string()),
+                    flakearg: None,
+                };
+                sender.output(AppMsg::LoadConfig(config));
+                self.hidden = true;
             }
             WelcomeMsg::UpdateConfPath(s) => {
                 info!("Set configuration path to {}", s.to_string_lossy());
@@ -233,6 +237,9 @@ impl SimpleComponent for WelcomeModel {
             WelcomeMsg::UpdateFlakePath(s) => {
                 info!("Set flake path to {}", s.to_string_lossy());
                 self.set_flakepath(Some(s));
+            }
+            WelcomeMsg::ClearConfPath => {
+                self.set_confpath(None);
             }
             WelcomeMsg::ClearFlakePath => {
                 info!("Clear flake path");
