@@ -4,6 +4,7 @@ use crate::APPINFO;
 use super::window::*;
 use adw::prelude::*;
 use relm4::{factory::*, *, gtk::pango};
+use log::*;
 
 #[tracker::track]
 #[derive(Debug)]

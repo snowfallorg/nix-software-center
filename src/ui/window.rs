@@ -1303,11 +1303,13 @@ impl Component for AppModel {
                 let pkgitems: Vec<PkgItem> = self.pkgitems.values().cloned().collect();
                 let installeduserpkgs = self.installeduserpkgs.clone();
                 let installedsystempkgs = self.installedsystempkgs.clone();
+                let userpkgtype = self.userpkgtype.clone();
                 sender.command(move |out, shutdown| {
                     let pkgs = pkgitems.clone();
                     let search = search.clone();
                     let installeduserpkgs = installeduserpkgs.clone();
                     let installedsystempkgs = installedsystempkgs;
+                    let userpkgtype = userpkgtype.clone();
                     shutdown.register(async move {
                         let searchsplit: Vec<String> = search.split(' ').filter(|x| x.len() > 1).map(|x| x.to_string()).collect();
                         let mut namepkgs = pkgs.iter().filter(|x| searchsplit.iter().any(|s| x.name.to_lowercase().contains(&s.to_lowercase()))).collect::<Vec<&PkgItem>>();
@@ -1346,8 +1348,11 @@ impl Component for AppModel {
                                 name: p.name.to_string(),
                                 summary: p.summary.clone(),
                                 icon: p.icon.clone(),
-                                installeduser: installeduserpkgs.contains_key(&p.pname),
-                                installedsystem: installedsystempkgs.contains(&p.pname),
+                                installeduser: match userpkgtype {
+                                  UserPkgs::Env => installeduserpkgs.contains_key(&p.pname),
+                                  UserPkgs::Profile => installeduserpkgs.contains_key(&p.pkg)
+                                },
+                                installedsystem: installedsystempkgs.contains(&p.pkg),
                             });
                             if i > 100 {
                                 break;
@@ -1368,18 +1373,6 @@ impl Component for AppModel {
                     .launch(self.mainwindow.clone().upcast())
                     .forward(sender.input_sender(), identity);
                 preferencespage.emit(PreferencesPageMsg::Show(self.config.clone()));
-                // if let Some(flake) = &self.config.flake {
-                //     let flakeparts = flake.split('#').collect::<Vec<&str>>();
-                //     if let Some(p) = flakeparts.first() {
-                //         let path = PathBuf::from(p);
-                //         let args = flakeparts.get(1).unwrap_or(&"").to_string();
-                //         preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), Some((path, args))))
-                //     } else {
-                //         preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
-                //     }
-                // } else {
-                //     preferencespage.emit(PreferencesPageMsg::Show(PathBuf::from(&self.config.systemconfig), None))
-                // }
             }
             AppMsg::AddInstalledToWorkQueue(work) => {
                 let p = match work.pkgtype {
