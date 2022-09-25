@@ -31,7 +31,7 @@ impl SimpleComponent for AboutPageModel {
             set_application_name: "Nix Software Center",
             set_application_icon: config::APP_ID,
             set_developer_name: "Victor Fuentes",
-            set_version: env!("CARGO_PKG_VERSION"),
+            set_version: config::VERSION,
             set_issue_url: "https://github.com/vlinkz/nix-software-center/issues",
             set_license_type: gtk::License::Gpl30Only,
             set_website: "https://github.com/vlinkz/nix-software-center",

@@ -1,6 +1,6 @@
 [package]
 name = "nix-software-center"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 default-run = "nix-software-center"
 
@@ -19,7 +19,7 @@ simd-json = { version = "0.6", features = ["allow-non-simd"] }
 
 nix-editor = "0.2.12"
 
-html2pango = "0.4"
+html2pango = "0.5"
 brotli = "3.3"
 log = "0.4"
 pretty_env_logger = "0.4"

@@ -1,9 +1,9 @@
 project(
   'nix-software-center',
   'rust',
-  version: '0.0.1',
+  version: '0.0.2',
   meson_version: '>= 0.59',
-  license: 'GPL-3.0',
+  license: 'GPL-3.0-only',
 )
 
 i18n = import('i18n')
@@ -14,8 +14,8 @@ base_id = 'dev.vlinkz.NixSoftwareCenter'
 dependency('openssl', version: '>= 1.0')
 dependency('glib-2.0', version: '>= 2.66')
 dependency('gio-2.0', version: '>= 2.66')
-dependency('gtk4', version: '>= 4.0.0')
-dependency('libadwaita-1', version: '>=1.2.alpha')
+dependency('gtk4', version: '>= 4.6.0')
+dependency('libadwaita-1', version: '>=1.2.0')
 dependency('polkit-gobject-1', version: '>= 0.103')
 
 glib_compile_resources = find_program('glib-compile-resources', required: true)
