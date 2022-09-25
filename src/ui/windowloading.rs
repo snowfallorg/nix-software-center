@@ -49,8 +49,9 @@ impl Worker for WindowAsyncHandler {
                 relm4::spawn(async move {
                     match checkcache(syspkgs2, userpkgs2, config) {
                         Ok(_) => {}
-                        Err(_) => {
+                        Err(e) => {
                             warn!("FAILED TO CHECK CACHE");
+                            warn!("{}", e);
                             sender.output(AppMsg::LoadError(
                                 String::from("Could not load cache"),
                                 String::from(
@@ -62,8 +63,9 @@ impl Worker for WindowAsyncHandler {
                     }
                     let pkgs = match readpkgs().await {
                         Ok(pkgs) => pkgs,
-                        Err(_) => {
+                        Err(e) => {
                             warn!("FAILED TO LOAD PKGS");
+                            warn!("{}", e);
                             sender.output(AppMsg::LoadError(
                                 String::from("Could not load packages"),
                                 String::from(
@@ -78,8 +80,9 @@ impl Worker for WindowAsyncHandler {
                         SystemPkgs::Legacy => {
                             match readlegacysyspkgs() {
                                 Ok(newpkgs) => newpkgs,
-                                Err(_) => {
+                                Err(e) => {
                                     warn!("FAILED TO LOAD NEW PKGS");
+                                    warn!("{}", e);
                                     sender.output(AppMsg::LoadError(
                                         String::from("Could not load new packages"),
                                         String::from(
@@ -93,8 +96,9 @@ impl Worker for WindowAsyncHandler {
                         SystemPkgs::Flake => {
                             match readflakesyspkgs() {
                                 Ok(newpkgs) => newpkgs,
-                                Err(_) => {
+                                Err(e) => {
                                     warn!("FAILED TO LOAD NEW PKGS");
+                                    warn!("{}", e);
                                     sender.output(AppMsg::LoadError(
                                         String::from("Could not load new packages"),
                                         String::from(
