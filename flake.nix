@@ -5,6 +5,10 @@
   };
 
   outputs = { self, nixpkgs, utils }:
+    {
+      nixosModules.nix-software-center = import ./modules/default.nix;
+      nixosModules.default = self.nixosModules.nix-software-center;
+    } //
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
