@@ -5,10 +5,6 @@
   };
 
   outputs = { self, nixpkgs, utils }:
-    {
-      nixosModules.nix-software-center = import ./modules/default.nix;
-      nixosModules.default = self.nixosModules.nix-software-center;
-    } //
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -75,5 +71,13 @@
           ];
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
         };
+
+        nixosModules.nix-software-center = ({ config, ... }: import ./modules/default.nix {
+          inherit pkgs;
+          inherit (pkgs) lib;
+          inherit config;
+          nix-software-center = defaultPackage;
+        });
+        nixosModules.default = nixosModules.nix-software-center;
       });
 }
