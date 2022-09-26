@@ -26,7 +26,11 @@ struct NewPackage {
     version: IString,
 }
 
-pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs, config: NscConfig) -> Result<(), Box<dyn Error>> {
+pub fn checkcache(
+    syspkgs: SystemPkgs,
+    userpkgs: UserPkgs,
+    config: NscConfig,
+) -> Result<(), Box<dyn Error>> {
     match syspkgs {
         SystemPkgs::Legacy => {
             setuplegacypkgscache()?;
@@ -36,7 +40,11 @@ pub fn checkcache(syspkgs: SystemPkgs, userpkgs: UserPkgs, config: NscConfig) ->
         SystemPkgs::Flake => {
             setupflakepkgscache(config)?;
         }
-        SystemPkgs::None => {}
+        SystemPkgs::None => {
+            if userpkgs == UserPkgs::Profile {
+                getlatestpkgs().unwrap();
+            }
+        }
     }
 
     if userpkgs == UserPkgs::Env && syspkgs != SystemPkgs::Legacy {
@@ -119,6 +127,54 @@ pub fn flakever() -> Result<Option<(String, String)>, Box<dyn Error>> {
         info!("flakever {:?} != newver {:?}", oldversion, newversion);
         Ok(Some((oldversion, newversion)))
     }
+}
+
+fn getlatestpkgs() -> Result<(), Box<dyn Error>> {
+    let vout = Command::new("nixos-version").arg("--json").output()?;
+
+    let versiondata: Value = serde_json::from_str(&String::from_utf8_lossy(&vout.stdout))?;
+    let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
+
+    let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".")[0..5].to_string();
+    if relver == "22.11" {
+        relver = "unstable".to_string();
+    }
+
+    let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
+    fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
+    info!("Relver {}", relver);
+    let url = format!(
+        "https://channels.nixos.org/nixos-{}/packages.json.br",
+        relver
+    );
+
+    // Check newest nixpkgs version
+    let revurl = format!("https://channels.nixos.org/nixos-{}/git-revision", relver);
+    let response = reqwest::blocking::get(revurl)?;
+    let mut dl = false;
+    if response.status().is_success() {
+        let newrev = response.text()?;
+        info!("NEW REV: {}", newrev);
+        if Path::new(&format!("{}/newver.txt", &cachedir)).exists() {
+            let oldrev = fs::read_to_string(&format!("{}/newver.txt", &cachedir))?;
+            if oldrev != newrev {
+                dl = true;
+            }
+        } else {
+            dl = true;
+        }
+        let mut sysver = fs::File::create(format!("{}/newver.txt", &cachedir))?;
+        sysver.write_all(newrev.as_bytes())?;
+    } else {
+        error!("Failed to get newest nixpkgs version");
+    }
+
+    let outfile = format!("{}/packages.json", &cachedir);
+    if dl {
+        dlfile(&url, &outfile)?;
+    }
+
+    Ok(())
 }
 
 fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
@@ -208,11 +264,6 @@ fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
         relver
     );
 
-    let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
-    if !Path::new(&cachedir).exists() {
-        fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
-    }
-
     fn writesyspkgs(outfile: &str, inputpath: &str) -> Result<(), Box<dyn Error>> {
         let output = Command::new("nix")
             .arg("search")
@@ -226,7 +277,14 @@ fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
-    let flakepath = config.flake.map(|x| x.strip_suffix("/flake.nix").unwrap_or(x.as_str()).to_string()).unwrap_or_else(|| String::from("/etc/nixos"));
+    let flakepath = config
+        .flake
+        .map(|x| {
+            x.strip_suffix("/flake.nix")
+                .unwrap_or(x.as_str())
+                .to_string()
+        })
+        .unwrap_or_else(|| String::from("/etc/nixos"));
     if !Path::new(&format!("{}/flakever.txt", &cachedir)).exists() {
         let mut sysver = fs::File::create(format!("{}/flakever.txt", &cachedir))?;
         sysver.write_all(rev.as_bytes())?;
