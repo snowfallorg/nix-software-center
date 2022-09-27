@@ -8,6 +8,7 @@ Nix Software Center
 [![Built with Nix][builtwithnix badge]][builtwithnix]
 [![License: GPLv3][GPLv3 badge]][GPLv3]
 [![Chat on Matrix][matrix badge]][matrix]
+[![Chat on Discord][discord badge]][discord]
 
 A graphical app store for Nix built with [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita), [GTK4](https://www.gtk.org/), and [Relm4](https://relm4.org/). Heavily inspired by [GNOME Software](https://gitlab.gnome.org/GNOME/gnome-software).
 
@@ -34,8 +35,8 @@ let
   nix-software-center = (import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
-    rev = "0.0.2";
-    sha256 = "0000000000000000000000000000000000000000000000000000";
+    rev = "0.0.3";
+    sha256 = "sha256-r5xOi/dd/hW/gdi0X0tHFFt2w82S9PFhZSXPeCA69ig=";
   })) {};
 in
 ```
@@ -105,4 +106,6 @@ Some icons in [data/icons](data/icons/) contains assets from [GNOME Software](ht
 [GPLv3 badge]: https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge
 [GPLv3]: https://opensource.org/licenses/GPL-3.0
 [matrix badge]: https://img.shields.io/badge/matrix-join%20chat-0cbc8c?style=for-the-badge&logo=matrix&logoColor=white
-[matrix]: https://matrix.to/#/#nixos-gui:matrix.org
+[matrix]: https://matrix.to/#/#snowflakeos:matrix.org
+[discord badge]: https://img.shields.io/discord/1021080090676842506?color=7289da&label=Discord&logo=discord&logoColor=ffffff&style=for-the-badge
+[discord]: https://discord.gg/6rWNMmdkgT
