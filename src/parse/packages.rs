@@ -165,11 +165,14 @@ struct FlakeJson {
 }
 
 pub async fn readpkgs() -> Result<HashMap<String, Package>,  Box<dyn Error + Send + Sync>> {
+    info!("Reading package list");
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/packages.json", cachedir);
     let file = File::open(cachefile)?;
     let reader = BufReader::new(file);
+    trace!("Reading packages.json");
     let pkgbase: PackageBase = simd_json::serde::from_reader(reader)?;
+    trace!("Finished reading packages.json");
     let mut pkgs = pkgbase.packages;
     debug!("APPDATADIR {}", APPINFO);
     let appdata = File::open(&format!("{}/xmls/nixos_x86_64_linux.yml.gz", APPINFO))?;
@@ -192,6 +195,7 @@ pub async fn readpkgs() -> Result<HashMap<String, Package>,  Box<dyn Error + Sen
 }
 
 pub fn readlegacysyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+    info!("Reading legacy system package list");
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/syspackages.json", cachedir);
     if let Ok(f) = fs::read_to_string(&cachefile) {
@@ -206,6 +210,7 @@ pub fn readlegacysyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + S
 }
 
 pub fn readflakesyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+    info!("Reading flake system package list");
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/syspackages.json", cachedir);
     if let Ok(f) = fs::read_to_string(&cachefile) {
@@ -221,6 +226,7 @@ pub fn readflakesyspkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Se
 }
 
 pub fn readprofilepkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Send + Sync>> {
+    info!("Reading profile package list");
     let cachedir = format!("{}/.cache/nix-software-center/", env::var("HOME")?);
     let cachefile = format!("{}/profilepackages.json", cachedir);
     if let Ok(f) = fs::read_to_string(&cachefile) {

@@ -145,7 +145,7 @@ fn getlatestpkgs() -> Result<(), Box<dyn Error>> {
     info!("Relver {}", relver);
     let url = format!(
         "https://channels.nixos.org/nixos-{}/packages.json.br",
-        relver
+        relver.trim()
     );
 
     // Check newest nixpkgs version
@@ -178,6 +178,7 @@ fn getlatestpkgs() -> Result<(), Box<dyn Error>> {
 }
 
 fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
+    info!("Setting up legacy package cache");
     let vout = Command::new("nix-instantiate")
         .arg("-I")
         .arg("nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos")
@@ -190,9 +191,13 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
 
     let dlver = String::from_utf8_lossy(&vout.stdout)
         .to_string()
-        .replace('"', "");
+        .replace('"', "")
+        .trim()
+        .to_string();
 
-    let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();
+    let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5]
+        .trim()
+        .to_string();
 
     if dlver.len() >= 8 && &dlver[5..8] == "pre" {
         relver = "unstable".to_string();
@@ -202,7 +207,8 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
     let url = format!(
         "https://releases.nixos.org/nixos/{}/nixos-{}/packages.json.br",
-        relver, dlver
+        relver.trim(),
+        dlver.trim()
     );
 
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
@@ -216,14 +222,15 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
     }
 
     if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists()
-        && fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))? == dlver
+        && fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))?.trim()
+            == dlver
         && Path::new(format!("{}/packages.json", &cachedir).as_str()).exists()
     {
         return Ok(());
     } else {
         let oldver = fs::read_to_string(&Path::new(format!("{}/chnver.txt", &cachedir).as_str()))?;
         let sysver = &dlver;
-        info!("OLD: {}, != NEW: {}", oldver, sysver);
+        info!("OLD: {}, != NEW: {}", oldver.trim(), sysver.trim());
     }
     if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists() {
         fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
@@ -236,6 +243,7 @@ fn setuplegacypkgscache() -> Result<(), Box<dyn Error>> {
 }
 
 fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
+    info!("Setting up flake cache");
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
 
     // First remove legacy files
@@ -250,7 +258,7 @@ fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
         .get("nixpkgsRevision")
         .unwrap()
         .as_str()
-        .unwrap();
+        .unwrap_or("unknown");
     let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
 
     let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".");
@@ -261,7 +269,7 @@ fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
     let url = format!(
         "https://channels.nixos.org/nixos-{}/packages.json.br",
-        relver
+        relver.trim()
     );
 
     fn writesyspkgs(outfile: &str, inputpath: &str) -> Result<(), Box<dyn Error>> {
@@ -332,17 +340,30 @@ fn setupflakepkgscache(config: NscConfig) -> Result<(), Box<dyn Error>> {
 }
 
 fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
+    info!("Setting up profile package cache");
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
-    fn writeprofilepkgs(outfile: &str) -> Result<(), Box<dyn Error>> {
-        let output = Command::new("nix")
-            .arg("search")
-            .arg("nixpkgs")
-            .arg("--json")
-            .output()?;
-        let mut file = fs::File::create(outfile)?;
-        file.write_all(&output.stdout)?;
-        Ok(())
+
+    // First remove legacy files
+    if Path::new(format!("{}/chnver.txt", &cachedir).as_str()).exists() {
+        fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
     }
+
+    let vout = Command::new("nixos-version").arg("--json").output()?;
+
+    let versiondata: Value = serde_json::from_str(&String::from_utf8_lossy(&vout.stdout))?;
+    let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
+
+    let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".");
+    if relver == "22.11" {
+        relver = "unstable".to_string();
+    }
+
+    fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
+    let url = format!(
+        "https://channels.nixos.org/nixpkgs-{}/packages.json.br",
+        relver.trim()
+    );
+
     // Check nix profile nixpkgs version
     let client = reqwest::blocking::Client::builder()
         .user_agent("request")
@@ -359,7 +380,8 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
         if !Path::new(&format!("{}/profilever.txt", &cachedir)).exists() {
             let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
             sysver.write_all(profilerev.as_bytes())?;
-            writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
+            dlfile(&url, &format!("{}/profilepackages.json", &cachedir))?;
+            // writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
         } else {
             let oldver =
                 fs::read_to_string(&Path::new(format!("{}/profilever.txt", &cachedir).as_str()))?;
@@ -368,14 +390,12 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
                 info!("OLD PROFILEVER: {}, != NEW: {}", oldver, sysver);
                 let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
                 sysver.write_all(profilerev.as_bytes())?;
-                writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
+                dlfile(&url, &format!("{}/profilepackages.json", &cachedir))?;
+                // writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
             } else {
                 info!("PROFILEVER UP TO DATE");
             }
         }
-    }
-    if !Path::new(&format!("{}/profilepackages.json", &cachedir)).exists() {
-        writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
     }
     Ok(())
 }
@@ -383,14 +403,20 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
 // nix-instantiate --eval -E '(builtins.getFlake "/home/user/nix").inputs.nixpkgs.outPath'
 // nix-env -f /nix/store/sjmq1gphj1arbzf4aqqnygd9pf4hkfkf-source -qa --json > packages.json
 fn setupupdatecache() -> Result<(), Box<dyn Error>> {
+    info!("Setting up update cache");
     let output = Command::new("nix-instantiate")
         .arg("--eval")
         .arg("-E")
         .arg("with import <nixpkgs> {}; pkgs.lib.version")
         .output()?;
-    let dlver = String::from_utf8(output.stdout)?.replace("\"", "");
+    let dlver = String::from_utf8(output.stdout)?
+        .replace("\"", "")
+        .trim()
+        .to_string();
 
-    let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5].to_string();
+    let mut relver = dlver.split('.').collect::<Vec<&str>>().join(".")[0..5]
+        .trim()
+        .to_string();
 
     if dlver.len() >= 8 && &dlver[5..8] == "pre" {
         relver = "unstable".to_string();
@@ -400,7 +426,8 @@ fn setupupdatecache() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
     let url = format!(
         "https://releases.nixos.org/nixos/{}/nixos-{}/packages.json.br",
-        relver, dlver
+        relver.trim(),
+        dlver.trim()
     );
 
     let cachedir = format!("{}/.cache/nix-software-center", env::var("HOME")?);
@@ -414,14 +441,15 @@ fn setupupdatecache() -> Result<(), Box<dyn Error>> {
     }
 
     if Path::new(format!("{}/sysver.txt", &cachedir).as_str()).exists()
-        && fs::read_to_string(&Path::new(format!("{}/sysver.txt", &cachedir).as_str()))? == dlver
+        && fs::read_to_string(&Path::new(format!("{}/sysver.txt", &cachedir).as_str()))?.trim()
+            == dlver
         && Path::new(format!("{}/syspackages.json", &cachedir).as_str()).exists()
     {
         return Ok(());
     } else {
         let oldver = fs::read_to_string(&Path::new(format!("{}/sysver.txt", &cachedir).as_str()))?;
         let sysver = &dlver;
-        info!("OLD: {}, != NEW: {}", oldver, sysver);
+        info!("OLD: {}, != NEW: {}", oldver.trim(), sysver.trim());
     }
     if Path::new(format!("{}/sysver.txt", &cachedir).as_str()).exists() {
         fs::remove_file(format!("{}/sysver.txt", &cachedir).as_str())?;
@@ -522,5 +550,6 @@ fn dlfile(url: &str, path: &str) -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    trace!("Finished downloading {} -> {}", url, path);
     Ok(())
 }
