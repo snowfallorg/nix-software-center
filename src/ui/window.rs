@@ -957,20 +957,20 @@ impl Component for AppModel {
                                             .arg("show-derivation")
                                             .arg(&storepath)
                                             .output()?;
-                                        let data: Value = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
-                                        if let Some(version) = data.as_object().unwrap().values().next().unwrap()["env"].get("version") {
-                                            let version = version.as_str().unwrap().to_string();
-                                            pcurrpkgs.insert(
-                                                pkgname.to_string(),
-                                                version,
-                                            );
-                                        } else {
-                                            pcurrpkgs.insert(
-                                                pkgname.to_string(),
-                                                String::default(),
-                                            );
+                                        if let Ok(data) = serde_json::from_str::<Value>(&String::from_utf8_lossy(&output.stdout)) {
+                                            if let Some(version) = data.as_object().unwrap().values().next().unwrap()["env"].get("version") {
+                                                let version = version.as_str().unwrap().to_string();
+                                                pcurrpkgs.insert(
+                                                    pkgname.to_string(),
+                                                    version,
+                                                );
+                                            } else {
+                                                pcurrpkgs.insert(
+                                                    pkgname.to_string(),
+                                                    String::default(),
+                                                );
+                                            }
                                         }
-                                        
                                     }
                                 }
                             }

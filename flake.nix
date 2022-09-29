@@ -64,7 +64,7 @@
             openssl
             pandoc
             pango
-            pkgconfig
+            pkg-config
             polkit
             wrapGAppsHook4
             nixos-appstream-data

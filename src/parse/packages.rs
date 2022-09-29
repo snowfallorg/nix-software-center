@@ -159,6 +159,11 @@ pub struct AppScreenshotImage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct FlakePkgs {
+    packages: HashMap<String, FlakeJson>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct FlakeJson {
     pname: IString,
     version: IString,
@@ -236,7 +241,7 @@ pub fn readprofilepkgs() -> Result<HashMap<String, String>,  Box<dyn Error + Sen
     }
     let file = File::open(cachefile)?;
     let reader = BufReader::new(file);
-    let profilepkgs: HashMap<String, FlakeJson> = simd_json::serde::from_reader(reader)?;
-    let profilepkgs = profilepkgs.into_iter().filter_map(|(k, v)| if let Some(pkg) = k.strip_prefix("legacyPackages.x86_64-linux.") { Some((pkg.to_string(), v.version.to_string())) } else { None }).collect::<HashMap<_, _>>();
+    let profilepkgs: FlakePkgs = simd_json::serde::from_reader(reader)?;
+    let profilepkgs = profilepkgs.packages.into_iter().map(|(pkg, v)| (pkg.to_string(), v.version.to_string())).collect::<HashMap<_, _>>();
     Ok(profilepkgs)
 }
