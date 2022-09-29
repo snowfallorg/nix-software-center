@@ -5,7 +5,7 @@ use adw::prelude::*;
 use edit_distance;
 use serde_json::Value;
 use spdx::Expression;
-use crate::{parse::{packages::{Package, LicenseEnum, Platform}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg}, APPINFO, config};
+use crate::{parse::{packages::{Package, LicenseEnum, Platform, PkgMaintainer}, cache::{uptodatelegacy, uptodateflake}, config::{NscConfig, getconfig, editconfig}}, ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg}, APPINFO, config};
 use log::*;
 
 use super::{
@@ -873,8 +873,10 @@ impl Component for AppModel {
                     platforms.insert(0, input.system.to_string());
 
                     if let Some(m) = input.meta.maintainers.clone() {
-                        for m in m {
-                            maintainers.push(m);
+                        if let Ok(m) = ijson::from_value::<Vec<PkgMaintainer>>(&m) {
+                            for m in m {
+                                maintainers.push(m);
+                            }
                         }
                     }
 

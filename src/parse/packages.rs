@@ -22,6 +22,7 @@ pub struct Package {
     #[serde(skip_deserializing)]
     pub appdata: Option<AppData>,
 }
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Meta {
     pub broken: Option<bool>,
@@ -32,7 +33,7 @@ pub struct Meta {
     #[serde(rename = "longDescription")]
     pub longdescription: Option<IString>,
     pub homepage: Option<StrOrVec>,
-    pub maintainers: Option<Vec<PkgMaintainer>>,
+    pub maintainers: Option<ijson::IValue>,
     pub position: Option<IString>,
     pub license: Option<LicenseEnum>,
     pub platforms: Option<Platform>
@@ -75,8 +76,8 @@ pub struct License {
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub struct PkgMaintainer {
-    pub email: IString,
-    pub github: IString,
+    pub email: Option<IString>,
+    pub github: Option<IString>,
     pub matrix: Option<IString>,
     pub name: Option<IString>
 }

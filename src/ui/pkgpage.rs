@@ -869,29 +869,30 @@ impl Component for PkgModel {
                                                     #[watch]
                                                     set_label: {
                                                         let mut s = String::new();
-                                                        for p in model.maintainers.iter() {
-                                                            if model.maintainers.iter().len() == 1 {
+                                                        let maintainerlist = model.maintainers.iter().filter(|m| m.name.is_some() || m.github.is_some()).collect::<Vec<_>>();
+                                                        for p in &maintainerlist {
+                                                            if maintainerlist.len() == 1 {
                                                                 if let Some(n) = &p.name {
                                                                     s.push_str(n);
-                                                                } else {
-                                                                    s.push_str(&p.github);
+                                                                } else if let Some(g) = &p.github {
+                                                                    s.push_str(g);
                                                                 }
-                                                            } else if model.maintainers.iter().len() == 2 && model.maintainers.get(0) == Some(p) {
+                                                            } else if maintainerlist.len() == 2 && model.maintainers.get(0) == Some(p) {
                                                                 if let Some(n) = &p.name {
-                                                                    let _ = write!(s, "{} ", n.to_string());
-                                                                } else {
-                                                                    let _ = write!(s, "{} ", p.github.to_string());
+                                                                    let _ = write!(s, "{} ", n.as_str());
+                                                                } else if let Some(g) = &p.github {
+                                                                    s.push_str(g);
                                                                 }
-                                                            } else if Some(p) == model.maintainers.iter().last() {
+                                                            } else if Some(p) == maintainerlist.last() {
                                                                 if let Some(n) = &p.name {
-                                                                    let _ = write!(s, "and {}", n.to_string());
-                                                                } else {
-                                                                    let _ = write!(s, "and {}", p.github.to_string());
+                                                                    let _ = write!(s, "and {}", n.as_str());
+                                                                } else if let Some(g) = &p.github {
+                                                                    let _ = write!(s, "and {}", g.as_str());
                                                                 }
                                                             } else if let Some(n) = &p.name {
-                                                                let _ = write!(s, "{}, ", n.to_string());
-                                                            } else {
-                                                                let _ = write!(s, "{}, ", p.github.to_string());
+                                                                let _ = write!(s, "{}, ", n.as_str());
+                                                            } else if let Some(g) = &p.github {
+                                                                let _ = write!(s, "{}, ", g.as_str());
                                                             }
                                                         }
                                                         if model.maintainers.is_empty() {
