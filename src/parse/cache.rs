@@ -348,21 +348,8 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
         fs::remove_file(format!("{}/chnver.txt", &cachedir).as_str())?;
     }
 
-    let vout = Command::new("nixos-version").arg("--json").output()?;
-
-    let versiondata: Value = serde_json::from_str(&String::from_utf8_lossy(&vout.stdout))?;
-    let dlver = versiondata.get("nixosVersion").unwrap().as_str().unwrap();
-
-    let mut relver = dlver.split('.').collect::<Vec<&str>>()[0..2].join(".");
-    if relver == "22.11" {
-        relver = "unstable".to_string();
-    }
-
     fs::create_dir_all(&cachedir).expect("Failed to create cache directory");
-    let url = format!(
-        "https://channels.nixos.org/nixpkgs-{}/packages.json.br",
-        relver.trim()
-    );
+    let url = "https://channels.nixos.org/nixpkgs-unstable/packages.json.br".to_string();
 
     // Check nix profile nixpkgs version
     let client = reqwest::blocking::Client::builder()
@@ -381,7 +368,6 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
             let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
             sysver.write_all(profilerev.as_bytes())?;
             dlfile(&url, &format!("{}/profilepackages.json", &cachedir))?;
-            // writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
         } else {
             let oldver =
                 fs::read_to_string(&Path::new(format!("{}/profilever.txt", &cachedir).as_str()))?;
@@ -391,7 +377,6 @@ fn setupprofilepkgscache() -> Result<(), Box<dyn Error>> {
                 let mut sysver = fs::File::create(format!("{}/profilever.txt", &cachedir))?;
                 sysver.write_all(profilerev.as_bytes())?;
                 dlfile(&url, &format!("{}/profilepackages.json", &cachedir))?;
-                // writeprofilepkgs(&format!("{}/profilepackages.json", &cachedir))?;
             } else {
                 info!("PROFILEVER UP TO DATE");
             }
@@ -549,6 +534,12 @@ fn dlfile(url: &str, path: &str) -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+    } else {
+        error!("Failed to download {}", url);
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Failed to download file",
+        )))
     }
     trace!("Finished downloading {} -> {}", url, path);
     Ok(())
