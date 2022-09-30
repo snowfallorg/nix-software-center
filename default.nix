@@ -66,4 +66,8 @@ pkgs.stdenv.mkDerivation rec {
     substituteInPlace ./src/lib.rs \
         --replace "/usr/share/app-info" "${nixos-appstream-data}/share/app-info"
   '';
+
+  postInstall = ''
+    wrapProgram $out/bin/nix-software-center --prefix PATH : '${lib.makeBinPath [ pkgs.gnome-console ]}'
+  '';
 }

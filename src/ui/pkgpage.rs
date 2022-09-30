@@ -1475,6 +1475,7 @@ impl Component for PkgModel {
                         Launch::GtkApp(x) => {
                             match self.userpkgtype {
                                 UserPkgs::Env => {
+                                    debug!("Launching {} with nix-shell", x);
                                     let _ = Command::new("nix-shell")
                                         .arg("-p")
                                         .arg(&self.pkg)
@@ -1483,6 +1484,7 @@ impl Component for PkgModel {
                                         .spawn();
                                 }
                                 UserPkgs::Profile => {
+                                    debug!("Launching {} with nix shell", x);
                                     let _ = Command::new("nix")
                                         .arg("shell")
                                         .arg(&format!("nixpkgs#{}", self.pkg))
