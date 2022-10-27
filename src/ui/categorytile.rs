@@ -7,7 +7,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::pango;
 use relm4::{factory::*, *};
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct CategoryTile {
     pub name: String,
     pub pkg: String,
@@ -31,7 +31,7 @@ impl FactoryComponent for CategoryTile {
     type Output = CategoryTileMsg;
     type Widgets = CategoryTileWidgets;
     type ParentWidget = gtk::FlowBox;
-    type ParentMsg = CategoryPageMsg;
+    type ParentInput = CategoryPageMsg;
 
     view! {
         gtk::FlowBoxChild {
@@ -176,7 +176,7 @@ impl FactoryComponent for CategoryTile {
         }
     }
 
-    fn output_to_parent_msg(output: Self::Output) -> Option<CategoryPageMsg> {
+    fn output_to_parent_input(output: Self::Output) -> Option<CategoryPageMsg> {
         Some(match output {
             CategoryTileMsg::Open(x) => CategoryPageMsg::OpenPkg(x),
         })

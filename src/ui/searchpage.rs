@@ -16,16 +16,14 @@ pub struct SearchPageModel {
 
 #[derive(Debug)]
 pub enum SearchPageMsg {
-    Open,
     Search(Vec<SearchItem>),
     UpdateInstalled(HashSet<String>, HashSet<String>),
-    Close,
     OpenRow(gtk::ListBoxRow)
 }
 
 #[relm4::component(pub)]
 impl SimpleComponent for SearchPageModel {
-    type InitParams = ();
+    type Init = ();
     type Input = SearchPageMsg;
     type Output = AppMsg;
     type Widgets = SearchPageWidgets;
@@ -53,12 +51,12 @@ impl SimpleComponent for SearchPageModel {
     }
 
     fn init(
-        (): Self::InitParams,
+        (): Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = SearchPageModel {
-            searchitems: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
+            searchitems: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
             searchitemtracker: 0,
             tracker: 0,
         };
@@ -82,8 +80,6 @@ impl SimpleComponent for SearchPageModel {
                 searchitem_guard.drop();
                 self.update_searchitemtracker(|_| ());
             }
-            SearchPageMsg::Open => {}
-            SearchPageMsg::Close => {}
             SearchPageMsg::OpenRow(row) => {
                 let searchitem_guard = self.searchitems.guard();
                 for (i, child) in searchitem_guard.widget().iter_children().enumerate() {
@@ -110,7 +106,7 @@ impl SimpleComponent for SearchPageModel {
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct SearchItem {
     pub name: String,
     pub pkg: String,
@@ -122,7 +118,7 @@ pub struct SearchItem {
 }
 
 #[tracker::track]
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct SearchItemModel {
     pub item: SearchItem,
 }
@@ -138,7 +134,7 @@ impl FactoryComponent for SearchItemModel {
     type Output = SearchItemMsg;
     type Widgets = SearchItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
-    type ParentMsg = SearchPageMsg;
+    type ParentInput = SearchPageMsg;
 
     view! {
         adw::PreferencesRow {

@@ -1,7 +1,7 @@
 project(
   'nix-software-center',
   'rust',
-  version: '0.0.3',
+  version: '0.1.0',
   meson_version: '>= 0.59',
   license: 'GPL-3.0-only',
 )

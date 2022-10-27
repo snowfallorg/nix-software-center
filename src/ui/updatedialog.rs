@@ -21,7 +21,7 @@ pub enum UpdateDialogMsg {
 
 #[relm4::component(pub)]
 impl SimpleComponent for UpdateDialogModel {
-    type InitParams = gtk::Window;
+    type Init = gtk::Window;
     type Input = UpdateDialogMsg;
     type Output = UpdatePageMsg;
     type Widgets = UpdateDialogWidgets;
@@ -99,7 +99,7 @@ impl SimpleComponent for UpdateDialogModel {
     }
 
     fn init(
-        parent_window: Self::InitParams,
+        parent_window: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {

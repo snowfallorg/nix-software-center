@@ -10,16 +10,6 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-        libadwaita-git = pkgs.libadwaita.overrideAttrs (oldAttrs: rec {
-          version = "1.2.0";
-          src = pkgs.fetchFromGitLab {
-            domain = "gitlab.gnome.org";
-            owner = "GNOME";
-            repo = "libadwaita";
-            rev = version;
-            hash = "sha256-3lH7Vi9M8k+GSrCpvruRpLrIpMoOakKbcJlaAc/FK+U=";
-          };
-        });
         nixos-appstream-data = pkgs.fetchFromGitHub {
           owner = "vlinkz";
           repo = "nixos-appstream-data";
@@ -58,7 +48,8 @@
             graphene
             gtk4
             gtksourceview5
-            libadwaita-git
+            libadwaita
+            libxml2
             meson
             ninja
             openssl

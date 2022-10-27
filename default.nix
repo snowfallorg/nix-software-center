@@ -2,16 +2,6 @@
 , lib ? import <nixpkgs/lib>
 }:
 let
-  libadwaita-git = pkgs.libadwaita.overrideAttrs (oldAttrs: rec {
-    version = "1.2.0";
-    src = pkgs.fetchFromGitLab {
-      domain = "gitlab.gnome.org";
-      owner = "GNOME";
-      repo = "libadwaita";
-      rev = version;
-      hash = "sha256-3lH7Vi9M8k+GSrCpvruRpLrIpMoOakKbcJlaAc/FK+U=";
-    };
-  });
   nixos-appstream-data = (import
     (pkgs.fetchFromGitHub {
       owner = "vlinkz";
@@ -19,18 +9,18 @@ let
       rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
       hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
     })
-    { stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
+    { set = "all"; stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
 in
 pkgs.stdenv.mkDerivation rec {
   pname = "nix-software-center";
-  version = "0.0.3";
+  version = "0.1.0";
 
   src = [ ./. ];
 
   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-8eUFl3N1tVZ2j+S6iIIpFSH5F5fXAl5+Yz3xS/NxF2I=";
+    hash = "sha256-yZKhtc5Rnkk3QdASnIxHFAYKPbG0RWySXLBjhraFPuc=";
   };
 
   nativeBuildInputs = with pkgs; [
@@ -54,7 +44,8 @@ pkgs.stdenv.mkDerivation rec {
     glib
     gtk4
     gtksourceview5
-    libadwaita-git
+    libadwaita
+    libxml2
     openssl
     wayland
     gnome.adwaita-icon-theme

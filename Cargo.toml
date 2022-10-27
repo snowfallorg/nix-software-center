@@ -1,26 +1,27 @@
 [package]
 name = "nix-software-center"
-version = "0.0.3"
+version = "0.1.0"
 edition = "2021"
 default-run = "nix-software-center"
 
 [dependencies]
-relm4 = { git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.2", features = ["all"]  }
-relm4-components = { package = "relm4-components", git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.2"}
-adw = { package = "libadwaita", git = "https://gitlab.gnome.org/World/Rust/libadwaita-rs", features = ["v1_2", "gtk_v4_6"] }
-gtk = { package = "gtk4", git = "https://github.com/gtk-rs/gtk4-rs", features = ["v4_6"] }
+relm4 = { version = "0.5.0-beta.4", features = ["all"]  }
+relm4-components = { package = "relm4-components", version = "0.5.0-beta.4"}
+adw = { package = "libadwaita", version = "0.2", features = ["v1_2", "gtk_v4_6"] }
+gtk = { package = "gtk4", version = "0.5", features = ["v4_6"] }
 tokio = { version = "1.21", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
 tracker = "0.1"
 
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-simd-json = { version = "0.6", features = ["allow-non-simd"] }
 
-nix-editor = "0.2.12"
+nix-editor = "0.3.0-beta.1"
+nix-data = { git = "https://github.com/snowflakelinux/nix-data", rev = "a5168c768e8cf8bd3e1afe1772f8e05e5b03ed95" }
+
+sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "sqlite" ] }
 
 html2pango = "0.5"
-brotli = "3.3"
 log = "0.4"
 pretty_env_logger = "0.4"
 flate2 = "1.0"
@@ -30,11 +31,8 @@ reqwest = { version = "0.11", features = ["blocking"] }
 sha256 = "1.0"
 image = "0.24"
 spdx = "0.9"
-edit-distance = "2.1"
-ijson = "0.1"
-strum = "0.24"
-strum_macros = "0.24"
-which = "4.3"
+
+anyhow = "1.0"
 
 [workspace]
 members = [".", "nsc-helper"]

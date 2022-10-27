@@ -1,9 +1,8 @@
+use nix_data::config::configfile::NixDataConfig;
 use relm4::*;
 use std::{error::Error, path::Path, process::Stdio};
 use tokio::io::AsyncBufReadExt;
 use log::*;
-
-use crate::parse::config::NscConfig;
 
 use super::{
     updatepage::UpdatePageMsg,
@@ -23,7 +22,7 @@ pub struct UpdateAsyncHandler {
 
 #[derive(Debug)]
 pub enum UpdateAsyncHandlerMsg {
-    UpdateConfig(NscConfig),
+    UpdateConfig(NixDataConfig),
     UpdatePkgTypes(SystemPkgs, UserPkgs),
 
     UpdateChannels,
@@ -47,11 +46,11 @@ pub struct UpdateAsyncHandlerInit {
 }
 
 impl Worker for UpdateAsyncHandler {
-    type InitParams = UpdateAsyncHandlerInit;
+    type Init = UpdateAsyncHandlerInit;
     type Input = UpdateAsyncHandlerMsg;
     type Output = UpdatePageMsg;
 
-    fn init(params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
+    fn init(params: Self::Init, _sender: relm4::ComponentSender<Self>) -> Self {
         Self {
             process: None,
             systemconfig: None,
