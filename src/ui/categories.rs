@@ -5,7 +5,7 @@ use strum_macros::{EnumIter, Display};
 
 use super::window::AppMsg;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct PkgGroup {
     pub category: PkgCategory,
 }
@@ -33,7 +33,7 @@ impl FactoryComponent for PkgGroup {
     type Output = PkgCategoryMsg;
     type Widgets = PkgGroupWidgets;
     type ParentWidget = gtk::FlowBox;
-    type ParentMsg = AppMsg;
+    type ParentInput = AppMsg;
 
     view! {
         gtk::FlowBoxChild {
@@ -95,7 +95,7 @@ impl FactoryComponent for PkgGroup {
         }
     }
 
-    fn output_to_parent_msg(output: Self::Output) -> Option<AppMsg> {
+    fn output_to_parent_input(output: Self::Output) -> Option<AppMsg> {
         Some(match output {
             PkgCategoryMsg::Open(x) => AppMsg::OpenCategoryPage(x),
         })

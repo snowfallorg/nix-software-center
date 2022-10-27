@@ -1,7 +1,8 @@
-use crate::{parse::{cache::channelver, config::NscConfig}, APPINFO};
+use crate::APPINFO;
 
 use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, UpdateDialogMsg}, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}};
 use adw::prelude::*;
+use nix_data::config::configfile::NixDataConfig;
 use relm4::{factory::*, gtk::pango, *};
 use std::{path::Path, convert::identity};
 use log::*;
@@ -18,7 +19,7 @@ pub struct UpdatePageModel {
     updatedialog: Controller<UpdateDialogModel>,
     #[tracker::no_eq]
     updateworker: WorkerController<UpdateAsyncHandler>,
-    config: NscConfig,
+    config: NixDataConfig,
     systype: SystemPkgs,
     usertype: UserPkgs,
     updatetracker: u8,
@@ -26,7 +27,7 @@ pub struct UpdatePageModel {
 
 #[derive(Debug)]
 pub enum UpdatePageMsg {
-    UpdateConfig(NscConfig),
+    UpdateConfig(NixDataConfig),
     UpdatePkgTypes(SystemPkgs, UserPkgs),
     Update(Vec<UpdateItem>, Vec<UpdateItem>),
     OpenRow(usize, InstallType),
@@ -45,12 +46,12 @@ pub struct UpdatePageInit {
     pub window: gtk::Window,
     pub systype: SystemPkgs,
     pub usertype: UserPkgs,
-    pub config: NscConfig,
+    pub config: NixDataConfig,
 }
 
 #[relm4::component(pub)]
 impl SimpleComponent for UpdatePageModel {
-    type InitParams = UpdatePageInit;
+    type Init = UpdatePageInit;
     type Input = UpdatePageMsg;
     type Output = AppMsg;
     type Widgets = UpdatePageWidgets;
@@ -277,7 +278,7 @@ impl SimpleComponent for UpdatePageModel {
     }
 
     fn init(
-        initparams: Self::InitParams,
+        initparams: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
@@ -292,8 +293,8 @@ impl SimpleComponent for UpdatePageModel {
         updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(config.clone()));
 
         let model = UpdatePageModel {
-            updateuserlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
-            updatesystemlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
+            updateuserlist: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
+            updatesystemlist: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
             channelupdate: None,
             updatetracker: 0,
             updatedialog,
@@ -320,15 +321,21 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(self.config.clone()));
             }
             UpdatePageMsg::UpdatePkgTypes(systype, usertype) => {
-                self.systype = systype.clone();
-                self.usertype = usertype.clone();
+                self.systype = systype;
+                self.usertype = usertype;
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdatePkgTypes(self.systype.clone(), self.usertype.clone()));
             }
             UpdatePageMsg::Update(updateuserlist, updatesystemlist) => {
                 info!("UpdatePageMsg::Update");
                 debug!("UPDATEUSERLIST: {:?}", updateuserlist);
                 debug!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
-                self.channelupdate = channelver().unwrap_or(None);
+                self.channelupdate = match nix_data::cache::channel::uptodate() {
+                    Ok(x) => {
+                        x
+                    },
+                    Err(_) => None,
+                };
+                debug!("CHANNELUPDATE: {:?}", self.channelupdate);
                 self.update_updatetracker(|_| ());
                 let mut updateuserlist_guard = self.updateuserlist.guard();
                 updateuserlist_guard.clear();
@@ -384,7 +391,7 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateAll);
             }
             UpdatePageMsg::DoneWorking => {
-                sender.output(AppMsg::ReloadUpdate);
+                sender.output(AppMsg::UpdateInstalledPkgs);
             }
             UpdatePageMsg::DoneLoading => {
                 self.updatedialog.emit(UpdateDialogMsg::Done);
@@ -396,7 +403,7 @@ impl SimpleComponent for UpdatePageModel {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UpdateItem {
     pub name: String,
     pub pkg: Option<String>,
@@ -408,7 +415,7 @@ pub struct UpdateItem {
     pub verto: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UpdateItemModel {
     item: UpdateItem,
 }
@@ -424,7 +431,7 @@ impl FactoryComponent for UpdateItemModel {
     type Output = UpdateItemMsg;
     type Widgets = UpdateItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
-    type ParentMsg = UpdatePageMsg;
+    type ParentInput = UpdatePageMsg;
 
     view! {
         adw::PreferencesRow {

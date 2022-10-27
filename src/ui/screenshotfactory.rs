@@ -3,7 +3,7 @@ use relm4::{factory::*, *};
 
 use super::pkgpage::PkgMsg;
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct ScreenshotItem {
     pub path: Option<String>,
     pub error: bool,
@@ -20,7 +20,7 @@ impl FactoryComponent for ScreenshotItem {
     type Output = ScreenshotItemMsg;
     type Widgets = PkgTileWidgets;
     type ParentWidget = adw::Carousel;
-    type ParentMsg = PkgMsg;
+    type ParentInput = PkgMsg;
 
     view! {
         gtk::Box {

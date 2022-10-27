@@ -28,7 +28,7 @@ pub enum InstalledPageMsg {
 
 #[relm4::component(pub)]
 impl SimpleComponent for InstalledPageModel {
-    type InitParams = (SystemPkgs, UserPkgs);
+    type Init = (SystemPkgs, UserPkgs);
     type Input = InstalledPageMsg;
     type Output = AppMsg;
     type Widgets = InstalledPageWidgets;
@@ -93,13 +93,13 @@ impl SimpleComponent for InstalledPageModel {
     }
 
     fn init(
-        (systempkgtype, userpkgtype): Self::InitParams,
+        (systempkgtype, userpkgtype): Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = InstalledPageModel {
-            installeduserlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
-            installedsystemlist: FactoryVecDeque::new(gtk::ListBox::new(), &sender.input),
+            installeduserlist: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
+            installedsystemlist: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
             updatetracker: 0,
             userpkgtype,
             systempkgtype,
@@ -196,7 +196,7 @@ impl SimpleComponent for InstalledPageModel {
 
 
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct InstalledItem {
     pub name: String,
     pub pkg: Option<String>,
@@ -207,7 +207,7 @@ pub struct InstalledItem {
     pub busy: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct InstalledItemModel {
     pub item: InstalledItem,
 }
@@ -230,7 +230,7 @@ impl FactoryComponent for InstalledItemModel {
     type Output = InstalledItemMsg;
     type Widgets = InstalledItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
-    type ParentMsg = InstalledPageMsg;
+    type ParentInput = InstalledPageMsg;
 
     view! {
         adw::PreferencesRow {
@@ -363,7 +363,7 @@ impl FactoryComponent for InstalledItemModel {
         }
     }
 
-    fn output_to_parent_msg(output: Self::Output) -> Option<InstalledPageMsg> {
+    fn output_to_parent_input(output: Self::Output) -> Option<InstalledPageMsg> {
         Some(match output {
             InstalledItemMsg::Delete(item) => InstalledPageMsg::Remove(item),
         })

@@ -8,7 +8,7 @@ use crate::APPINFO;
 
 use super::window::AppMsg;
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct PkgTile {
     pub name: String,
     pub pkg: String,
@@ -32,7 +32,7 @@ impl FactoryComponent for PkgTile {
     type Output = PkgTileMsg;
     type Widgets = PkgTileWidgets;
     type ParentWidget = gtk::FlowBox;
-    type ParentMsg = AppMsg;
+    type ParentInput = AppMsg;
 
     view! {
         gtk::FlowBoxChild {
@@ -171,7 +171,7 @@ impl FactoryComponent for PkgTile {
         }
     }
 
-    fn output_to_parent_msg(output: Self::Output) -> Option<AppMsg> {
+    fn output_to_parent_input(output: Self::Output) -> Option<AppMsg> {
         Some(match output {
             PkgTileMsg::Open(x) => AppMsg::OpenPkg(x),
         })

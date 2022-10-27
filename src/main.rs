@@ -8,6 +8,5 @@ fn main() {
         gio::resources_register(&res);
     }
     let app = RelmApp::new(nix_software_center::config::APP_ID);
-    let application = app.app.clone();
-    app.run::<AppModel>(application);
+    app.run::<AppModel>(());
 }

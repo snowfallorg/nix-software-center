@@ -1,8 +1,7 @@
-use crate::parse::config::NscConfig;
-
 use super::pkgpage::{InstallType, PkgAction, PkgMsg, WorkPkg};
 use super::window::{SystemPkgs, UserPkgs};
 use log::*;
+use nix_data::config::configfile::NixDataConfig;
 use relm4::*;
 use std::error::Error;
 use std::path::Path;
@@ -25,7 +24,7 @@ pub struct InstallAsyncHandler {
 
 #[derive(Debug)]
 pub enum InstallAsyncHandlerMsg {
-    SetConfig(NscConfig),
+    SetConfig(NixDataConfig),
     SetPkgTypes(SystemPkgs, UserPkgs),
     Process(WorkPkg),
     CancelProcess,
@@ -39,11 +38,11 @@ pub struct InstallAsyncHandlerInit {
 }
 
 impl Worker for InstallAsyncHandler {
-    type InitParams = InstallAsyncHandlerInit;
+    type Init = InstallAsyncHandlerInit;
     type Input = InstallAsyncHandlerMsg;
     type Output = PkgMsg;
 
-    fn init(params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
+    fn init(params: Self::Init, _sender: relm4::ComponentSender<Self>) -> Self {
         Self {
             process: None,
             work: None,

@@ -1,423 +1,375 @@
 use super::window::AppMsg;
 use super::window::SystemPkgs;
-use crate::parse::cache::checkcache;
-use crate::parse::config::NscConfig;
-use crate::parse::packages::readflakesyspkgs;
-use crate::parse::packages::readpkgs;
-use crate::parse::packages::readlegacysyspkgs;
-use crate::parse::packages::Package;
-use crate::parse::packages::readprofilepkgs;
+use crate::parse::packages::appsteamdata;
+use crate::parse::packages::AppData;
 use crate::ui::categories::PkgCategory;
 use crate::ui::window::UserPkgs;
+use log::*;
+use nix_data::config::configfile::NixDataConfig;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use relm4::adw::prelude::*;
 use relm4::*;
+use sqlx::SqlitePool;
 use std::{collections::HashMap, env};
 use strum::IntoEnumIterator;
-use log::*;
 
 pub struct WindowAsyncHandler;
 
 #[derive(Debug)]
 pub enum WindowAsyncHandlerMsg {
-    CheckCache(CacheReturn, SystemPkgs, UserPkgs, NscConfig),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum CacheReturn {
-    Init,
-    Update,
+    CheckCache(SystemPkgs, UserPkgs, NixDataConfig),
 }
 
 impl Worker for WindowAsyncHandler {
-    type InitParams = ();
+    type Init = ();
     type Input = WindowAsyncHandlerMsg;
     type Output = AppMsg;
 
-    fn init(_params: Self::InitParams, _sender: relm4::ComponentSender<Self>) -> Self {
+    fn init(_params: Self::Init, _sender: relm4::ComponentSender<Self>) -> Self {
         Self
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
-            WindowAsyncHandlerMsg::CheckCache(cr, syspkgs, userpkgs, config) => {
+            WindowAsyncHandlerMsg::CheckCache(syspkgs, userpkgs, _config) => {
                 info!("WindowAsyncHandlerMsg::CheckCache");
-                let syspkgs2 = syspkgs.clone();
-                let userpkgs2 = userpkgs.clone();
-                let config = config.clone();
                 relm4::spawn(async move {
-                    match checkcache(syspkgs2, userpkgs2, config) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            warn!("FAILED TO CHECK CACHE");
-                            warn!("{}", e);
-                            sender.output(AppMsg::LoadError(
-                                String::from("Could not load cache"),
-                                String::from(
-                                    "Try connecting to the internet or launching the application again",
-                                ),
-                            ));
-                            return;
-                        }
-                    }
-                    let pkgs = match readpkgs().await {
-                        Ok(pkgs) => pkgs,
-                        Err(e) => {
-                            warn!("FAILED TO LOAD PKGS");
-                            warn!("{}", e);
-                            sender.output(AppMsg::LoadError(
-                                String::from("Could not load packages"),
-                                String::from(
-                                    "Try connecting to the internet or launching the application again",
-                                ),
-                            ));
-                            return;
-                        }
-                    };
-
-                    let newpkgs = match syspkgs {
-                        SystemPkgs::Legacy => {
-                            match readlegacysyspkgs() {
-                                Ok(newpkgs) => newpkgs,
-                                Err(e) => {
-                                    warn!("FAILED TO LOAD NEW PKGS");
-                                    warn!("{}", e);
-                                    sender.output(AppMsg::LoadError(
-                                        String::from("Could not load new packages"),
-                                        String::from(
-                                            "Try connecting to the internet or launching the application again",
-                                        ),
-                                    ));
-                                    return;
-                                }
-                            }
-                        }
-                        SystemPkgs::Flake => {
-                            match readflakesyspkgs() {
-                                Ok(newpkgs) => newpkgs,
-                                Err(e) => {
-                                    warn!("FAILED TO LOAD NEW PKGS");
-                                    warn!("{}", e);
-                                    sender.output(AppMsg::LoadError(
-                                        String::from("Could not load new packages"),
-                                        String::from(
-                                            "Try connecting to the internet or launching the application again",
-                                        ),
-                                    ));
-                                    return;
-                                }
-                            }
-                        }
-                        SystemPkgs::None => {
-                            HashMap::new()
-                        }
-                    };
-
-                    let profilepkgs = match userpkgs {
-                        UserPkgs::Env => None,
-                        UserPkgs::Profile => if let Ok(r) = readprofilepkgs() { Some(r) } else { None },
-                    };
-
                     let mut recpicks = vec![];
                     let mut catpicks: HashMap<PkgCategory, Vec<String>> = HashMap::new();
                     let mut catpkgs: HashMap<PkgCategory, Vec<String>> = HashMap::new();
+                    println!("Connecting to DB");
 
+                    let pkgdb = nix_data::cache::nixos::nixospkgs().await.unwrap();
+                    let pool = SqlitePool::connect(&format!("sqlite://{}", pkgdb))
+                        .await
+                        .unwrap();
 
-                    if cr == CacheReturn::Init {
-                        let desktopenv = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
-                        let appdatapkgs = pkgs
-                            .iter()
-                            .filter(|(x, _)| {
-                                if let Some(p) = pkgs.get(*x) {
-                                    if let Some(data) = &p.appdata {
-                                        (if let Some(i) = &data.icon {
-                                            i.cached.is_some()
-                                        } else {
-                                            false
-                                        }) && data.description.is_some()
-                                            && data.name.is_some()
-                                            && data.launchable.is_some()
-                                            && data.screenshots.is_some()
-                                            && (!x.starts_with("gnome.") || desktopenv == "GNOME")
-                                            && (!x.starts_with("xfce.") || desktopenv == "XFCE")
-                                            && (!x.starts_with("mate.") || desktopenv == "MATE")
-                                            && (!x.starts_with("cinnamon.")
-                                                || desktopenv == "X-Cinnamon")
-                                            && (!x.starts_with("libsForQt5") || desktopenv == "KDE")
-                                            && (!x.starts_with("pantheon.")
-                                                || desktopenv == "Pantheon")
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            })
-                            .collect::<HashMap<_, _>>();
-
-                        let mut recommendedpkgs = appdatapkgs
-                            .keys()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<_>>();
-                        let mut rng = thread_rng();
-                        recommendedpkgs.shuffle(&mut rng);
-
-                        let mut desktoppicks = recommendedpkgs
-                            .iter()
-                            .filter(|x| {
-                                if desktopenv == "GNOME" {
-                                    x.starts_with("gnome.") || x.starts_with("gnome-")
-                                } else if desktopenv == "XFCE" {
-                                    x.starts_with("xfce.")
-                                } else if desktopenv == "MATE" {
-                                    x.starts_with("mate.")
-                                } else if desktopenv == "X-Cinnamon" {
-                                    x.starts_with("cinnamon.")
-                                } else if desktopenv == "KDE" {
-                                    x.starts_with("libsForQt5")
-                                } else if desktopenv == "Pantheon" {
-                                    x.starts_with("pantheon.")
-                                } else {
-                                    false
-                                }
-                            })
-                            .collect::<Vec<_>>();
-
-                        for p in desktoppicks.iter().take(3) {
-                            recpicks.push(p.to_string());
+                    let nixpkgsdb = match userpkgs {
+                        UserPkgs::Profile => {
+                            if let Ok(x) = nix_data::cache::profile::nixpkgslatest().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
                         }
-                        for category in PkgCategory::iter() {
-                            desktoppicks.shuffle(&mut rng);
-                            let mut cvec = vec![];
-                            let mut allvec = vec![];
-                            let mut rpkgs = recommendedpkgs.clone();
-                            fn checkpkgs(
-                                pkg: String,
-                                pkgs: &HashMap<&String, &Package>,
-                                category: PkgCategory,
-                            ) -> bool {
-                                match category {
-                                    PkgCategory::Audio => {
-                                        // Audio:
-                                        // - pkgs/applications/audio
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/applications/audio") {
+                        UserPkgs::Env => None,
+                    };
+
+                    let systemdb = match syspkgs {
+                        SystemPkgs::None => None,
+                        SystemPkgs::Legacy => {
+                            if let Ok(x) = nix_data::cache::channel::legacypkgs().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        }
+                        SystemPkgs::Flake => {
+                            if let Ok(x) = nix_data::cache::flakes::flakespkgs().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        }
+                    };
+
+                    let pkglist: Vec<(String,)> = sqlx::query_as("SELECT attribute FROM pkgs")
+                        .fetch_all(&pool)
+                        .await
+                        .unwrap();
+                    let pkglist = pkglist.iter().map(|x| x.0.clone()).collect::<Vec<String>>();
+
+                    let posvec: Vec<(String, String)> =
+                        sqlx::query_as("SELECT attribute, position FROM meta")
+                            .fetch_all(&pool)
+                            .await
+                            .unwrap();
+                    println!("Got DB data");
+                    let appdata = appsteamdata().unwrap();
+
+                    let desktopenv = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+
+                    let mut recpkgs = pkglist
+                        .iter()
+                        .filter(|x| {
+                            if let Some(data) = appdata.get(&x.to_string()) {
+                                (if let Some(i) = &data.icon {
+                                    i.cached.is_some()
+                                } else {
+                                    false
+                                }) && data.description.is_some()
+                                    && data.name.is_some()
+                                    && data.launchable.is_some()
+                                    && data.screenshots.is_some()
+                                    && (!x.starts_with("gnome.") || desktopenv == "GNOME")
+                                    && (!x.starts_with("xfce.") || desktopenv == "XFCE")
+                                    && (!x.starts_with("mate.") || desktopenv == "MATE")
+                                    && (!x.starts_with("cinnamon.") || desktopenv == "X-Cinnamon")
+                                    && (!x.starts_with("libsForQt5") || desktopenv == "KDE")
+                                    && (!x.starts_with("pantheon.") || desktopenv == "Pantheon")
+                            } else {
+                                false
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    let mut rng = thread_rng();
+                    recpkgs.shuffle(&mut rng);
+
+                    let mut desktoppicks = recpkgs
+                        .iter()
+                        .filter(|x| {
+                            if desktopenv == "GNOME" {
+                                x.starts_with("gnome.") || x.starts_with("gnome-")
+                            } else if desktopenv == "XFCE" {
+                                x.starts_with("xfce.")
+                            } else if desktopenv == "MATE" {
+                                x.starts_with("mate.")
+                            } else if desktopenv == "X-Cinnamon" {
+                                x.starts_with("cinnamon.")
+                            } else if desktopenv == "KDE" {
+                                x.starts_with("libsForQt5")
+                            } else if desktopenv == "Pantheon" {
+                                x.starts_with("pantheon.")
+                            } else {
+                                false
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    for p in desktoppicks.iter().take(3) {
+                        recpicks.push(p.to_string());
+                    }
+
+                    let pospkgs = posvec
+                        .into_iter()
+                        .map(|(x, y)| (x, if y.is_empty() { None } else { Some(y) }))
+                        .collect::<HashMap<String, Option<String>>>();
+
+                    println!("Starting category");
+                    for category in PkgCategory::iter() {
+                        desktoppicks.shuffle(&mut rng);
+                        let mut cvec = vec![];
+                        let mut allvec = vec![];
+                        let mut rpkgs = recpkgs.clone();
+                        fn checkpkgs(
+                            pkg: String,
+                            pospkgs: &HashMap<String, Option<String>>,
+                            appdata: &HashMap<String, AppData>,
+                            category: PkgCategory,
+                        ) -> bool {
+                            match category {
+                                PkgCategory::Audio => {
+                                    // Audio:
+                                    // - pkgs/applications/audio
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/applications/audio") {
+                                            return true;
+                                        }
+                                        if let Some(data) = appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Audio")) {
                                                     return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories.contains(&String::from("Audio")) {
-                                                        return true;
-                                                    }
                                                 }
                                             }
                                         }
-                                        false
                                     }
-                                    PkgCategory::Development => {
-                                        // Development:
-                                        // - pkgs/development
-                                        // - pkgs/applications/terminal-emulators
-                                        // - xdg: Development
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/development")
-                                                    || pos.starts_with(
-                                                        "pkgs/applications/terminal-emulators",
-                                                    )
+                                    false
+                                }
+                                PkgCategory::Development => {
+                                    // Development:
+                                    // - pkgs/development
+                                    // - pkgs/applications/terminal-emulators
+                                    // - xdg: Development
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/development")
+                                            || pos
+                                                .starts_with("pkgs/applications/terminal-emulators")
+                                        {
+                                            return true;
+                                        }
+                                        if let Some(data) = appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Development"))
                                                 {
                                                     return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories
-                                                        .contains(&String::from("Development"))
-                                                    {
-                                                        return true;
-                                                    }
                                                 }
                                             }
                                         }
-                                        false
                                     }
-                                    PkgCategory::Games => {
-                                        // Games:
-                                        // - pkgs/games
-                                        // - pkgs/applications/emulators
-                                        // - pkgs/tools/games
-                                        // - xdg::Games
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/games")
-                                                    || pos.starts_with(
-                                                        "pkgs/applications/emulators",
-                                                    )
-                                                    || pos.starts_with("pkgs/tools/games")
-                                                {
+                                    false
+                                }
+                                PkgCategory::Games => {
+                                    // Games:
+                                    // - pkgs/games
+                                    // - pkgs/applications/emulators
+                                    // - pkgs/tools/games
+                                    // - xdg::Games
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/games")
+                                            || pos.starts_with("pkgs/applications/emulators")
+                                            || pos.starts_with("pkgs/tools/games")
+                                        {
+                                            return true;
+                                        }
+                                        if let Some(data) = &appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Games")) {
                                                     return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories.contains(&String::from("Games")) {
-                                                        return true;
-                                                    }
                                                 }
                                             }
                                         }
-                                        false
                                     }
-                                    PkgCategory::Graphics => {
-                                        // Graphics:
-                                        // - pkgs/applications/graphics
-                                        // - xdg: Graphics
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/applications/graphics")
-                                                    || pos.starts_with("xdg:Graphics")
-                                                {
+                                    false
+                                }
+                                PkgCategory::Graphics => {
+                                    // Graphics:
+                                    // - pkgs/applications/graphics
+                                    // - xdg: Graphics
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/applications/graphics")
+                                            || pos.starts_with("xdg:Graphics")
+                                        {
+                                            return true;
+                                        }
+                                        if let Some(data) = &appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Graphics")) {
                                                     return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories.contains(&String::from("Graphics")) {
-                                                        return true;
-                                                    }
-                                                }
-                                            }
-                                        }                                        
-                                        false
-                                    }
-                                    PkgCategory::Network => {
-                                        // Network:
-                                        // - pkgs/applications/networking
-                                        // - xdg: Network
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/applications/networking")
-                                                    || pos.starts_with("xdg:Network")
-                                                {
-                                                    return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories.contains(&String::from("Network")) {
-                                                        return true;
-                                                    }
-                                                }
-                                            }
-                                        }                                        
-                                        false
-                                    }
-                                    PkgCategory::Video => {
-                                        // Video:
-                                        // - pkgs/applications/video
-                                        // - xdg: Video
-                                        if let Some(p) = pkgs.get(&pkg) {
-                                            if let Some(pos) = &p.meta.position {
-                                                if pos.starts_with("pkgs/applications/video")
-                                                    || pos.starts_with("xdg:Video")
-                                                {
-                                                    return true;
-                                                }
-                                            }
-                                            if let Some(data) = &p.appdata {
-                                                if let Some(categories) = &data.categories {
-                                                    if categories.contains(&String::from("Video")) {
-                                                        return true;
-                                                    }
                                                 }
                                             }
                                         }
-                                        false
                                     }
+                                    false
+                                }
+                                PkgCategory::Network => {
+                                    // Network:
+                                    // - pkgs/applications/networking
+                                    // - xdg: Network
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/applications/networking")
+                                            || pos.starts_with("xdg:Network")
+                                        {
+                                            return true;
+                                        }
+                                        if let Some(data) = &appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Network")) {
+                                                    return true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    false
+                                }
+                                PkgCategory::Video => {
+                                    // Video:
+                                    // - pkgs/applications/video
+                                    // - xdg: Video
+                                    if let Some(Some(pos)) = pospkgs.get(&pkg) {
+                                        if pos.starts_with("pkgs/applications/video")
+                                            || pos.starts_with("xdg:Video")
+                                        {
+                                            return true;
+                                        }
+                                        if let Some(data) = &appdata.get(&pkg) {
+                                            if let Some(categories) = &data.categories {
+                                                if categories.contains(&String::from("Video")) {
+                                                    return true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    false
                                 }
                             }
+                        }
 
-                            for pkg in desktoppicks.iter().take(3) {
-                                if checkpkgs(pkg.to_string(), &appdatapkgs, category.clone()) {
+                        for pkg in desktoppicks.iter().take(3) {
+                            if checkpkgs(pkg.to_string(), &pospkgs, &appdata, category.clone()) {
+                                cvec.push(pkg.to_string());
+                            }
+                        }
+
+                        while cvec.len() < 12 {
+                            if let Some(pkg) = rpkgs.pop() {
+                                if !cvec.contains(&pkg.to_string())
+                                    && checkpkgs(
+                                        pkg.to_string(),
+                                        &pospkgs,
+                                        &appdata,
+                                        category.clone(),
+                                    )
+                                {
                                     cvec.push(pkg.to_string());
-                                }
-                            }
-
-                            while cvec.len() < 12 {
-                                if let Some(pkg) = rpkgs.pop() {
-                                    if !cvec.contains(&pkg.to_string())
-                                        && checkpkgs(
-                                            pkg.to_string(),
-                                            &appdatapkgs,
-                                            category.clone(),
-                                        )
-                                    {
-                                        cvec.push(pkg.to_string());
-                                    }
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            let catagortypkgs = pkgs
-                            .iter()
-                            .filter(|(x, _)| {
-                                if let Some(p) = appdatapkgs.get(*x) {
-                                    if let Some(position) = &p.meta.position {
-                                        (position.starts_with("pkgs/applications/audio") && category == PkgCategory::Audio)
-                                        || (position.starts_with("pkgs/applications/terminal-emulators") && category == PkgCategory::Development)
-                                        || (position.starts_with("pkgs/applications/emulators") && category == PkgCategory::Games)
-                                        || (position.starts_with("pkgs/applications/graphics") && category == PkgCategory::Graphics)
-                                        || (position.starts_with("pkgs/applications/networking") && category == PkgCategory::Network)
-                                        || (position.starts_with("pkgs/applications/video") && category == PkgCategory::Video)
-                                        || (position.starts_with("pkgs/tools/games") && category == PkgCategory::Games)
-                                        || (position.starts_with("pkgs/games") && category == PkgCategory::Games)
-                                        || (position.starts_with("pkgs/development") && category == PkgCategory::Development)
-                                        || appdatapkgs.contains_key(x)
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            })
-                            .collect::<HashMap<_, _>>();
-
-                            for pkg in catagortypkgs.keys() {
-                                if checkpkgs(pkg.to_string(), &catagortypkgs, category.clone()) {
-                                    allvec.push(pkg.to_string());
-                                }
-                            }
-
-                            cvec.shuffle(&mut rng);
-                            allvec.sort_by_key(|x| x.to_lowercase());
-                            catpicks.insert(category.clone(), cvec);
-                            catpkgs.insert(category.clone(), allvec);
-                        }
-
-                        while recpicks.len() < 12 {
-                            if let Some(p) = recommendedpkgs.pop() {
-                                if !recpicks.contains(&p.to_string()) {
-                                    recpicks.push(p);
                                 }
                             } else {
                                 break;
                             }
                         }
-                        recpicks.shuffle(&mut rng);
+
+                        let catagortypkgs = pkglist
+                            .iter()
+                            .filter(|x| {
+                                if appdata.get(*x).is_some() {
+                                    if let Some(Some(position)) = &pospkgs.get(*x) {
+                                        (position.starts_with("pkgs/applications/audio")
+                                            && category == PkgCategory::Audio)
+                                            || (position.starts_with(
+                                                "pkgs/applications/terminal-emulators",
+                                            ) && category == PkgCategory::Development)
+                                            || (position.starts_with("pkgs/applications/emulators")
+                                                && category == PkgCategory::Games)
+                                            || (position.starts_with("pkgs/applications/graphics")
+                                                && category == PkgCategory::Graphics)
+                                            || (position
+                                                .starts_with("pkgs/applications/networking")
+                                                && category == PkgCategory::Network)
+                                            || (position.starts_with("pkgs/applications/video")
+                                                && category == PkgCategory::Video)
+                                            || (position.starts_with("pkgs/tools/games")
+                                                && category == PkgCategory::Games)
+                                            || (position.starts_with("pkgs/games")
+                                                && category == PkgCategory::Games)
+                                            || (position.starts_with("pkgs/development")
+                                                && category == PkgCategory::Development)
+                                            || recpkgs.contains(x)
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            })
+                            .collect::<Vec<_>>();
+
+                        for pkg in catagortypkgs {
+                            if checkpkgs(pkg.to_string(), &pospkgs, &appdata, category.clone()) {
+                                allvec.push(pkg.to_string());
+                            }
+                        }
+
+                        cvec.shuffle(&mut rng);
+                        allvec.sort_by_key(|x| x.to_lowercase());
+                        catpicks.insert(category.clone(), cvec);
+                        catpkgs.insert(category.clone(), allvec);
                     }
 
-                    match cr {
-                        CacheReturn::Init => {
-                            sender.output(AppMsg::Initialize(pkgs, recpicks, newpkgs, catpicks, catpkgs, profilepkgs));
-                        }
-                        CacheReturn::Update => {
-                            sender.output(AppMsg::ReloadUpdateItems(pkgs, newpkgs));
+                    while recpicks.len() < 12 {
+                        if let Some(p) = recpkgs.pop() {
+                            if !recpicks.contains(&p.to_string()) {
+                                recpicks.push(p.to_string());
+                            }
+                        } else {
+                            break;
                         }
                     }
+                    recpicks.shuffle(&mut rng);
+
+                    sender.output(AppMsg::Initialize(
+                        pkgdb, nixpkgsdb, systemdb, appdata, recpicks, catpicks, catpkgs,
+                    ));
                 });
             }
         }
@@ -435,12 +387,11 @@ pub enum LoadErrorMsg {
     Show(String, String),
     Retry,
     Close,
-    // Preferences,
 }
 
 #[relm4::component(pub)]
 impl SimpleComponent for LoadErrorModel {
-    type InitParams = gtk::Window;
+    type Init = gtk::Window;
     type Input = LoadErrorMsg;
     type Output = AppMsg;
     type Widgets = LoadErrorWidgets;
@@ -472,7 +423,7 @@ impl SimpleComponent for LoadErrorModel {
     }
 
     fn init(
-        parent_window: Self::InitParams,
+        parent_window: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {

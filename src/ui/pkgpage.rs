@@ -2,6 +2,7 @@ use adw::gio;
 use adw::prelude::*;
 use html2pango;
 use image::{imageops::FilterType, ImageFormat};
+use nix_data::config::configfile::NixDataConfig;
 use relm4::actions::RelmAction;
 use relm4::actions::RelmActionGroup;
 use relm4::gtk::pango;
@@ -22,9 +23,7 @@ use std::{
 };
 use log::*;
 
-use crate::parse::config::NscConfig;
 use crate::parse::packages::PkgMaintainer;
-use crate::parse::packages::StrOrVec;
 use crate::ui::installworker::InstallAsyncHandlerMsg;
 
 use super::installworker::InstallAsyncHandler;
@@ -36,7 +35,7 @@ use super::{screenshotfactory::ScreenshotItem, window::AppMsg};
 #[tracker::track]
 #[derive(Debug)]
 pub struct PkgModel {
-    config: NscConfig,
+    config: NixDataConfig,
     name: String,
     pkg: String,
     pname: String,
@@ -87,13 +86,13 @@ pub enum PkgAction {
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Launch {
     GtkApp(String),
     TerminalApp(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CarouselPage {
     First,
     Middle,
@@ -107,7 +106,7 @@ pub enum InstallType {
     System,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct License {
     pub free: Option<bool>,
     pub fullname: String,
@@ -126,7 +125,7 @@ pub struct PkgInitModel {
     pub description: Option<String>,
     pub icon: Option<String>,
     pub screenshots: Vec<String>,
-    pub homepage: Option<StrOrVec>,
+    pub homepage: Option<String>,
     pub licenses: Vec<License>,
     pub platforms: Vec<String>,
     pub maintainers: Vec<PkgMaintainer>,
@@ -135,7 +134,7 @@ pub struct PkgInitModel {
 
 #[derive(Debug)]
 pub enum PkgMsg {
-    UpdateConfig(NscConfig),
+    UpdateConfig(NixDataConfig),
     UpdatePkgTypes(SystemPkgs, UserPkgs),
     Open(Box<PkgInitModel>),
     LoadScreenshot(String, usize, String),
@@ -168,7 +167,7 @@ pub enum PkgAsyncMsg {
 pub struct PkgPageInit {
     pub syspkgs: SystemPkgs,
     pub userpkgs: UserPkgs,
-    pub config: NscConfig,
+    pub config: NixDataConfig,
 }
 
 #[relm4::component(pub)]
@@ -1123,22 +1122,23 @@ impl Component for PkgModel {
                     self.description = Some(pango.strip_prefix('\n').unwrap_or(&pango).to_string());
                 }
 
-                if let Some(h) = pkgmodel.homepage {
-                    match h {
-                        StrOrVec::Single(h) => {
-                            self.homepage = Some(h.to_string());
-                        }
-                        StrOrVec::List(h) => {
-                            if let Some(first) = h.get(0) {
-                                self.homepage = Some(first.to_string());
-                            } else {
-                                self.homepage = None;
-                            }
-                        }
-                    }
-                } else {
-                    self.homepage = None;
-                }
+                self.homepage = pkgmodel.homepage;
+                // if let Some(h) = pkgmodel.homepage {
+                //     match h {
+                //         StrOrVec::Single(h) => {
+                //             self.homepage = Some(h.to_string());
+                //         }
+                //         StrOrVec::List(h) => {
+                //             if let Some(first) = h.get(0) {
+                //                 self.homepage = Some(first.to_string());
+                //             } else {
+                //                 self.homepage = None;
+                //             }
+                //         }
+                //     }
+                // } else {
+                //     self.homepage = None;
+                // }
 
                 if pkgmodel.screenshots.len() <= 1 {
                     self.carpage = CarouselPage::Single;
@@ -1150,14 +1150,14 @@ impl Component for PkgModel {
                     let mut scrn_guard = self.screenshots.guard();
                     scrn_guard.clear();
                     for _i in 0..pkgmodel.screenshots.len() {
-                        scrn_guard.push_back(())
+                        scrn_guard.push_back(());
                     }
                 }
 
                 for (i, url) in pkgmodel.screenshots.into_iter().enumerate() {
                     if let Ok(home) = env::var("HOME") {
                         let cachedir = format!("{}/.cache/nix-software-center", home);
-                        let sha = digest(&url);
+                        let sha = digest(url.to_string());
                         let scrnpath = format!("{}/screenshots/{}", cachedir, sha);
                         let pkg = self.pkg.clone();
 
@@ -1289,13 +1289,13 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::Close => {
-                self.pkg = String::default();
-                self.name = String::default();
-                self.summary = None;
-                self.description = None;
-                self.icon = None;
-                let mut scrn_guard = self.screenshots.guard();
-                scrn_guard.clear();
+                // self.pkg = String::default();
+                // self.name = String::default();
+                // self.summary = None;
+                // self.description = None;
+                // self.icon = None;
+                // let mut scrn_guard = self.screenshots.guard();
+                // scrn_guard.clear();
                 sender.output(AppMsg::FrontPage)
             }
             PkgMsg::InstallUser => {
@@ -1391,10 +1391,11 @@ impl Component for PkgModel {
                                 self.installedsystempkgs.remove(&work.pkg);
                             }
                         };
-                        sender.output(AppMsg::UpdateUpdatePkgs);
+                        // sender.output(AppMsg::UpdateUpdatePkgs);
+                        // sender.output(AppMsg::UpdateInstalledPkgs);
                     }
                 }
-                sender.output(AppMsg::UpdatePkgs(None));
+                sender.output(AppMsg::UpdateInstalledPkgs);
                 if let Some(n) = &work.notify {
                     match n {
                         NotifyPage::Installed => {
@@ -1556,29 +1557,7 @@ impl Component for PkgModel {
 }
 
 fn launchterm(cmd: &str) {
-    if which::which("kgx").is_ok() {
-        let _ = Command::new("kgx").arg("-e").arg(&cmd).spawn();
-    } else if which::which("gnome-terminal").is_ok() {
-        let _ = Command::new("gnome-terminal").arg("--").arg(&cmd).spawn();
-    } else if which::which("konsole").is_ok() {
-        let _ = Command::new("konsole").arg("-e").arg(&cmd).spawn();
-    } else if which::which("mate-terminal").is_ok() {
-        let _ = Command::new("mate-terminal").arg("-e").arg(&cmd).spawn();
-    } else if which::which("xfce4-terminal").is_ok() {
-        let _ = Command::new("xfce4-terminal").arg("-e").arg(&cmd).spawn();
-    } else if which::which("tilix").is_ok() {
-        let _ = Command::new("tilix").arg("-e").arg(&cmd).spawn();
-    } else if which::which("terminology").is_ok() {
-        let _ = Command::new("terminology").arg("-e").arg(&cmd).spawn();
-    } else if which::which("alacritty").is_ok() {
-        let _ = Command::new("alacritty").arg("-e").arg(&cmd).spawn();
-    } else if which::which("urxvt").is_ok() {
-        let _ = Command::new("urxvt").arg("-e").arg(&cmd).spawn();
-    } else if which::which("xterm").is_ok() {
-        let _ = Command::new("xterm").arg("-e").arg(&cmd).spawn();
-    } else {
-        error!("No terminal detected!")
-    }
+    let _ = Command::new("kgx").arg("-e").arg(&cmd).spawn();
 }
 
 relm4::new_action_group!(ModeActionGroup, "mode");
