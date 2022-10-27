@@ -32,9 +32,7 @@ use super::{
     searchpage::{SearchItem, SearchPageModel, SearchPageMsg},
     updatepage::{UpdateItem, UpdatePageInit, UpdatePageModel, UpdatePageMsg},
     welcome::WelcomeModel,
-    windowloading::{
-        LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg,
-    },
+    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg},
 };
 
 #[derive(PartialEq)]
@@ -606,13 +604,13 @@ impl Component for AppModel {
                     warn!("Error editing config: {}", e);
                 }
 
-
                 self.syspkgtype = if self.config.systemconfig.is_none() {
                     SystemPkgs::None
                 } else {
                     match fs::read_to_string("/run/current-system/nixos-version") {
                         Ok(s) => {
-                            if !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos").exists()
+                            if !Path::new("/nix/var/nix/profiles/per-user/root/channels/nixos")
+                                .exists()
                                 || self.config.flake.is_some()
                             {
                                 SystemPkgs::Flake
@@ -626,12 +624,18 @@ impl Component for AppModel {
                                 SystemPkgs::Legacy
                             }
                         }
-                        Err(_) => SystemPkgs::None
+                        Err(_) => SystemPkgs::None,
                     }
                 };
-                self.pkgpage.emit(PkgMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.pkgpage.emit(PkgMsg::UpdatePkgTypes(
+                    self.syspkgtype.clone(),
+                    self.userpkgtype.clone(),
+                ));
                 self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
-                self.updatepage.emit(UpdatePageMsg::UpdatePkgTypes(self.syspkgtype.clone(), self.userpkgtype.clone()));
+                self.updatepage.emit(UpdatePageMsg::UpdatePkgTypes(
+                    self.syspkgtype.clone(),
+                    self.userpkgtype.clone(),
+                ));
                 self.updatepage
                     .emit(UpdatePageMsg::UpdateConfig(self.config.clone()));
                 self.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(
@@ -1172,80 +1176,115 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 if let Ok(pool) = &SqlitePool::connect(&format!("sqlite://{}", self.pkgdb)).await {
                     match self.userpkgtype {
                         UserPkgs::Env => {
-                            updateuseritems.push(UpdateItem {
-                                name: String::from("Nix Env"),
-                                pname: String::from("nix-env packages do not contain enough version information to determine if they are up to date."),
-                                pkg: None,
-                                summary: None, //data.summary.clone(),
-                                icon: None,    //data.icon.clone(),
-                                pkgtype: InstallType::User,
-                                verfrom: None,
-                                verto: None,
-                            });
-                            for installedpname in self.installeduserpkgs.keys() {
-                                installeduseritems.push(InstalledItem {
-                                    name: installedpname.clone(),
-                                    pname: installedpname.clone(),
-                                    pkg: None,
-                                    summary: None, //data.summary.clone(),
-                                    icon: None,    //data.icon.clone(),
-                                    pkgtype: InstallType::User,
-                                    busy: self
-                                        .installedpagebusy
-                                        .contains(&(installedpname.clone(), InstallType::User)),
-                                });
-
-                                // match count {
-                                //     1 => {
-                                //         let (pkg,) = &possibleitems[0];
-                                //         let (description,): (String,) = sqlx::query_as("SELECT description FROM meta WHERE attribute LIKE $1").bind(&format!("'%{}%'", pkg)).fetch_one(&pool).await.unwrap();
-                                //         let mut name = installedpname.to_string();
-                                //         let mut summary = if description.is_empty() { None } else { Some(description.to_string()) };
-                                //         let mut icon = None;
-                                //         if let Some(data) = self.appdata.get(pkg) {
-                                //             if let Some(n) = &data.name {
-                                //                 if let Some(n) = n.get("C") {
-                                //                     name = n.to_string();
-                                //                 }
-                                //             }
-                                //             if let Some(s) = &data.summary {
-                                //                 if let Some(s) = s.get("C") {
-                                //                     summary = Some(s.to_string());
-                                //                 }
-                                //             }
-                                //             if let Some(i) = &data.icon {
-                                //                 if let Some(i) = &i.cached {
-                                //                     icon = Some(i[0].name.clone());
-                                //                 }
-                                //             }
-                                //         }
-                                //         installeduseritems.push(InstalledItem {
-                                //             name,
-                                //             pname: installedpname.to_string(),
-                                //             pkg: Some(pkg.clone()),
-                                //             summary,
-                                //             icon,
-                                //             pkgtype: InstallType::User,
-                                //             busy: self
-                                //                 .installedpagebusy
-                                //                 .contains(&(installedpname.to_string(), InstallType::User)),
-                                //         })
-                                //     }
-                                //     2.. => {
-                                //         installeduseritems.push(InstalledItem {
-                                //             name: installedpname.clone(),
-                                //             pname: installedpname.clone(),
-                                //             pkg: None,
-                                //             summary: None, //data.summary.clone(),
-                                //             icon: None,    //data.icon.clone(),
-                                //             pkgtype: InstallType::User,
-                                //             busy: self
-                                //                 .installedpagebusy
-                                //                 .contains(&(installedpname.clone(), InstallType::User)),
-                                //         })
-                                //     }
-                                //     _ => {}
-                                // }
+                            for (installedpname, installedver) in &self.installeduserpkgs {
+                                let possibleitems: Vec<(String,)> =
+                                    sqlx::query_as("SELECT attribute FROM pkgs WHERE pname = $1")
+                                        .bind(installedpname)
+                                        .fetch_all(pool)
+                                        .await
+                                        .unwrap();
+                                match possibleitems.len() {
+                                    1 => {
+                                        let (pkg,) = &possibleitems[0];
+                                        let (description,): (String,) = sqlx::query_as(
+                                            "SELECT description FROM meta WHERE attribute = $1",
+                                        )
+                                        .bind(pkg)
+                                        .fetch_one(pool)
+                                        .await
+                                        .unwrap();
+                                        let (newver,): (String,) = sqlx::query_as(
+                                            "SELECT version FROM pkgs WHERE attribute = $1",
+                                        )
+                                        .bind(pkg)
+                                        .fetch_one(pool)
+                                        .await
+                                        .unwrap();
+                                        let mut name = installedpname.to_string();
+                                        let mut summary = if description.is_empty() {
+                                            None
+                                        } else {
+                                            Some(description.to_string())
+                                        };
+                                        let mut icon = None;
+                                        if let Some(data) = self.appdata.get(pkg) {
+                                            if let Some(n) = &data.name {
+                                                if let Some(n) = n.get("C") {
+                                                    name = n.to_string();
+                                                }
+                                            }
+                                            if let Some(s) = &data.summary {
+                                                if let Some(s) = s.get("C") {
+                                                    summary = Some(s.to_string());
+                                                }
+                                            }
+                                            if let Some(i) = &data.icon {
+                                                if let Some(i) = &i.cached {
+                                                    icon = Some(i[0].name.clone());
+                                                }
+                                            }
+                                        }
+                                        installeduseritems.push(InstalledItem {
+                                            name: name.clone(),
+                                            pname: installedpname.to_string(),
+                                            pkg: Some(pkg.clone()),
+                                            summary: summary.clone(),
+                                            icon: icon.clone(),
+                                            pkgtype: InstallType::User,
+                                            busy: self.installedpagebusy.contains(&(
+                                                installedpname.to_string(),
+                                                InstallType::User,
+                                            )),
+                                        });
+                                        if !installedver.eq(&newver) {
+                                            updateuseritems.push(UpdateItem {
+                                                name,
+                                                pname: installedpname.to_string(),
+                                                pkg: Some(pkg.clone()),
+                                                summary,
+                                                icon,
+                                                pkgtype: InstallType::User,
+                                                verfrom: Some(installedver.to_string()),
+                                                verto: Some(newver),
+                                            });
+                                        }
+                                    }
+                                    2.. => {
+                                        installeduseritems.push(InstalledItem {
+                                            name: installedpname.clone(),
+                                            pname: installedpname.clone(),
+                                            pkg: None,
+                                            summary: None,
+                                            icon: None,
+                                            pkgtype: InstallType::User,
+                                            busy: self.installedpagebusy.contains(&(
+                                                installedpname.clone(),
+                                                InstallType::User,
+                                            )),
+                                        });
+                                        let possibleversions: Vec<(String,)> = sqlx::query_as(
+                                            "SELECT version FROM pkgs WHERE pname =  $1",
+                                        )
+                                        .bind(installedpname)
+                                        .fetch_all(pool)
+                                        .await
+                                        .unwrap();
+                                        if !possibleversions.contains(&(installedver.to_string(),))
+                                        {
+                                            updateuseritems.push(UpdateItem {
+                                                name: installedpname.clone(),
+                                                pname: installedpname.clone(),
+                                                pkg: None,
+                                                summary: None,
+                                                icon: None,
+                                                pkgtype: InstallType::User,
+                                                verfrom: Some(installedver.to_string()),
+                                                verto: None,
+                                            });
+                                        }
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                         UserPkgs::Profile => {
@@ -1646,7 +1685,8 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 info!("AppMsg::OpenCategoryPage({})", category);
                 self.page = Page::FrontPage;
                 self.mainpage = MainPage::CategoryPage;
-                self.categorypage.emit(CategoryPageMsg::Loading(category.clone()));
+                self.categorypage
+                    .emit(CategoryPageMsg::Loading(category.clone()));
                 sender.input(AppMsg::LoadCategory(category));
             }
             AppMsg::LoadCategory(category) => {
@@ -1811,7 +1851,8 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 info!("DONE AppAsyncMsg::UpdateInstalledPkgs");
             }
             AppAsyncMsg::LoadCategory(category, catrec, catall) => {
-                self.categorypage.emit(CategoryPageMsg::Open(category, catrec, catall));
+                self.categorypage
+                    .emit(CategoryPageMsg::Open(category, catrec, catall));
             }
         }
     }
