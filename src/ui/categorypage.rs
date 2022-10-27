@@ -53,7 +53,14 @@ impl Component for CategoryPageModel {
                 #[wrap(Some)]
                 set_title_widget = &gtk::Label {
                     #[watch]
-                    set_label: &model.category.to_string(),
+                    set_label: match model.category {
+                        PkgCategory::Audio => "Audio",
+                        PkgCategory::Development => "Development",
+                        PkgCategory::Games => "Games",
+                        PkgCategory::Graphics => "Graphics",
+                        PkgCategory::Web => "Web",
+                        PkgCategory::Video => "Video",
+                    },
                 },
             },
             gtk::ScrolledWindow {
@@ -150,10 +157,6 @@ impl Component for CategoryPageModel {
         self.reset();
         match msg {
             CategoryPageMsg::Close => {
-                // let mut recapps_guard = self.recommendedapps.guard();
-                // let mut apps_guard = self.apps.guard();
-                // recapps_guard.clear();
-                // apps_guard.clear();
                 sender.output(AppMsg::FrontFrontPage)
             }
             CategoryPageMsg::OpenPkg(pkg) => {

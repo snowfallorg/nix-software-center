@@ -1,7 +1,7 @@
 .envrc
 /.direnv
 /.vscode
+/build
 /result
 /src/config.rs
 /target
-/src/resources.gresource

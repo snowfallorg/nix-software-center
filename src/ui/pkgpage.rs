@@ -1002,9 +1002,9 @@ impl Component for PkgModel {
             })
         };
 
-        group.add_action(nixenv);
-        group.add_action(nixprofile);
-        group.add_action(nixsystem);
+        group.add_action(&nixenv);
+        group.add_action(&nixprofile);
+        group.add_action(&nixsystem);
 
         let actions = group.into_action_group();
         widgets
@@ -1026,8 +1026,8 @@ impl Component for PkgModel {
             })
         };
 
-        rungroup.add_action(launchaction);
-        rungroup.add_action(termaction);
+        rungroup.add_action(&launchaction);
+        rungroup.add_action(&termaction);
 
         let runactions = rungroup.into_action_group();
         widgets

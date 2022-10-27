@@ -49,6 +49,7 @@
             gtk4
             gtksourceview5
             libadwaita
+            libxml2
             meson
             ninja
             openssl

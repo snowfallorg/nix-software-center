@@ -559,8 +559,8 @@ impl Component for AppModel {
             })
         };
 
-        group.add_action(aboutpage);
-        group.add_action(prefernecespage);
+        group.add_action(&aboutpage);
+        group.add_action(&prefernecespage);
         let actions = group.into_action_group();
         widgets
             .main_window
@@ -579,9 +579,9 @@ impl Component for AppModel {
         installedvs.set_name(Some("installed"));
         searchvs.set_name(Some("search"));
         updatesvs.set_name(Some("updates"));
-        frontvs.set_icon_name(Some("compass"));
-        installedvs.set_icon_name(Some("selection-mode"));
-        updatesvs.set_icon_name(Some("emblem-synchronizing-symbolic"));
+        frontvs.set_icon_name(Some("nsc-home-symbolic"));
+        installedvs.set_icon_name(Some("nsc-installed-symbolic"));
+        updatesvs.set_icon_name(Some("nsc-update-symbolic"));
         ComponentParts { model, widgets }
     }
 
@@ -749,7 +749,7 @@ impl Component for AppModel {
                     PkgCategory::Development,
                     PkgCategory::Games,
                     PkgCategory::Graphics,
-                    PkgCategory::Network,
+                    PkgCategory::Web,
                     PkgCategory::Video,
                 ] {
                     cat_guard.push_back(c);
@@ -1682,7 +1682,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 self.installedpage.emit(InstalledPageMsg::UnsetBusy(work));
             }
             AppMsg::OpenCategoryPage(category) => {
-                info!("AppMsg::OpenCategoryPage({})", category);
+                info!("AppMsg::OpenCategoryPage({:?})", category);
                 self.page = Page::FrontPage;
                 self.mainpage = MainPage::CategoryPage;
                 self.categorypage
@@ -1690,7 +1690,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 sender.input(AppMsg::LoadCategory(category));
             }
             AppMsg::LoadCategory(category) => {
-                info!("AppMsg::LoadCategory({})", category);
+                info!("AppMsg::LoadCategory({:?})", category);
                 let pkgdb = self.pkgdb.clone();
                 let categoryrec = self.categoryrec.get(&category).unwrap_or(&vec![]).to_vec();
                 let categoryall = self.categoryall.get(&category).unwrap_or(&vec![]).to_vec();

@@ -1,12 +1,21 @@
 use adw::gio;
-use nix_software_center::ui::window::AppModel;
+use gtk::{prelude::ApplicationExt, glib};
+use log::{error, info};
+use nix_software_center::{ui::window::AppModel, config::RESOURCES_FILE};
 use relm4::*;
-use nix_software_center::config::PKGDATADIR;
 fn main() {
+    gtk::init().unwrap();
     pretty_env_logger::init();
-    if let Ok(res) = gio::Resource::load(PKGDATADIR.to_string() + "/resources.gresource") {
+	glib::set_application_name("Software Center");
+    if let Ok(res) = gio::Resource::load(RESOURCES_FILE) {
+        info!("Resource loaded: {}", RESOURCES_FILE);
         gio::resources_register(&res);
+    } else {
+        error!("Failed to load resources");
     }
-    let app = RelmApp::new(nix_software_center::config::APP_ID);
+    gtk::Window::set_default_icon_name(nix_software_center::config::APP_ID);
+    let app = adw::Application::new(Some(nix_software_center::config::APP_ID), gio::ApplicationFlags::empty());
+    app.set_resource_base_path(Some("/dev/vlinkz/NixSoftwareCenter"));
+    let app = RelmApp::with_app(app);
     app.run::<AppModel>(());
 }

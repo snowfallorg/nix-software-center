@@ -1,7 +1,6 @@
 use relm4::adw::prelude::*;
 use relm4::gtk::pango;
 use relm4::{factory::*, *};
-use strum_macros::{EnumIter, Display};
 
 use super::window::AppMsg;
 
@@ -10,13 +9,13 @@ pub struct PkgGroup {
     pub category: PkgCategory,
 }
 
-#[derive(Debug, Display, Hash, EnumIter, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum PkgCategory {
     Audio,
     Development,
     Games,
     Graphics,
-    Network,
+    Web,
     Video,
 }
 
@@ -51,14 +50,14 @@ impl FactoryComponent for PkgGroup {
                     gtk::Image {
                         add_css_class: "icon-dropshadow",
                         set_icon_name: match self.category {
-                            PkgCategory::Audio => Some("audio-x-generic"),
-                            PkgCategory::Development => Some("computer"),
-                            PkgCategory::Games => Some("input-gaming"),
-                            PkgCategory::Graphics => Some("image-x-generic"),
-                            PkgCategory::Network => Some("network-server"),
-                            PkgCategory::Video => Some("video-x-generic"),
+                            PkgCategory::Audio => Some("nsc-audio"),
+                            PkgCategory::Development => Some("nsc-development"),
+                            PkgCategory::Games => Some("nsc-gaming"),
+                            PkgCategory::Graphics => Some("nsc-graphics"),
+                            PkgCategory::Web => Some("nsc-web"),
+                            PkgCategory::Video => Some("nsc-video"),
                         },
-                        set_pixel_size: 32,
+                        set_pixel_size: 40,
                     },
                     gtk::Label {
                         add_css_class: "title-2",
@@ -69,7 +68,7 @@ impl FactoryComponent for PkgGroup {
                             PkgCategory::Development => "Development",
                             PkgCategory::Games => "Games",
                             PkgCategory::Graphics => "Graphics",
-                            PkgCategory::Network => "Network",
+                            PkgCategory::Web => "Web",
                             PkgCategory::Video => "Video",
                         },
                         set_ellipsize: pango::EllipsizeMode::End,

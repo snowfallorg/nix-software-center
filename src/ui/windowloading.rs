@@ -12,7 +12,6 @@ use relm4::adw::prelude::*;
 use relm4::*;
 use sqlx::SqlitePool;
 use std::{collections::HashMap, env};
-use strum::IntoEnumIterator;
 
 pub struct WindowAsyncHandler;
 
@@ -148,7 +147,14 @@ impl Worker for WindowAsyncHandler {
                         .collect::<HashMap<String, Option<String>>>();
 
                     println!("Starting category");
-                    for category in PkgCategory::iter() {
+                    for category in vec![
+                        PkgCategory::Audio,
+                        PkgCategory::Development,
+                        PkgCategory::Games,
+                        PkgCategory::Graphics,
+                        PkgCategory::Web,
+                        PkgCategory::Video,
+                    ] {
                         desktoppicks.shuffle(&mut rng);
                         let mut cvec = vec![];
                         let mut allvec = vec![];
@@ -243,8 +249,8 @@ impl Worker for WindowAsyncHandler {
                                     }
                                     false
                                 }
-                                PkgCategory::Network => {
-                                    // Network:
+                                PkgCategory::Web => {
+                                    // Web:
                                     // - pkgs/applications/networking
                                     // - xdg: Network
                                     if let Some(Some(pos)) = pospkgs.get(&pkg) {
@@ -325,7 +331,7 @@ impl Worker for WindowAsyncHandler {
                                                 && category == PkgCategory::Graphics)
                                             || (position
                                                 .starts_with("pkgs/applications/networking")
-                                                && category == PkgCategory::Network)
+                                                && category == PkgCategory::Web)
                                             || (position.starts_with("pkgs/applications/video")
                                                 && category == PkgCategory::Video)
                                             || (position.starts_with("pkgs/tools/games")

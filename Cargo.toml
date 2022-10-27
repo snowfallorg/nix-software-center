@@ -5,10 +5,10 @@ edition = "2021"
 default-run = "nix-software-center"
 
 [dependencies]
-relm4 = { git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.3", features = ["all"]  }
-relm4-components = { package = "relm4-components", git = "https://github.com/Relm4/Relm4", tag = "v0.5.0-beta.3"}
-adw = { package = "libadwaita", git = "https://gitlab.gnome.org/World/Rust/libadwaita-rs", features = ["v1_2", "gtk_v4_6"] }
-gtk = { package = "gtk4", git = "https://github.com/gtk-rs/gtk4-rs", features = ["v4_6"] }
+relm4 = { version = "0.5.0-beta.4", features = ["all"]  }
+relm4-components = { package = "relm4-components", version = "0.5.0-beta.4"}
+adw = { package = "libadwaita", version = "0.2", features = ["v1_2", "gtk_v4_6"] }
+gtk = { package = "gtk4", version = "0.5", features = ["v4_6"] }
 tokio = { version = "1.21", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
 tracker = "0.1"
 
@@ -31,8 +31,6 @@ reqwest = { version = "0.11", features = ["blocking"] }
 sha256 = "1.0"
 image = "0.24"
 spdx = "0.9"
-strum = "0.24"
-strum_macros = "0.24"
 
 anyhow = "1.0"
 

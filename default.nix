@@ -9,7 +9,7 @@ let
       rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
       hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
     })
-    { stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
+    { set = "all"; stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
 in
 pkgs.stdenv.mkDerivation rec {
   pname = "nix-software-center";
@@ -20,7 +20,7 @@ pkgs.stdenv.mkDerivation rec {
   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-NqjBlNHt9rlej5Y3R6cYDZFwpDIFa3ZmfsxSXaTUOUI=";
+    hash = "sha256-yZKhtc5Rnkk3QdASnIxHFAYKPbG0RWySXLBjhraFPuc=";
   };
 
   nativeBuildInputs = with pkgs; [
