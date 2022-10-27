@@ -62,6 +62,7 @@ pub struct PkgModel {
     installedsystempkgs: HashSet<String>,
 
     workqueue: HashSet<WorkPkg>,
+    visible: bool,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -230,6 +231,8 @@ impl Component for PkgModel {
                 set_hexpand: true,
                 set_hscrollbar_policy: gtk::PolicyType::Never,
                 set_vscrollbar_policy: gtk::PolicyType::Automatic,
+                #[track(model.changed(PkgModel::visible()) && !self.visible)]
+                set_vadjustment: gtk::Adjustment::NONE,
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
                     adw::Clamp {
@@ -616,7 +619,6 @@ impl Component for PkgModel {
                             set_homogeneous: true,
                             set_row_spacing: 5,
                             set_column_spacing: 4,
-                            // set_margin_all: 15,
                             set_selection_mode: gtk::SelectionMode::None,
                             set_max_children_per_line: 2,
                             append = &gtk::FlowBoxChild {
@@ -959,13 +961,11 @@ impl Component for PkgModel {
             maintainers: vec![],
             installeduserpkgs: HashSet::new(),
             installedsystempkgs: HashSet::new(),
-            // installinguserpkgs: HashSet::new(),
-            // installingsystempkgs: HashSet::new(),
-            // removinguserpkgs: HashSet::new(),
             syspkgtype: initparams.syspkgs,
             userpkgtype: initparams.userpkgs,
             workqueue: HashSet::new(),
             launchable: None,
+            visible: false,
             tracker: 0,
         };
 
@@ -1050,6 +1050,7 @@ impl Component for PkgModel {
                 self.installworker.emit(InstallAsyncHandlerMsg::SetPkgTypes(syspkgs, userpkgs));
             }
             PkgMsg::Open(pkgmodel) => {
+                self.set_visible(true);
                 self.set_pkg(pkgmodel.pkg);
                 self.set_name(pkgmodel.name);
                 self.set_icon(pkgmodel.icon);
@@ -1123,22 +1124,6 @@ impl Component for PkgModel {
                 }
 
                 self.homepage = pkgmodel.homepage;
-                // if let Some(h) = pkgmodel.homepage {
-                //     match h {
-                //         StrOrVec::Single(h) => {
-                //             self.homepage = Some(h.to_string());
-                //         }
-                //         StrOrVec::List(h) => {
-                //             if let Some(first) = h.get(0) {
-                //                 self.homepage = Some(first.to_string());
-                //             } else {
-                //                 self.homepage = None;
-                //             }
-                //         }
-                //     }
-                // } else {
-                //     self.homepage = None;
-                // }
 
                 if pkgmodel.screenshots.len() <= 1 {
                     self.carpage = CarouselPage::Single;
@@ -1197,7 +1182,6 @@ impl Component for PkgModel {
                                                             let mut content =  Cursor::new(b);
                                                             if std::io::copy(&mut content, &mut file).is_ok() {
                                                                 fn openimg(scrnpath: &str) -> Result<(), Box<dyn Error>> {
-                                                                    // let mut reader = Reader::new(Cursor::new(imgdata.buffer())).with_guessed_format().expect("Cursor io never fails");
                                                                     let img = if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Png) {
                                                                         x
                                                                     } else if let Ok(x) = image::load(BufReader::new(File::open(scrnpath)?), image::ImageFormat::Jpeg) {
@@ -1296,6 +1280,7 @@ impl Component for PkgModel {
                 // self.icon = None;
                 // let mut scrn_guard = self.screenshots.guard();
                 // scrn_guard.clear();
+                self.set_visible(false);
                 sender.output(AppMsg::FrontPage)
             }
             PkgMsg::InstallUser => {
@@ -1390,9 +1375,7 @@ impl Component for PkgModel {
                             PkgAction::Remove => {
                                 self.installedsystempkgs.remove(&work.pkg);
                             }
-                        };
-                        // sender.output(AppMsg::UpdateUpdatePkgs);
-                        // sender.output(AppMsg::UpdateInstalledPkgs);
+                        }
                     }
                 }
                 sender.output(AppMsg::UpdateInstalledPkgs);

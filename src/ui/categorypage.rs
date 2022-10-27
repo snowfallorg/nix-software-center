@@ -165,19 +165,28 @@ impl Component for CategoryPageModel {
                 let mut recapps_guard = self.recommendedapps.guard();
                 recapps_guard.clear();
                 recapps_guard.drop();
-                for app in catrec {
-                    sender.oneshot_command(async move {
-                        CategoryPageAsyncMsg::PushRec(app)
-                    });
-                }
                 let mut apps_guard = self.apps.guard();
                 apps_guard.clear();
                 apps_guard.drop();
-                for app in catall {
-                    sender.oneshot_command(async move {
-                        CategoryPageAsyncMsg::Push(app)
-                    });
-                }
+
+                sender.command(|out, shutdown| {
+                    shutdown.register(async move {
+                        for app in catrec {
+                            out.send(CategoryPageAsyncMsg::PushRec(app));
+                            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+                        }
+                    }).drop_on_shutdown()
+                });
+
+                sender.command(|out, shutdown| {
+                    shutdown.register(async move {
+                        for app in catall {
+                            out.send(CategoryPageAsyncMsg::Push(app));
+                            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+                        }
+                    }).drop_on_shutdown()
+                });
+                
                 self.busy = false;
                 info!("DONE CategoryPageMsg::Open");
             }

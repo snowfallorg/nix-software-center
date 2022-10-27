@@ -1259,7 +1259,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                 .await
                                 .unwrap();
                                 let (description,): (String,) = sqlx::query_as(
-                                    "SELECT description FROM meta WHERE attribute LIKE $1",
+                                    "SELECT description FROM meta WHERE attribute = $1",
                                 )
                                 .bind(installedpkg)
                                 .fetch_one(pool)
@@ -1289,7 +1289,6 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         }
                                     }
                                 }
-                                // if let Some(item) = self.pkgitems.get(installedpkg) {
                                 installeduseritems.push(InstalledItem {
                                     name: name.to_string(),
                                     pname: pname.to_string(),
@@ -1500,16 +1499,13 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 info!("AppMsg::Search");
                 debug!("Searching for: {}", search);
                 self.viewstack.set_visible_child_name("search");
-                self.searchpage.emit(SearchPageMsg::Open);
                 self.set_searchquery(search.to_string());
-                // // let pkgitems: Vec<PkgItem> = self.pkgitems.values().cloned().collect();
                 let installeduserpkgs = self.installeduserpkgs.clone();
                 let installedsystempkgs = self.installedsystempkgs.clone();
                 let userpkgtype = self.userpkgtype.clone();
                 let pkgdb = self.pkgdb.clone();
                 let appdata = self.appdata.clone();
                 sender.command(move |out, shutdown| {
-                    // let pkgs = pkgitems.clone();
                     let search = search.clone();
                     let installeduserpkgs = installeduserpkgs.clone();
                     let installedsystempkgs = installedsystempkgs;
@@ -1579,8 +1575,8 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                 }
                             }
                             outpkgs.sort_by(|a, b| {
-                                let mut aleft = a.pkg.to_lowercase();
-                                let mut bleft = b.pkg.to_lowercase();
+                                let mut aleft = a.name.to_lowercase() + &a.pkg.to_lowercase();
+                                let mut bleft = b.name.to_lowercase() + &b.pkg.to_lowercase();
                                 for q in searchsplit.iter() {
                                     let q = &q.to_lowercase();
                                     if aleft.contains(q) {
@@ -1594,8 +1590,8 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         bleft.push_str(q);
                                     }
                                 }
-                                let mut apoints = aleft.len();
-                                let mut bpoints = bleft.len();
+                                let mut apoints = aleft.len() + 5;
+                                let mut bpoints = bleft.len() + 5;
                                 // for q in searchsplit.iter() {
                                 //     if a.name.contains(q) {
                                 //         apoints -= 1;
@@ -1604,11 +1600,11 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                 //         bpoints -= 1;
                                 //     }
                                 // }
-                                if a.icon.is_some() {
-                                    apoints -= 3;
+                                if appdata.get(&a.pkg).is_some() {
+                                    apoints -= 5;
                                 }
-                                if b.icon.is_some() {
-                                    bpoints -= 3;
+                                if appdata.get(&b.pkg).is_some() {
+                                    bpoints -= 5;
                                 }
                                 apoints.cmp(&bpoints)
                             });

@@ -16,10 +16,8 @@ pub struct SearchPageModel {
 
 #[derive(Debug)]
 pub enum SearchPageMsg {
-    Open,
     Search(Vec<SearchItem>),
     UpdateInstalled(HashSet<String>, HashSet<String>),
-    Close,
     OpenRow(gtk::ListBoxRow)
 }
 
@@ -82,8 +80,6 @@ impl SimpleComponent for SearchPageModel {
                 searchitem_guard.drop();
                 self.update_searchitemtracker(|_| ());
             }
-            SearchPageMsg::Open => {}
-            SearchPageMsg::Close => {}
             SearchPageMsg::OpenRow(row) => {
                 let searchitem_guard = self.searchitems.guard();
                 for (i, child) in searchitem_guard.widget().iter_children().enumerate() {
