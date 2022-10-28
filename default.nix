@@ -59,6 +59,6 @@ pkgs.stdenv.mkDerivation rec {
   '';
 
   postInstall = ''
-    wrapProgram $out/bin/nix-software-center --prefix PATH : '${lib.makeBinPath [ pkgs.gnome-console ]}'
+    wrapProgram $out/bin/nix-software-center --prefix PATH : '${lib.makeBinPath [ pkgs.gnome-console pkgs.sqlite ]}'
   '';
 }

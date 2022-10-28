@@ -38,7 +38,13 @@ impl Worker for WindowAsyncHandler {
                     let mut catpicks: HashMap<PkgCategory, Vec<String>> = HashMap::new();
                     let mut catpkgs: HashMap<PkgCategory, Vec<String>> = HashMap::new();
 
-                    let pkgdb = nix_data::cache::nixos::nixospkgs().await.unwrap();
+                    let pkgdb = match nix_data::cache::nixos::nixospkgs().await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!("Error getting NixOS pkgs: {}", e);
+                            return;
+                        }
+                    };
                     let pool = SqlitePool::connect(&format!("sqlite://{}", pkgdb))
                         .await
                         .unwrap();
