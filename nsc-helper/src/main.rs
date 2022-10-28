@@ -6,11 +6,11 @@ use std::{
     process::Command,
 };
 
-#[derive(clap::Subcommand)]
+#[derive(Subcommand, Debug)]
 enum SubCommands {
     Config {
         /// Write stdin to file in path output
-        #[clap(short, long)]
+        #[arg(short, long)]
         output: String,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
@@ -21,17 +21,17 @@ enum SubCommands {
     },
     Channel {
         /// Whether to rebuild the system after updating channels
-        #[clap(short, long)]
+        #[arg(short, long)]
         rebuild: bool,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
     Flake {
         /// Whether to rebuild the system after updating flake
-        #[clap(short, long)]
+        #[arg(short, long)]
         rebuild: bool,
         /// Path to the flake file
-        #[clap(short, long)]
+        #[arg(short, long)]
         flakepath: String,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
