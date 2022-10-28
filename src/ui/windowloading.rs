@@ -37,7 +37,6 @@ impl Worker for WindowAsyncHandler {
                     let mut recpicks = vec![];
                     let mut catpicks: HashMap<PkgCategory, Vec<String>> = HashMap::new();
                     let mut catpkgs: HashMap<PkgCategory, Vec<String>> = HashMap::new();
-                    println!("Connecting to DB");
 
                     let pkgdb = nix_data::cache::nixos::nixospkgs().await.unwrap();
                     let pool = SqlitePool::connect(&format!("sqlite://{}", pkgdb))
@@ -84,7 +83,6 @@ impl Worker for WindowAsyncHandler {
                             .fetch_all(&pool)
                             .await
                             .unwrap();
-                    println!("Got DB data");
                     let appdata = appsteamdata().unwrap();
 
                     let desktopenv = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
@@ -146,7 +144,6 @@ impl Worker for WindowAsyncHandler {
                         .map(|(x, y)| (x, if y.is_empty() { None } else { Some(y) }))
                         .collect::<HashMap<String, Option<String>>>();
 
-                    println!("Starting category");
                     for category in vec![
                         PkgCategory::Audio,
                         PkgCategory::Development,

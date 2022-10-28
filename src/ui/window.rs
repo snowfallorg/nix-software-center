@@ -1105,7 +1105,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                         self.pkgpage.emit(PkgMsg::Open(Box::new(out)));
                     }
                 } else {
-                    eprintln!("No pkgdb!!!!!!!!!!!!!!!!!!");
+                    error!("No pkgdb!");
                 }
             }
             AppMsg::FrontPage => {
@@ -1171,8 +1171,8 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 let mut installeduseritems = vec![];
                 let mut updateuseritems = vec![];
                 // let pool = SqlitePool::connect(&self.pkgdb).await.unwrap();
-                println!("Installed user pkgs: {:?}", self.installeduserpkgs);
-                println!("Installed system pkgs: {:?}", self.installedsystempkgs);
+                debug!("Installed user pkgs: {:?}", self.installeduserpkgs);
+                debug!("Installed system pkgs: {:?}", self.installedsystempkgs);
                 if let Ok(pool) = &SqlitePool::connect(&format!("sqlite://{}", self.pkgdb)).await {
                     match self.userpkgtype {
                         UserPkgs::Env => {
@@ -1289,7 +1289,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                         }
                         UserPkgs::Profile => {
                             for installedpkg in self.installeduserpkgs.keys() {
-                                println!("Checking package {}", installedpkg);
+                                debug!("Checking package {}", installedpkg);
                                 let (pname, version): (String, String) = sqlx::query_as(
                                     "SELECT pname, version FROM pkgs WHERE attribute = $1",
                                 )
@@ -1350,7 +1350,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         .fetch_one(latestpool)
                                         .await
                                         .unwrap();
-                                        println!(
+                                        debug!(
                                             "PROFILE: {} {} {}",
                                             installedpkg, version, newver
                                         );
@@ -1435,7 +1435,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         .fetch_one(currentpool)
                                         .await
                                         .unwrap();
-                                println!("SYSTEM: {} {} {}", installedpkg, currver, version);
+                                debug!("SYSTEM: {} {} {}", installedpkg, currver, version);
                                 if version != currver {
                                     updatesystemitems.push(UpdateItem {
                                         name,
