@@ -773,6 +773,7 @@ impl Component for AppModel {
                 let installeduser = self.installeduserpkgs.clone();
                 let installedsystem = self.installedsystempkgs.clone();
                 let poolref = self.pkgdb.clone();
+                let userpkgtype = self.userpkgtype.clone();
                 sender.oneshot_command(async move {
                     let mut pkgtiles = vec![];
                     if let Ok(pool) = &SqlitePool::connect(&format!("sqlite://{}", poolref)).await {
@@ -791,7 +792,7 @@ impl Component for AppModel {
                                     } else {
                                         pname.0.to_string()
                                     },
-                                    pname: pname.0,
+                                    pname: pname.0.to_string(),
                                     icon: data
                                         .icon
                                         .as_ref()
@@ -803,7 +804,7 @@ impl Component for AppModel {
                                         .and_then(|x| x.get("C"))
                                         .map(|x| x.to_string())
                                         .unwrap_or_default(),
-                                    installeduser: installeduser.contains_key(&pkg),
+                                    installeduser: installeduser.contains_key(&match userpkgtype { UserPkgs::Env => pname.0, UserPkgs::Profile => pkg.to_string() }),
                                     installedsystem: installedsystem.contains(&pkg),
                                 })
                             }
@@ -1837,11 +1838,10 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                     debug!("Got recommended apps guard");
                     for item in recommendedapps_guard.iter_mut() {
                         debug!("Got item {}", item.pkg);
-                        item.installeduser = self.installeduserpkgs.contains_key(&item.pname);
-                        item.installedsystem = self.installedsystempkgs.contains(&item.pname);
+                        item.installeduser = self.installeduserpkgs.contains_key(match self.userpkgtype { UserPkgs::Env => &item.pname, UserPkgs::Profile => &item.pkg });
+                        item.installedsystem = self.installedsystempkgs.contains(&item.pkg);
                     }
                     if self.searching {
-                        // self.update_searching(|_| ());
                         self.searchpage.emit(SearchPageMsg::UpdateInstalled(
                             self.installeduserpkgs.keys().cloned().collect(),
                             self.installedsystempkgs.clone(),

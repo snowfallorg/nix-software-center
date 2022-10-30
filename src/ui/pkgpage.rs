@@ -313,7 +313,7 @@ impl Component for PkgModel {
                                                                 },
                                                             }
                                                         }                                                   
-                                                    } else if model.installeduserpkgs.contains(&model.pname) {
+                                                    } else if model.installeduserpkgs.contains(match model.userpkgtype { UserPkgs::Env => &model.pname, UserPkgs::Profile => &model.pkg }) {
                                                         gtk::Box {
                                                             set_halign: gtk::Align::End,
                                                             set_valign: gtk::Align::Center,
@@ -1061,7 +1061,7 @@ impl Component for PkgModel {
                 self.set_installeduserpkgs(pkgmodel.installeduserpkgs);
                 self.set_installedsystempkgs(pkgmodel.installedsystempkgs);
 
-                if self.installedsystempkgs.contains(&self.pkg) && !self.installeduserpkgs.contains(&self.pname) {
+                if self.installedsystempkgs.contains(&self.pkg) && !self.installeduserpkgs.contains(match self.userpkgtype { UserPkgs::Env => &self.pname, UserPkgs::Profile => &self.pkg }) {
                     self.set_installtype(InstallType::System)
                 } else {
                     self.set_installtype(InstallType::User)
@@ -1069,7 +1069,7 @@ impl Component for PkgModel {
 
                 self.launchable = if let Some(l) = pkgmodel.launchable {
                     Some(Launch::GtkApp(l))
-                } else if self.installeduserpkgs.contains(&self.pname) {
+                } else if self.installeduserpkgs.contains(match self.userpkgtype { UserPkgs::Env => &self.pname, UserPkgs::Profile => &self.pkg }) {
                     if let Ok(o) = Command::new("command").arg("-v").arg(&self.pname).output() {
                         if o.status.success() {
                             Some(Launch::TerminalApp(self.pname.to_string()))
@@ -1346,7 +1346,10 @@ impl Component for PkgModel {
                     InstallType::User => {
                         match work.action {
                             PkgAction::Install => {
-                                self.installeduserpkgs.insert(work.pname.clone());
+                                match self.userpkgtype {
+                                    UserPkgs::Env => self.installeduserpkgs.insert(work.pname.to_string()),
+                                    UserPkgs::Profile => self.installeduserpkgs.insert(work.pkg.to_string()),
+                                };
                                 if self.launchable.is_none() {
                                     if let Ok(o) = Command::new("command").arg("-v").arg(&self.pname).output() {
                                         if o.status.success() {
@@ -1356,7 +1359,10 @@ impl Component for PkgModel {
                                 }
                             }
                             PkgAction::Remove => {
-                                self.installeduserpkgs.remove(&work.pname);
+                                match self.userpkgtype {
+                                    UserPkgs::Env => self.installeduserpkgs.remove(&work.pname),
+                                    UserPkgs::Profile => self.installeduserpkgs.remove(&work.pkg),
+                                };
                             }
                         }
                     }
