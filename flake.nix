@@ -57,6 +57,7 @@
             pango
             pkg-config
             polkit
+            sqlite
             wrapGAppsHook4
             nixos-appstream-data
           ];

@@ -1,6 +1,6 @@
 use crate::APPINFO;
 
-use super::{pkgpage::InstallType, window::*, updatedialog::{UpdateDialogModel, UpdateDialogMsg}, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}};
+use super::{pkgpage::InstallType, window::*, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}, rebuild::RebuildMsg};
 use adw::prelude::*;
 use nix_data::config::configfile::NixDataConfig;
 use relm4::{factory::*, gtk::pango, *};
@@ -15,8 +15,6 @@ pub struct UpdatePageModel {
     #[tracker::no_eq]
     updatesystemlist: FactoryVecDeque<UpdateItemModel>,
     channelupdate: Option<(String, String)>,
-    #[tracker::no_eq]
-    updatedialog: Controller<UpdateDialogModel>,
     #[tracker::no_eq]
     updateworker: WorkerController<UpdateAsyncHandler>,
     config: NixDataConfig,
@@ -34,11 +32,10 @@ pub enum UpdatePageMsg {
     UpdateSystem,
     UpdateAllUser,
     UpdateUser(String),
-    UpdateChannels,
-    UpdateSystemAndChannels,
+    // UpdateChannels,
+    // UpdateSystemAndChannels,
     UpdateAll,
     DoneWorking,
-    DoneLoading,
     FailedWorking,
 }
 
@@ -87,101 +84,101 @@ impl SimpleComponent for UpdatePageModel {
                                 }
                             }
                         },
-                        gtk::Box {
-                            set_orientation: gtk::Orientation::Horizontal,
-                            set_hexpand: true,
-                            #[watch]
-                            set_visible: model.channelupdate.is_some(),
-                            gtk::Label {
-                                set_halign: gtk::Align::Start,
-                                add_css_class: "title-4",
-                                set_label: "Channels",
-                            },
-                        },
-                        gtk::ListBox {
-                            set_valign: gtk::Align::Start,
-                            add_css_class: "boxed-list",
-                            set_selection_mode: gtk::SelectionMode::None,
-                            #[watch]
-                            set_visible: model.channelupdate.is_some(),
-                            adw::PreferencesRow {
-                                set_activatable: false,
-                                set_can_focus: false,
-                                #[wrap(Some)]
-                                set_child = &gtk::Box {
-                                    set_orientation: gtk::Orientation::Horizontal,
-                                    set_hexpand: true,
-                                    set_spacing: 10,
-                                    set_margin_all: 10,
-                                    adw::Bin {
-                                        set_valign: gtk::Align::Center,
-                                        gtk::Image {
-                                            add_css_class: "icon-dropshadow",
-                                            set_halign: gtk::Align::Start,
-                                            set_icon_name: Some("application-x-addon"),
-                                            set_pixel_size: 64,
-                                        }
-                                    },
-                                    gtk::Box {
-                                        set_orientation: gtk::Orientation::Vertical,
-                                        set_halign: gtk::Align::Fill,
-                                        set_valign: gtk::Align::Center,
-                                        set_hexpand: true,
-                                        set_spacing: 2,
-                                        gtk::Label {
-                                            set_halign: gtk::Align::Start,
-                                            set_label: "nixos",
-                                            set_ellipsize: pango::EllipsizeMode::End,
-                                            set_lines: 1,
-                                            set_wrap: true,
-                                            set_max_width_chars: 0,
-                                        },
-                                        gtk::Label {
-                                            set_halign: gtk::Align::Start,
-                                            add_css_class: "dim-label",
-                                            add_css_class: "caption",
-                                            set_label: {
-                                                &(if let Some((old, new)) = &model.channelupdate {
-                                                    format!("{} → {}", old, new)
-                                                } else {
-                                                    String::default()
-                                                })
-                                            },
-                                            set_visible: model.channelupdate.is_some(),
-                                            set_ellipsize: pango::EllipsizeMode::End,
-                                            set_lines: 1,
-                                            set_wrap: true,
-                                            set_max_width_chars: 0,
-                                        },
-                                    },
-                                    gtk::Box {
-                                        set_orientation: gtk::Orientation::Vertical,
-                                        set_spacing: 5,
-                                        set_halign: gtk::Align::End,
-                                        set_valign: gtk::Align::Center,
-                                        gtk::Button {
-                                            add_css_class: "suggested-action",
-                                            set_valign: gtk::Align::Center,
-                                            set_halign: gtk::Align::End,
-                                            set_label: "Update channel and system",
-                                            set_can_focus: false,
-                                            connect_clicked[sender] => move |_| {
-                                                sender.input(UpdatePageMsg::UpdateSystemAndChannels);
-                                            }
-                                        },
-                                        gtk::Button {
-                                            set_valign: gtk::Align::Center,
-                                            set_halign: gtk::Align::End,
-                                            set_label: "Update channel only",
-                                            set_can_focus: false,
-                                            connect_clicked[sender] => move |_| {
-                                                sender.input(UpdatePageMsg::UpdateChannels);
-                                            }
-                                        },
-                                    }
-                                }
-                            }
-                        },
+                        // gtk::Box {
+                        //     set_orientation: gtk::Orientation::Horizontal,
+                        //     set_hexpand: true,
+                        //     #[watch]
+                        //     set_visible: model.channelupdate.is_some(),
+                        //     gtk::Label {
+                        //         set_halign: gtk::Align::Start,
+                        //         add_css_class: "title-4",
+                        //         set_label: "Channels",
+                        //     },
+                        // },
+                        // gtk::ListBox {
+                        //     set_valign: gtk::Align::Start,
+                        //     add_css_class: "boxed-list",
+                        //     set_selection_mode: gtk::SelectionMode::None,
+                        //     #[watch]
+                        //     set_visible: model.channelupdate.is_some(),
+                        //     adw::PreferencesRow {
+                        //         set_activatable: false,
+                        //         set_can_focus: false,
+                        //         #[wrap(Some)]
+                        //         set_child = &gtk::Box {
+                        //             set_orientation: gtk::Orientation::Horizontal,
+                        //             set_hexpand: true,
+                        //             set_spacing: 10,
+                        //             set_margin_all: 10,
+                        //             adw::Bin {
+                        //                 set_valign: gtk::Align::Center,
+                        //                 gtk::Image {
+                        //                     add_css_class: "icon-dropshadow",
+                        //                     set_halign: gtk::Align::Start,
+                        //                     set_icon_name: Some("application-x-addon"),
+                        //                     set_pixel_size: 64,
+                        //                 }
+                        //             },
+                        //             gtk::Box {
+                        //                 set_orientation: gtk::Orientation::Vertical,
+                        //                 set_halign: gtk::Align::Fill,
+                        //                 set_valign: gtk::Align::Center,
+                        //                 set_hexpand: true,
+                        //                 set_spacing: 2,
+                        //                 gtk::Label {
+                        //                     set_halign: gtk::Align::Start,
+                        //                     set_label: "nixos",
+                        //                     set_ellipsize: pango::EllipsizeMode::End,
+                        //                     set_lines: 1,
+                        //                     set_wrap: true,
+                        //                     set_max_width_chars: 0,
+                        //                 },
+                        //                 gtk::Label {
+                        //                     set_halign: gtk::Align::Start,
+                        //                     add_css_class: "dim-label",
+                        //                     add_css_class: "caption",
+                        //                     set_label: {
+                        //                         &(if let Some((old, new)) = &model.channelupdate {
+                        //                             format!("{} → {}", old, new)
+                        //                         } else {
+                        //                             String::default()
+                        //                         })
+                        //                     },
+                        //                     set_visible: model.channelupdate.is_some(),
+                        //                     set_ellipsize: pango::EllipsizeMode::End,
+                        //                     set_lines: 1,
+                        //                     set_wrap: true,
+                        //                     set_max_width_chars: 0,
+                        //                 },
+                        //             },
+                        //             gtk::Box {
+                        //                 set_orientation: gtk::Orientation::Vertical,
+                        //                 set_spacing: 5,
+                        //                 set_halign: gtk::Align::End,
+                        //                 set_valign: gtk::Align::Center,
+                        //                 gtk::Button {
+                        //                     add_css_class: "suggested-action",
+                        //                     set_valign: gtk::Align::Center,
+                        //                     set_halign: gtk::Align::End,
+                        //                     set_label: "Update channel and system",
+                        //                     set_can_focus: false,
+                        //                     connect_clicked[sender] => move |_| {
+                        //                         sender.input(UpdatePageMsg::UpdateSystemAndChannels);
+                        //                     }
+                        //                 },
+                        //                 gtk::Button {
+                        //                     set_valign: gtk::Align::Center,
+                        //                     set_halign: gtk::Align::End,
+                        //                     set_label: "Update channel only",
+                        //                     set_can_focus: false,
+                        //                     connect_clicked[sender] => move |_| {
+                        //                         sender.input(UpdatePageMsg::UpdateChannels);
+                        //                     }
+                        //                 },
+                        //             }
+                        //         }
+                        //     }
+                        // },
                         gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
                             set_hexpand: true,
@@ -234,7 +231,7 @@ impl SimpleComponent for UpdatePageModel {
                                 set_halign: gtk::Align::End,
                                 set_hexpand: true,
                                 set_valign: gtk::Align::Center,
-                                set_label: "Update All",
+                                set_label: "Update",
                                 connect_clicked[sender] => move |_|{
                                     sender.input(UpdatePageMsg::UpdateSystem);
                                 },
@@ -282,9 +279,6 @@ impl SimpleComponent for UpdatePageModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let updatedialog = UpdateDialogModel::builder()
-            .launch(initparams.window.upcast())
-            .forward(sender.input_sender(), identity);
         let updateworker = UpdateAsyncHandler::builder()
             .detach_worker(UpdateAsyncHandlerInit { syspkgs: initparams.systype.clone(), userpkgs: initparams.usertype.clone() })
             .forward(sender.input_sender(), identity);
@@ -297,7 +291,6 @@ impl SimpleComponent for UpdatePageModel {
             updatesystemlist: FactoryVecDeque::new(gtk::ListBox::new(), sender.input_sender()),
             channelupdate: None,
             updatetracker: 0,
-            updatedialog,
             updateworker,
             config,
             systype: initparams.systype,
@@ -329,13 +322,13 @@ impl SimpleComponent for UpdatePageModel {
                 info!("UpdatePageMsg::Update");
                 debug!("UPDATEUSERLIST: {:?}", updateuserlist);
                 debug!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
-                self.channelupdate = match nix_data::cache::channel::uptodate() {
-                    Ok(x) => {
-                        x
-                    },
-                    Err(_) => None,
-                };
-                debug!("CHANNELUPDATE: {:?}", self.channelupdate);
+                // self.channelupdate = match nix_data::cache::channel::uptodate() {
+                //     Ok(x) => {
+                //         x
+                //     },
+                //     Err(_) => None,
+                // };
+                // debug!("CHANNELUPDATE: {:?}", self.channelupdate);
                 self.update_updatetracker(|_| ());
                 let mut updateuserlist_guard = self.updateuserlist.guard();
                 updateuserlist_guard.clear();
@@ -347,6 +340,16 @@ impl SimpleComponent for UpdatePageModel {
                 for updatesystem in updatesystemlist {
                     updatesystemlist_guard.push_back(updatesystem);
                 }
+                updatesystemlist_guard.push_back(UpdateItem {
+                    pkg: None,
+                    name: "NixOS".to_string(),
+                    pname: "nixos".to_string(),
+                    summary: None,
+                    icon: None,
+                    pkgtype: InstallType::System,
+                    verfrom: None,
+                    verto: None,
+                });
             }
             UpdatePageMsg::OpenRow(row, pkgtype) => match pkgtype {
                 InstallType::User => {
@@ -366,38 +369,36 @@ impl SimpleComponent for UpdatePageModel {
                     }
                 }
             },
-            UpdatePageMsg::UpdateChannels => {
-                self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating channels...")));
-                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannels);
-            }
-            UpdatePageMsg::UpdateSystemAndChannels => {
-                self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating system and channels...")));
-                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannelsAndSystem);
-            }
+            // UpdatePageMsg::UpdateChannels => {
+            //     self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating channels...")));
+            //     self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannels);
+            // }
+            // UpdatePageMsg::UpdateSystemAndChannels => {
+            //     self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating system and channels...")));
+            //     self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannelsAndSystem);
+            // }
             UpdatePageMsg::UpdateSystem => {
-                self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating system...")));
-                self.updateworker.emit(UpdateAsyncHandlerMsg::RebuildSystem);
+                REBUILD_BROKER.send(RebuildMsg::Show);
+                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateSystem);
             }
             UpdatePageMsg::UpdateUser(pkg) => {
                 info!("UPDATE USER PKG: {}", pkg);
                 warn!("unimplemented");
             }
             UpdatePageMsg::UpdateAllUser => {
-                self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating all user packages...")));
+                REBUILD_BROKER.send(RebuildMsg::Show);
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateUserPkgs);
             }
             UpdatePageMsg::UpdateAll => {
-                self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating everything...")));
+                REBUILD_BROKER.send(RebuildMsg::Show);
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateAll);
             }
             UpdatePageMsg::DoneWorking => {
+                REBUILD_BROKER.send(RebuildMsg::FinishSuccess);
                 sender.output(AppMsg::UpdateInstalledPkgs);
             }
-            UpdatePageMsg::DoneLoading => {
-                self.updatedialog.emit(UpdateDialogMsg::Done);
-            }
             UpdatePageMsg::FailedWorking => {
-                self.updatedialog.emit(UpdateDialogMsg::Failed);
+                REBUILD_BROKER.send(RebuildMsg::FinishError(None));
             }
         }
     }

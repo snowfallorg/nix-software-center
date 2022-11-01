@@ -1,8 +1,11 @@
 use nix_data::config::configfile::NixDataConfig;
 use relm4::*;
-use std::{error::Error, path::Path, process::Stdio};
+use std::{path::Path, process::Stdio};
 use tokio::io::AsyncBufReadExt;
+use anyhow::Result;
 use log::*;
+
+use crate::ui::{rebuild::RebuildMsg, window::REBUILD_BROKER};
 
 use super::{
     updatepage::UpdatePageMsg,
@@ -25,8 +28,10 @@ pub enum UpdateAsyncHandlerMsg {
     UpdateConfig(NixDataConfig),
     UpdatePkgTypes(SystemPkgs, UserPkgs),
 
-    UpdateChannels,
-    UpdateChannelsAndSystem,
+    // UpdateChannels,
+    // UpdateChannelsAndSystem,
+
+    UpdateSystem,
 
     RebuildSystem,
     UpdateUserPkgs,
@@ -79,35 +84,52 @@ impl Worker for UpdateAsyncHandler {
                 self.syspkgs = syspkgs;
                 self.userpkgs = userpkgs;
             }
-            UpdateAsyncHandlerMsg::UpdateChannels => {
+            // UpdateAsyncHandlerMsg::UpdateChannels => {
+            //     let systemconfig = self.systemconfig.clone();
+            //     let flakeargs = self.flakeargs.clone();
+            //     let syspkgs = self.syspkgs.clone();
+            //     relm4::spawn(async move {
+            //         let result = runcmd(NscCmd::Channel, systemconfig, flakeargs, syspkgs).await;
+            //         match result {
+            //             Ok(true) => {
+            //                 sender.output(UpdatePageMsg::DoneWorking);
+            //             }
+            //             _ => {
+            //                 warn!("UPDATE CHANNEL FAILED");
+            //                 sender.output(UpdatePageMsg::FailedWorking);
+            //             }
+            //         }
+            //     });
+            // }
+            // UpdateAsyncHandlerMsg::UpdateChannelsAndSystem => {
+            //     let systenconfig = self.systemconfig.clone();
+            //     let flakeargs = self.flakeargs.clone();
+            //     let syspkgs = self.syspkgs.clone();
+            //     relm4::spawn(async move {
+            //         let result = runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await;
+            //         match result {
+            //             Ok(true) => {
+            //                 sender.output(UpdatePageMsg::DoneWorking);
+            //             }
+            //             _ => {
+            //                 warn!("UPDATE CHANNEL AND SYSTEM FAILED");
+            //                 sender.output(UpdatePageMsg::FailedWorking);
+            //             }
+            //         }
+            //     });
+            // }
+            UpdateAsyncHandlerMsg::UpdateSystem => {
                 let systemconfig = self.systemconfig.clone();
                 let flakeargs = self.flakeargs.clone();
                 let syspkgs = self.syspkgs.clone();
                 relm4::spawn(async move {
-                    let result = runcmd(NscCmd::Channel, systemconfig, flakeargs, syspkgs).await;
+                    let result = runcmd(NscCmd::All, systemconfig, flakeargs, syspkgs).await;
                     match result {
                         Ok(true) => {
                             sender.output(UpdatePageMsg::DoneWorking);
                         }
                         _ => {
-                            warn!("UPDATE CHANNEL FAILED");
-                            sender.output(UpdatePageMsg::FailedWorking);
-                        }
-                    }
-                });
-            }
-            UpdateAsyncHandlerMsg::UpdateChannelsAndSystem => {
-                let systenconfig = self.systemconfig.clone();
-                let flakeargs = self.flakeargs.clone();
-                let syspkgs = self.syspkgs.clone();
-                relm4::spawn(async move {
-                    let result = runcmd(NscCmd::All, systenconfig, flakeargs, syspkgs).await;
-                    match result {
-                        Ok(true) => {
-                            sender.output(UpdatePageMsg::DoneWorking);
-                        }
-                        _ => {
-                            warn!("UPDATE CHANNEL AND SYSTEM FAILED");
+                            warn!("UPDATE SYSTEM FAILED");
                             sender.output(UpdatePageMsg::FailedWorking);
                         }
                     }
@@ -190,7 +212,7 @@ async fn runcmd(
     _systemconfig: Option<String>,
     flakeargs: Option<String>,
     syspkgs: SystemPkgs,
-) -> Result<bool, Box<dyn Error + Send + Sync>> {
+) -> Result<bool> {
     let exe = match std::env::current_exe() {
         Ok(mut e) => {
             e.pop(); // root/bin
@@ -255,6 +277,7 @@ async fn runcmd(
                 .arg(flakepath)
                 .arg("--")
                 .arg("switch")
+                .arg("--impure")
                 .args(&rebuildargs)
                 .stderr(Stdio::piped())
                 .spawn()?,
@@ -267,6 +290,7 @@ async fn runcmd(
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        REBUILD_BROKER.send(RebuildMsg::UpdateText(line.to_string()));
         trace!("CAUGHT REBUILD LINE: {}", line);
     }
     if cmd.wait().await?.success() {
@@ -276,7 +300,7 @@ async fn runcmd(
     }
 }
 
-async fn updateenv() -> Result<bool, Box<dyn Error + Send + Sync>> {
+async fn updateenv() -> Result<bool> {
     let mut cmd = tokio::process::Command::new("nix-env")
         .arg("-u")
         .stderr(Stdio::piped())
@@ -287,6 +311,7 @@ async fn updateenv() -> Result<bool, Box<dyn Error + Send + Sync>> {
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        REBUILD_BROKER.send(RebuildMsg::UpdateText(line.to_string()));
         trace!("CAUGHT NIXENV LINE: {}", line);
     }
     if cmd.wait().await?.success() {
@@ -296,7 +321,7 @@ async fn updateenv() -> Result<bool, Box<dyn Error + Send + Sync>> {
     }
 }
 
-async fn updateprofile() -> Result<bool, Box<dyn Error + Send + Sync>> {
+async fn updateprofile() -> Result<bool> {
     let mut cmd = tokio::process::Command::new("nix")
         .arg("profile")
         .arg("upgrade")
@@ -311,6 +336,7 @@ async fn updateprofile() -> Result<bool, Box<dyn Error + Send + Sync>> {
 
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        REBUILD_BROKER.send(RebuildMsg::UpdateText(line.to_string()));
         trace!("CAUGHT NIX PROFILE LINE: {}", line);
     }
     if cmd.wait().await?.success() {

@@ -1,12 +1,13 @@
 use super::pkgpage::{InstallType, PkgAction, PkgMsg, WorkPkg};
-use super::window::{SystemPkgs, UserPkgs};
+use super::rebuild::RebuildMsg;
+use super::window::{SystemPkgs, UserPkgs, REBUILD_BROKER};
 use log::*;
 use nix_data::config::configfile::NixDataConfig;
 use relm4::*;
-use std::error::Error;
+use anyhow::{Result, anyhow};
 use std::path::Path;
 use std::process::Stdio;
-use std::{fs, io};
+use std::fs;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 #[tracker::track]
@@ -265,6 +266,7 @@ impl Worker for InstallAsyncHandler {
                         }
                     },
                     InstallType::System => {
+                        REBUILD_BROKER.send(RebuildMsg::Show);
                         if let Some(systemconfig) = systemconfig {
                             match work.action {
                                 PkgAction::Install => {
@@ -281,12 +283,15 @@ impl Worker for InstallAsyncHandler {
                                         {
                                             Ok(b) => {
                                                 if b {
+                                                    REBUILD_BROKER.send(RebuildMsg::FinishSuccess);
                                                     sender.output(PkgMsg::FinishedProcess(work))
                                                 } else {
+                                                    REBUILD_BROKER.send(RebuildMsg::FinishError(None));
                                                     sender.output(PkgMsg::FailedProcess(work))
                                                 }
                                             }
                                             Err(e) => {
+                                                REBUILD_BROKER.send(RebuildMsg::FinishError(None));
                                                 sender.output(PkgMsg::FailedProcess(work));
                                                 warn!("Error installing system package: {}", e);
                                             }
@@ -307,12 +312,15 @@ impl Worker for InstallAsyncHandler {
                                         {
                                             Ok(b) => {
                                                 if b {
+                                                    REBUILD_BROKER.send(RebuildMsg::FinishSuccess);
                                                     sender.output(PkgMsg::FinishedProcess(work))
                                                 } else {
+                                                    REBUILD_BROKER.send(RebuildMsg::FinishError(None));
                                                     sender.output(PkgMsg::FailedProcess(work))
                                                 }
                                             }
                                             Err(e) => {
+                                                REBUILD_BROKER.send(RebuildMsg::FinishError(None));
                                                 sender.output(PkgMsg::FailedProcess(work));
                                                 warn!("Error removing system package: {}", e);
                                             }
@@ -344,7 +352,7 @@ async fn installsys(
     systemconfig: String,
     flakeargs: Option<String>,
     _sender: ComponentSender<InstallAsyncHandler>,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool> {
     let mut p = pkg;
     let f = fs::read_to_string(&systemconfig)?;
     if let Ok(s) = nix_editor::read::getwithvalue(&f, "environment.systemPackages") {
@@ -352,10 +360,7 @@ async fn installsys(
             p = format!("pkgs.{}", p);
         }
     } else {
-        return Err(Box::new(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "Failed to write configuration.nix",
-        )));
+        return Err(anyhow!("Failed to write configuration.nix"));
     }
 
     let out = match action {
@@ -363,10 +368,7 @@ async fn installsys(
             match nix_editor::write::addtoarr(&f, "environment.systemPackages", vec![p]) {
                 Ok(x) => x,
                 Err(_) => {
-                    return Err(Box::new(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Failed to write configuration.nix",
-                    )))
+                    return Err(anyhow!("Failed to write configuration.nix"));
                 }
             }
         }
@@ -374,10 +376,7 @@ async fn installsys(
             match nix_editor::write::rmarr(&f, "environment.systemPackages", vec![p]) {
                 Ok(x) => x,
                 Err(_) => {
-                    return Err(Box::new(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Failed to write configuration.nix",
-                    )))
+                    return Err(anyhow!("Failed to write configuration.nix"));
                 }
             }
         }
@@ -419,12 +418,11 @@ async fn installsys(
         .arg(&systemconfig)
         .arg("--")
         .arg("switch")
+        .arg("--impure")
         .args(&rebuildargs)
         .stderr(Stdio::piped())
         .stdin(Stdio::piped())
         .spawn()?;
-
-    // sender.input(InstallAsyncHandlerMsg::SetPid(cmd.id()));
 
     cmd.stdin.take().unwrap().write_all(out.as_bytes()).await?;
     let stderr = cmd.stderr.take().unwrap();
@@ -433,6 +431,7 @@ async fn installsys(
     let mut lines = reader.lines();
     while let Ok(Some(line)) = lines.next_line().await {
         trace!("CAUGHT LINE: {}", line);
+        REBUILD_BROKER.send(RebuildMsg::UpdateText(line));
     }
     if cmd.wait().await?.success() {
         Ok(true)

@@ -9,6 +9,7 @@ relm4 = { version = "0.5.0-beta.4", features = ["all"]  }
 relm4-components = { package = "relm4-components", version = "0.5.0-beta.4"}
 adw = { package = "libadwaita", version = "0.2", features = ["v1_2", "gtk_v4_6"] }
 gtk = { package = "gtk4", version = "0.5", features = ["v4_6"] }
+sourceview5 = { version = "0.5", features = ["v5_4"] }
 tokio = { version = "1.21", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
 tracker = "0.1"
 
@@ -17,7 +18,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 
 nix-editor = "0.3.0-beta.1"
-nix-data = { git = "https://github.com/snowflakelinux/nix-data", rev = "a5168c768e8cf8bd3e1afe1772f8e05e5b03ed95" }
+nix-data = { git = "https://github.com/snowflakelinux/nix-data" }
 
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "sqlite" ] }
 

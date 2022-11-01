@@ -4,7 +4,7 @@ use crate::{
         config::{editconfig, getconfig},
         packages::{AppData, LicenseEnum, PkgMaintainer, Platform},
     },
-    ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg},
+    ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg, rebuild::RebuildMsg},
     APPINFO,
 };
 use adw::prelude::*;
@@ -32,8 +32,10 @@ use super::{
     searchpage::{SearchItem, SearchPageModel, SearchPageMsg},
     updatepage::{UpdateItem, UpdatePageInit, UpdatePageModel, UpdatePageMsg},
     welcome::WelcomeModel,
-    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg},
+    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg}, rebuild::RebuildModel,
 };
+
+pub static REBUILD_BROKER: MessageBroker<RebuildModel> = MessageBroker::new();
 
 #[derive(PartialEq)]
 enum Page {
@@ -109,6 +111,8 @@ pub struct AppModel {
     updatepage: Controller<UpdatePageModel>,
     viewstack: adw::ViewStack,
     installedpagebusy: Vec<(String, InstallType)>,
+    #[tracker::no_eq]
+    rebuild: Controller<RebuildModel>,
 }
 
 #[derive(Debug)]
@@ -146,8 +150,8 @@ pub enum AppMsg {
     RemoveInstalledBusy(WorkPkg),
     OpenCategoryPage(PkgCategory),
     LoadCategory(PkgCategory),
-
     UpdateRecPkgs(Vec<String>),
+    SetDarkMode(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -490,6 +494,9 @@ impl Component for AppModel {
                 config: config.clone(),
             })
             .forward(sender.input_sender(), identity);
+        let rebuild = RebuildModel::builder()
+            .launch_with_broker(root.clone().upcast(), &REBUILD_BROKER)
+            .forward(sender.input_sender(), identity);
         let viewstack = adw::ViewStack::new();
 
         let model = AppModel {
@@ -523,8 +530,17 @@ impl Component for AppModel {
             updatepage,
             viewstack,
             installedpagebusy: vec![],
+            rebuild,
             tracker: 0,
         };
+
+        {
+            let sender = sender.clone();
+            adw::StyleManager::default()
+                .connect_dark_notify(move |x| sender.input(AppMsg::SetDarkMode(x.is_dark())));
+        }
+
+        sender.input(AppMsg::SetDarkMode(adw::StyleManager::default().is_dark()));
 
         if welcome {
             let welcomepage = WelcomeModel::builder()
@@ -582,6 +598,7 @@ impl Component for AppModel {
         frontvs.set_icon_name(Some("nsc-home-symbolic"));
         installedvs.set_icon_name(Some("nsc-installed-symbolic"));
         updatesvs.set_icon_name(Some("nsc-update-symbolic"));
+
         ComponentParts { model, widgets }
     }
 
@@ -1802,6 +1819,11 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                     }
                     AppAsyncMsg::LoadCategory(category, catrec, catall)
                 });
+            }
+            AppMsg::SetDarkMode(dark) => {
+                info!("AppMsg::SetDarkMode({})", dark);
+                let scheme = if dark { "Adwaita-dark" } else { "Adwaita" };
+                self.rebuild.emit(RebuildMsg::SetScheme(scheme.to_string()));
             }
         }
     }
