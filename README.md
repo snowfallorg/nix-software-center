@@ -35,8 +35,8 @@ let
   nix-software-center = (import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
-    rev = "0.0.3";
-    sha256 = "sha256-r5xOi/dd/hW/gdi0X0tHFFt2w82S9PFhZSXPeCA69ig=";
+    rev = "0.1.0";
+    sha256 = "d4LAIaiCU91LAXfgPCWOUr2JBkHj6n0JQ25EqRIBtBM=";
   })) {};
 in
 ```
