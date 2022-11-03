@@ -1,7 +1,7 @@
 use clap::{self, FromArgMatches, Subcommand};
 use std::{
     error::Error,
-    fs::{File, self},
+    fs::{self, File},
     io::{self, Read, Write},
     process::Command,
 };
@@ -23,6 +23,12 @@ enum SubCommands {
         /// Whether to rebuild the system after updating channels
         #[arg(short, long)]
         rebuild: bool,
+        /// Update file
+        #[arg(short, long)]
+        update: bool,
+        /// Write stdin to file in path output
+        #[arg(short, long)]
+        output: String,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -33,6 +39,12 @@ enum SubCommands {
         /// Path to the flake file
         #[arg(short, long)]
         flakepath: String,
+        /// Update file
+        #[arg(short, long)]
+        update: bool,
+        /// Write stdin to file in path output
+        #[arg(short, long)]
+        output: String,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -81,7 +93,18 @@ fn main() {
                 std::process::exit(1);
             }
         },
-        SubCommands::Channel { rebuild: dorebuild, arguments } => {
+        SubCommands::Channel {
+            rebuild: dorebuild,
+            update,
+            output,
+            arguments,
+        } => {
+            if update {
+                if let Err(e) = write_file(&output) {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            }
             match channel() {
                 Ok(_) => {
                     if dorebuild {
@@ -93,14 +116,26 @@ fn main() {
                             }
                         }
                     }
-                },
+                }
                 Err(err) => {
                     eprintln!("{}", err);
                     std::process::exit(1);
                 }
             }
-        },
-        SubCommands::Flake { rebuild: dorebuild, flakepath, arguments } => {
+        }
+        SubCommands::Flake {
+            rebuild: dorebuild,
+            flakepath,
+            update,
+            output,
+            arguments,
+        } => {
+            if update {
+                if let Err(e) = write_file(&output) {
+                    eprintln!("{}", e);
+                    std::process::exit(1);
+                }
+            }
             match flake(&flakepath) {
                 Ok(_) => {
                     if dorebuild {
@@ -112,7 +147,7 @@ fn main() {
                             }
                         }
                     }
-                },
+                }
                 Err(err) => {
                     eprintln!("{}", err);
                     std::process::exit(1);
@@ -132,9 +167,7 @@ fn write_file(path: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn rebuild(args: Vec<String>) -> Result<(), Box<dyn Error>> {
-    let mut cmd = Command::new("nixos-rebuild")
-        .args(args)
-        .spawn()?;
+    let mut cmd = Command::new("nixos-rebuild").args(args).spawn()?;
     let x = cmd.wait()?;
     if x.success() {
         Ok(())
@@ -148,9 +181,7 @@ fn rebuild(args: Vec<String>) -> Result<(), Box<dyn Error>> {
 }
 
 fn channel() -> Result<(), Box<dyn Error>> {
-    let mut cmd = Command::new("nix-channel")
-        .arg("--update")
-        .spawn()?;
+    let mut cmd = Command::new("nix-channel").arg("--update").spawn()?;
     let x = cmd.wait()?;
     if x.success() {
         Ok(())

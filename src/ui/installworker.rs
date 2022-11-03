@@ -135,6 +135,7 @@ impl Worker for InstallAsyncHandler {
                                             .arg("profile")
                                             .arg("install")
                                             .arg(format!("nixpkgs#{}", work.pkg))
+                                            .arg("--impure")
                                             .kill_on_drop(true)
                                             .stdout(Stdio::piped())
                                             .stderr(Stdio::piped())

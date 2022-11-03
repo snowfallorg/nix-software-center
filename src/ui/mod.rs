@@ -10,6 +10,7 @@ pub mod preferencespage;
 pub mod rebuild;
 pub mod screenshotfactory;
 pub mod searchpage;
+pub mod unavailabledialog;
 pub mod updatepage;
 pub mod updateworker;
 pub mod welcome;

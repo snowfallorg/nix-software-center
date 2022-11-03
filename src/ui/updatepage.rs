@@ -1,11 +1,13 @@
-use crate::APPINFO;
+use crate::{APPINFO, ui::unavailabledialog::UnavailableDialogModel};
 
 use super::{pkgpage::InstallType, window::*, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}, rebuild::RebuildMsg};
 use adw::prelude::*;
 use nix_data::config::configfile::NixDataConfig;
 use relm4::{factory::*, gtk::pango, *};
-use std::{path::Path, convert::identity};
+use std::{path::Path, convert::identity, collections::HashMap};
 use log::*;
+
+pub static UNAVAILABLE_BROKER: MessageBroker<UnavailableDialogModel> = MessageBroker::new();
 
 #[tracker::track]
 #[derive(Debug)]
@@ -21,6 +23,8 @@ pub struct UpdatePageModel {
     systype: SystemPkgs,
     usertype: UserPkgs,
     updatetracker: u8,
+    #[tracker::no_eq]
+    unavailabledialog: Controller<UnavailableDialogModel>,
 }
 
 #[derive(Debug)]
@@ -30,13 +34,23 @@ pub enum UpdatePageMsg {
     Update(Vec<UpdateItem>, Vec<UpdateItem>),
     OpenRow(usize, InstallType),
     UpdateSystem,
+    UpdateSystemRm(Vec<String>),
     UpdateAllUser,
+    UpdateAllUserRm(Vec<String>),
     UpdateUser(String),
     // UpdateChannels,
     // UpdateSystemAndChannels,
     UpdateAll,
+    UpdateAllRm(Vec<String>, Vec<String>),
     DoneWorking,
     FailedWorking,
+}
+
+#[derive(Debug)]
+pub enum UpdateType {
+    System,
+    User,
+    All,
 }
 
 pub struct UpdatePageInit {
@@ -84,101 +98,6 @@ impl SimpleComponent for UpdatePageModel {
                                 }
                             }
                         },
-                        // gtk::Box {
-                        //     set_orientation: gtk::Orientation::Horizontal,
-                        //     set_hexpand: true,
-                        //     #[watch]
-                        //     set_visible: model.channelupdate.is_some(),
-                        //     gtk::Label {
-                        //         set_halign: gtk::Align::Start,
-                        //         add_css_class: "title-4",
-                        //         set_label: "Channels",
-                        //     },
-                        // },
-                        // gtk::ListBox {
-                        //     set_valign: gtk::Align::Start,
-                        //     add_css_class: "boxed-list",
-                        //     set_selection_mode: gtk::SelectionMode::None,
-                        //     #[watch]
-                        //     set_visible: model.channelupdate.is_some(),
-                        //     adw::PreferencesRow {
-                        //         set_activatable: false,
-                        //         set_can_focus: false,
-                        //         #[wrap(Some)]
-                        //         set_child = &gtk::Box {
-                        //             set_orientation: gtk::Orientation::Horizontal,
-                        //             set_hexpand: true,
-                        //             set_spacing: 10,
-                        //             set_margin_all: 10,
-                        //             adw::Bin {
-                        //                 set_valign: gtk::Align::Center,
-                        //                 gtk::Image {
-                        //                     add_css_class: "icon-dropshadow",
-                        //                     set_halign: gtk::Align::Start,
-                        //                     set_icon_name: Some("application-x-addon"),
-                        //                     set_pixel_size: 64,
-                        //                 }
-                        //             },
-                        //             gtk::Box {
-                        //                 set_orientation: gtk::Orientation::Vertical,
-                        //                 set_halign: gtk::Align::Fill,
-                        //                 set_valign: gtk::Align::Center,
-                        //                 set_hexpand: true,
-                        //                 set_spacing: 2,
-                        //                 gtk::Label {
-                        //                     set_halign: gtk::Align::Start,
-                        //                     set_label: "nixos",
-                        //                     set_ellipsize: pango::EllipsizeMode::End,
-                        //                     set_lines: 1,
-                        //                     set_wrap: true,
-                        //                     set_max_width_chars: 0,
-                        //                 },
-                        //                 gtk::Label {
-                        //                     set_halign: gtk::Align::Start,
-                        //                     add_css_class: "dim-label",
-                        //                     add_css_class: "caption",
-                        //                     set_label: {
-                        //                         &(if let Some((old, new)) = &model.channelupdate {
-                        //                             format!("{} → {}", old, new)
-                        //                         } else {
-                        //                             String::default()
-                        //                         })
-                        //                     },
-                        //                     set_visible: model.channelupdate.is_some(),
-                        //                     set_ellipsize: pango::EllipsizeMode::End,
-                        //                     set_lines: 1,
-                        //                     set_wrap: true,
-                        //                     set_max_width_chars: 0,
-                        //                 },
-                        //             },
-                        //             gtk::Box {
-                        //                 set_orientation: gtk::Orientation::Vertical,
-                        //                 set_spacing: 5,
-                        //                 set_halign: gtk::Align::End,
-                        //                 set_valign: gtk::Align::Center,
-                        //                 gtk::Button {
-                        //                     add_css_class: "suggested-action",
-                        //                     set_valign: gtk::Align::Center,
-                        //                     set_halign: gtk::Align::End,
-                        //                     set_label: "Update channel and system",
-                        //                     set_can_focus: false,
-                        //                     connect_clicked[sender] => move |_| {
-                        //                         sender.input(UpdatePageMsg::UpdateSystemAndChannels);
-                        //                     }
-                        //                 },
-                        //                 gtk::Button {
-                        //                     set_valign: gtk::Align::Center,
-                        //                     set_halign: gtk::Align::End,
-                        //                     set_label: "Update channel only",
-                        //                     set_can_focus: false,
-                        //                     connect_clicked[sender] => move |_| {
-                        //                         sender.input(UpdatePageMsg::UpdateChannels);
-                        //                     }
-                        //                 },
-                        //             }
-                        //         }
-                        //     }
-                        // },
                         gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
                             set_hexpand: true,
@@ -283,6 +202,10 @@ impl SimpleComponent for UpdatePageModel {
             .detach_worker(UpdateAsyncHandlerInit { syspkgs: initparams.systype.clone(), userpkgs: initparams.usertype.clone() })
             .forward(sender.input_sender(), identity);
 
+        let unavailabledialog = UnavailableDialogModel::builder()
+            .launch_with_broker(initparams.window.clone(), &UNAVAILABLE_BROKER)
+            .forward(sender.input_sender(), identity);
+
         let config = initparams.config;
         updateworker.emit(UpdateAsyncHandlerMsg::UpdateConfig(config.clone()));
 
@@ -295,6 +218,7 @@ impl SimpleComponent for UpdatePageModel {
             config,
             systype: initparams.systype,
             usertype: initparams.usertype,
+            unavailabledialog,
             tracker: 0,
         };
 
@@ -322,13 +246,6 @@ impl SimpleComponent for UpdatePageModel {
                 info!("UpdatePageMsg::Update");
                 debug!("UPDATEUSERLIST: {:?}", updateuserlist);
                 debug!("UPDATESYSTEMLIST: {:?}", updatesystemlist);
-                // self.channelupdate = match nix_data::cache::channel::uptodate() {
-                //     Ok(x) => {
-                //         x
-                //     },
-                //     Err(_) => None,
-                // };
-                // debug!("CHANNELUPDATE: {:?}", self.channelupdate);
                 self.update_updatetracker(|_| ());
                 let mut updateuserlist_guard = self.updateuserlist.guard();
                 updateuserlist_guard.clear();
@@ -340,16 +257,6 @@ impl SimpleComponent for UpdatePageModel {
                 for updatesystem in updatesystemlist {
                     updatesystemlist_guard.push_back(updatesystem);
                 }
-                updatesystemlist_guard.push_back(UpdateItem {
-                    pkg: None,
-                    name: "NixOS".to_string(),
-                    pname: "nixos".to_string(),
-                    summary: None,
-                    icon: None,
-                    pkgtype: InstallType::System,
-                    verfrom: None,
-                    verto: None,
-                });
             }
             UpdatePageMsg::OpenRow(row, pkgtype) => match pkgtype {
                 InstallType::User => {
@@ -369,17 +276,33 @@ impl SimpleComponent for UpdatePageModel {
                     }
                 }
             },
-            // UpdatePageMsg::UpdateChannels => {
-            //     self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating channels...")));
-            //     self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannels);
-            // }
-            // UpdatePageMsg::UpdateSystemAndChannels => {
-            //     self.updatedialog.emit(UpdateDialogMsg::Show(String::from("Updating system and channels...")));
-            //     self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateChannelsAndSystem);
-            // }
             UpdatePageMsg::UpdateSystem => {
+                let systype = self.systype.clone();
+                let systemconfig = self.config.systemconfig.clone();
+                let workersender = self.updateworker.sender().clone();
+                let output = sender.output_sender().clone();
                 REBUILD_BROKER.send(RebuildMsg::Show);
-                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateSystem);
+                relm4::spawn(async move {
+                    let uninstallsys = match systype {
+                        SystemPkgs::Legacy => {
+                            nix_data::cache::channel::unavailablepkgs(&[&systemconfig.unwrap()]).await.unwrap_or_default()
+                        }
+                        SystemPkgs::Flake => {
+                            nix_data::cache::flakes::unavailablepkgs(&[&systemconfig.unwrap()]).await.unwrap_or_default()
+                        }
+                        _ => HashMap::new(),
+                    };
+                    if uninstallsys.is_empty() {
+                        workersender.send(UpdateAsyncHandlerMsg::UpdateSystem);
+                    } else {
+                        warn!("Uninstalling unavailable packages: {:?}", uninstallsys);
+                        output.send(AppMsg::GetUnavailableItems(HashMap::new(), uninstallsys, UpdateType::System));
+                    }
+                });
+            }
+            UpdatePageMsg::UpdateSystemRm(pkgs) => {
+                info!("UpdatePageMsg::UpdateSystemRm({:?})", pkgs);
+                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateSystemRemove(pkgs));
             }
             UpdatePageMsg::UpdateUser(pkg) => {
                 info!("UPDATE USER PKG: {}", pkg);
@@ -387,11 +310,62 @@ impl SimpleComponent for UpdatePageModel {
             }
             UpdatePageMsg::UpdateAllUser => {
                 REBUILD_BROKER.send(RebuildMsg::Show);
-                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateUserPkgs);
+                if self.usertype == UserPkgs::Profile {
+                    let workersender = self.updateworker.sender().clone();
+                    let output = sender.output_sender().clone();
+                    relm4::spawn(async move {
+                        let uninstalluser = nix_data::cache::profile::unavailablepkgs().await.unwrap_or_default();
+                        if uninstalluser.is_empty() {
+                            workersender.send(UpdateAsyncHandlerMsg::UpdateUserPkgs);
+                        } else {
+                            warn!("Uninstalling unavailable packages: {:?}", uninstalluser);
+                            output.send(AppMsg::GetUnavailableItems(uninstalluser, HashMap::new(), UpdateType::User));
+                        }
+                    });
+    
+                } else {
+                    self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateUserPkgs);
+                }
+            }
+            UpdatePageMsg::UpdateAllUserRm(pkgs) => {
+                info!("UpdatePageMsg::UpdateAllUserRm({:?})", pkgs);
+                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateUserPkgsRemove(pkgs));
             }
             UpdatePageMsg::UpdateAll => {
+                info!("UpdatePageMsg::UpdateAll");
+                let systype = self.systype.clone();
+                let usertype = self.usertype.clone();
+                let systemconfig = self.config.systemconfig.clone();
+                let workersender = self.updateworker.sender().clone();
+                let output = sender.output_sender().clone();
                 REBUILD_BROKER.send(RebuildMsg::Show);
-                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateAll);
+                relm4::spawn(async move {
+                    let uninstallsys = match systype {
+                        SystemPkgs::Legacy => {
+                            nix_data::cache::channel::unavailablepkgs(&[&systemconfig.unwrap()]).await.unwrap_or_default()
+                        }
+                        SystemPkgs::Flake => {
+                            nix_data::cache::flakes::unavailablepkgs(&[&systemconfig.unwrap()]).await.unwrap_or_default()
+                        }
+                        _ => HashMap::new(),
+                    };
+                    let uninstalluser = if usertype == UserPkgs::Profile {
+                        nix_data::cache::profile::unavailablepkgs().await.unwrap_or_default()
+                    } else {
+                        HashMap::new()
+                    };
+                    if uninstallsys.is_empty() && uninstalluser.is_empty() {
+                        workersender.send(UpdateAsyncHandlerMsg::UpdateAll);
+                    } else {
+                        warn!("Uninstalling unavailable user packages: {:?}", uninstalluser);
+                        warn!("Uninstalling unavailable system packages: {:?}", uninstallsys);
+                        output.send(AppMsg::GetUnavailableItems(uninstalluser, uninstallsys, UpdateType::All));
+                    }
+                });
+            }
+            UpdatePageMsg::UpdateAllRm(userpkgs, syspkgs) => {
+                info!("UpdatePageMsg::UpdateAllRm({:?}, {:?})", userpkgs, syspkgs);
+                self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateAllRemove(userpkgs, syspkgs));
             }
             UpdatePageMsg::DoneWorking => {
                 REBUILD_BROKER.send(RebuildMsg::FinishSuccess);

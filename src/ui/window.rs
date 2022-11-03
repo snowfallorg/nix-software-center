@@ -4,7 +4,7 @@ use crate::{
         config::{editconfig, getconfig},
         packages::{AppData, LicenseEnum, PkgMaintainer, Platform},
     },
-    ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg, rebuild::RebuildMsg},
+    ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg, rebuild::RebuildMsg, updatepage::UNAVAILABLE_BROKER, unavailabledialog::UnavailableDialogMsg},
     APPINFO,
 };
 use adw::prelude::*;
@@ -30,9 +30,9 @@ use super::{
     pkgtile::PkgTile,
     preferencespage::{PreferencesPageModel, PreferencesPageMsg},
     searchpage::{SearchItem, SearchPageModel, SearchPageMsg},
-    updatepage::{UpdateItem, UpdatePageInit, UpdatePageModel, UpdatePageMsg},
+    updatepage::{UpdateItem, UpdatePageInit, UpdatePageModel, UpdatePageMsg, UpdateType},
     welcome::WelcomeModel,
-    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg}, rebuild::RebuildModel,
+    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg}, rebuild::RebuildModel, unavailabledialog::UnavailableItemModel,
 };
 
 pub static REBUILD_BROKER: MessageBroker<RebuildModel> = MessageBroker::new();
@@ -152,6 +152,7 @@ pub enum AppMsg {
     LoadCategory(PkgCategory),
     UpdateRecPkgs(Vec<String>),
     SetDarkMode(bool),
+    GetUnavailableItems(HashMap<String, String>, HashMap<String, String>, UpdateType),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1824,6 +1825,133 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                 info!("AppMsg::SetDarkMode({})", dark);
                 let scheme = if dark { "Adwaita-dark" } else { "Adwaita" };
                 self.rebuild.emit(RebuildMsg::SetScheme(scheme.to_string()));
+            }
+            AppMsg::GetUnavailableItems(userpkgs, syspkgs, updatetype) => {
+                info!("AppMsg::GetUnavailableItems");
+                let appdata: HashMap<String, AppData> = self
+                    .appdata
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        if syspkgs.contains_key(k) || userpkgs.contains_key(k) {
+                            Some((k.to_string(), v.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                let poolref = self.pkgdb.clone();
+                relm4::spawn(async move {
+                    let mut unavailableuser = vec![];
+                    let mut unavailablesys = vec![];
+                    if let Ok(pool) = &SqlitePool::connect(&format!("sqlite://{}", poolref)).await {
+                        let mut sortuserpkgs = userpkgs.into_iter().collect::<Vec<_>>();
+                        sortuserpkgs.sort();
+                        for (pkg, msg) in sortuserpkgs {
+                            if let Some(data) = appdata.get(&pkg) {
+                                let pname: Result<(String,), sqlx::Error> =
+                                    sqlx::query_as("SELECT pname FROM pkgs WHERE attribute = $1")
+                                        .bind(&pkg)
+                                        .fetch_one(pool)
+                                        .await;
+                                if let Ok(pname) = pname {
+                                    unavailableuser.push(UnavailableItemModel {
+                                        pkg: pkg.to_string(),
+                                        name: if let Some(name) = &data.name {
+                                            name.get("C").unwrap_or(&pname.0).to_string()
+                                        } else {
+                                            pname.0.to_string()
+                                        },
+                                        pname: pname.0.to_string(),
+                                        icon: data
+                                            .icon
+                                            .as_ref()
+                                            .and_then(|x| x.cached.as_ref())
+                                            .map(|x| x[0].name.clone()),
+                                        message: msg
+                                    })
+                                } else {
+                                    unavailableuser.push(UnavailableItemModel {
+                                        pkg: pkg.to_string(),
+                                        name: if let Some(name) = &data.name {
+                                            name.get("C").unwrap_or(&pkg).to_string()
+                                        } else {
+                                            pkg.to_string()
+                                        },
+                                        pname: String::new(),
+                                        icon: data
+                                            .icon
+                                            .as_ref()
+                                            .and_then(|x| x.cached.as_ref())
+                                            .map(|x| x[0].name.clone()),
+                                        message: msg
+                                    })
+                                }
+                            } else {
+                                unavailableuser.push(UnavailableItemModel {
+                                    pkg: pkg.to_string(),
+                                    name: pkg.to_string(),
+                                    pname: String::new(),
+                                    icon: None,
+                                    message: msg
+                                })
+                            }
+                        }
+                        let mut sortsyspkgs = syspkgs.into_iter().collect::<Vec<_>>();
+                        sortsyspkgs.sort();
+                        for (pkg, msg) in sortsyspkgs {
+                            if let Some(data) = appdata.get(&pkg) {
+                                let pname: Result<(String,), sqlx::Error> =
+                                    sqlx::query_as("SELECT pname FROM pkgs WHERE attribute = $1")
+                                        .bind(&pkg)
+                                        .fetch_one(pool)
+                                        .await;
+                                if let Ok(pname) = pname {
+                                    unavailablesys.push(UnavailableItemModel {
+                                        pkg: pkg.to_string(),
+                                        name: if let Some(name) = &data.name {
+                                            name.get("C").unwrap_or(&pname.0).to_string()
+                                        } else {
+                                            pname.0.to_string()
+                                        },
+                                        pname: pname.0.to_string(),
+                                        icon: data
+                                            .icon
+                                            .as_ref()
+                                            .and_then(|x| x.cached.as_ref())
+                                            .map(|x| x[0].name.clone()),
+                                        message: msg
+                                    })
+                                } else {
+                                    unavailablesys.push(UnavailableItemModel {
+                                        pkg: pkg.to_string(),
+                                        name: if let Some(name) = &data.name {
+                                            name.get("C").unwrap_or(&pkg).to_string()
+                                        } else {
+                                            pkg.to_string()
+                                        },
+                                        pname: String::new(),
+                                        icon: data
+                                            .icon
+                                            .as_ref()
+                                            .and_then(|x| x.cached.as_ref())
+                                            .map(|x| x[0].name.clone()),
+                                        message: msg
+                                    })
+                                }
+                            } else {
+                                unavailablesys.push(UnavailableItemModel {
+                                    pkg: pkg.to_string(),
+                                    name: pkg.to_string(),
+                                    pname: String::new(),
+                                    icon: None,
+                                    message: msg
+                                })
+                            }
+                        }
+
+                    }
+                    UNAVAILABLE_BROKER.send(UnavailableDialogMsg::Show(unavailableuser, unavailablesys, updatetype));
+                });
             }
         }
     }
