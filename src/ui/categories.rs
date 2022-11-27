@@ -30,7 +30,6 @@ impl FactoryComponent for PkgGroup {
     type Init = PkgCategory;
     type Input = ();
     type Output = PkgCategoryMsg;
-    type Widgets = PkgGroupWidgets;
     type ParentWidget = gtk::FlowBox;
     type ParentInput = AppMsg;
 
@@ -87,7 +86,7 @@ impl FactoryComponent for PkgGroup {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         Self {
             category: parent,

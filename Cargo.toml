@@ -5,8 +5,8 @@ edition = "2021"
 default-run = "nix-software-center"
 
 [dependencies]
-relm4 = { version = "0.5.0-beta.4", features = ["all"]  }
-relm4-components = { package = "relm4-components", version = "0.5.0-beta.4"}
+relm4 = { version = "0.5.0-beta.5", features = ["libadwaita", "macros"]  }
+relm4-components = { package = "relm4-components", version = "0.5.0-beta.5"}
 adw = { package = "libadwaita", version = "0.2", features = ["v1_2", "gtk_v4_6"] }
 gtk = { package = "gtk4", version = "0.5", features = ["v4_6"] }
 sourceview5 = { version = "0.5", features = ["v5_4"] }

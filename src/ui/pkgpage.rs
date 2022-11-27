@@ -176,7 +176,6 @@ impl Component for PkgModel {
     type Init = PkgPageInit;
     type Input = PkgMsg;
     type Output = AppMsg;
-    type Widgets = PkgWidgets;
     type CommandOutput = PkgAsyncMsg;
 
     view! {
@@ -1037,7 +1036,7 @@ impl Component for PkgModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         self.reset();
         match msg {
             PkgMsg::UpdateConfig(config) => {
@@ -1283,7 +1282,7 @@ impl Component for PkgModel {
             }
             PkgMsg::Close => {
                 self.set_visible(false);
-                sender.output(AppMsg::FrontPage)
+                sender.output(AppMsg::FrontPage);
             }
             PkgMsg::InstallUser => {
                 let w = WorkPkg {
@@ -1535,7 +1534,7 @@ impl Component for PkgModel {
         }
     }
 
-    fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>) {
+    fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             PkgAsyncMsg::LoadScreenshot(pkg, i, u) => {
                 sender.input(PkgMsg::LoadScreenshot(pkg, i, u));

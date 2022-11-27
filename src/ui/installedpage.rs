@@ -163,7 +163,7 @@ impl SimpleComponent for InstalledPageModel {
                     block: false,
                     notify: Some(NotifyPage::Installed)
                 };
-                sender.output(AppMsg::AddInstalledToWorkQueue(work))
+                sender.output(AppMsg::AddInstalledToWorkQueue(work));
             }
             InstalledPageMsg::UnsetBusy(work) => {
                 match work.pkgtype {
@@ -333,7 +333,7 @@ impl FactoryComponent for InstalledItemModel {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         let sum = if let Some(s) = parent.summary {
             let mut sum = s.trim().to_string();
@@ -369,7 +369,7 @@ impl FactoryComponent for InstalledItemModel {
         })
     }
 
-    fn update(&mut self, msg: Self::Input, _sender: FactoryComponentSender<Self>) {
+    fn update(&mut self, msg: Self::Input, _sender: FactorySender<Self>) {
         match msg {
             InstalledItemInputMsg::Busy(b) => self.item.busy = b,
         }

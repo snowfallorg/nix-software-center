@@ -20,7 +20,6 @@ impl SimpleComponent for AboutPageModel {
     type Init = gtk::Window;
     type Input = AboutPageMsg;
     type Output = AppMsg;
-    type Widgets = AboutPageWidgets;
 
     view! {
         adw::AboutWindow {

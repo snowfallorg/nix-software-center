@@ -403,7 +403,6 @@ impl SimpleComponent for LoadErrorModel {
     type Init = gtk::Window;
     type Input = LoadErrorMsg;
     type Output = AppMsg;
-    type Widgets = LoadErrorWidgets;
 
     view! {
         dialog = gtk::MessageDialog {
@@ -464,9 +463,11 @@ impl SimpleComponent for LoadErrorModel {
             }
             LoadErrorMsg::Retry => {
                 self.hidden = true;
-                sender.output(AppMsg::TryLoad)
+                sender.output(AppMsg::TryLoad);
             }
-            LoadErrorMsg::Close => sender.output(AppMsg::Close),
+            LoadErrorMsg::Close => {
+                sender.output(AppMsg::Close);
+            }
             // LoadErrorMsg::Preferences => sender.output(AppMsg::ShowPrefMenu),
         }
     }

@@ -26,7 +26,6 @@ impl SimpleComponent for SearchPageModel {
     type Init = ();
     type Input = SearchPageMsg;
     type Output = AppMsg;
-    type Widgets = SearchPageWidgets;
 
     view! {
         gtk::ScrolledWindow {
@@ -132,7 +131,6 @@ impl FactoryComponent for SearchItemModel {
     type Init = SearchItem;
     type Input = ();
     type Output = SearchItemMsg;
-    type Widgets = SearchItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
     type ParentInput = SearchPageMsg;
 
@@ -241,7 +239,7 @@ impl FactoryComponent for SearchItemModel {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         let sum = if let Some(s) = parent.summary {
             let mut sum = s.trim().to_string();

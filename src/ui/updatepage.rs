@@ -65,7 +65,6 @@ impl SimpleComponent for UpdatePageModel {
     type Init = UpdatePageInit;
     type Input = UpdatePageMsg;
     type Output = AppMsg;
-    type Widgets = UpdatePageWidgets;
 
     view! {
         gtk::ScrolledWindow {
@@ -404,7 +403,6 @@ impl FactoryComponent for UpdateItemModel {
     type Init = UpdateItem;
     type Input = ();
     type Output = UpdateItemMsg;
-    type Widgets = UpdateItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
     type ParentInput = UpdatePageMsg;
 
@@ -510,7 +508,7 @@ impl FactoryComponent for UpdateItemModel {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         let sum = if let Some(s) = parent.summary {
             let mut sum = s.trim().to_string();

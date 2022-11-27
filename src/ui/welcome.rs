@@ -38,7 +38,6 @@ impl SimpleComponent for WelcomeModel {
     type Init = gtk::Window;
     type Input = WelcomeMsg;
     type Output = AppMsg;
-    type Widgets = WelcomeWidgets;
 
     view! {
         window = adw::Window {

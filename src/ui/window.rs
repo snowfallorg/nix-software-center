@@ -178,7 +178,6 @@ impl Component for AppModel {
     type Init = ();
     type Input = AppMsg;
     type Output = ();
-    type Widgets = AppWidgets;
     type CommandOutput = AppAsyncMsg;
 
     view! {
@@ -604,7 +603,7 @@ impl Component for AppModel {
     }
 
     #[tokio::main]
-    async fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+    async fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         self.reset();
         match msg {
             AppMsg::TryLoad => {
@@ -1666,7 +1665,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                 }
                                 apoints.cmp(&bpoints)
                             });
-                            out.send(AppAsyncMsg::Search(search.to_string(), outpkgs))
+                            out.send(AppAsyncMsg::Search(search.to_string(), outpkgs));
                         }
                     }).drop_on_shutdown()
                 })
@@ -1956,7 +1955,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
         }
     }
 
-    fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>) {
+    fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             AppAsyncMsg::Search(search, pkgitems) => {
                 if search == self.searchquery {

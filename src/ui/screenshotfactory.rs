@@ -18,7 +18,6 @@ impl FactoryComponent for ScreenshotItem {
     type Init = ();
     type Input = ();
     type Output = ScreenshotItemMsg;
-    type Widgets = PkgTileWidgets;
     type ParentWidget = adw::Carousel;
     type ParentInput = PkgMsg;
 
@@ -63,7 +62,7 @@ impl FactoryComponent for ScreenshotItem {
     fn init_model(
         _parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         Self {
             path: None,

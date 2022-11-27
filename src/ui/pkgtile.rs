@@ -30,7 +30,6 @@ impl FactoryComponent for PkgTile {
     type Init = PkgTile;
     type Input = ();
     type Output = PkgTileMsg;
-    type Widgets = PkgTileWidgets;
     type ParentWidget = gtk::FlowBox;
     type ParentInput = AppMsg;
 
@@ -149,7 +148,7 @@ impl FactoryComponent for PkgTile {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
 
         let mut sum = parent.summary.trim().to_string();

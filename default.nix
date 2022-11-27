@@ -20,7 +20,7 @@ pkgs.stdenv.mkDerivation rec {
   cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-yChtK86/onSI2JQaQkBwwVzijGTEyc6vQbCUmgWb3u8=";
+    hash = "sha256-QaAWND3AF+/Bg38J0yzYzbU6FtIiBpLL21oKMa5RYwU=";
   };
 
   nativeBuildInputs = with pkgs; [

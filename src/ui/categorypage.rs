@@ -1,7 +1,7 @@
-use super::{window::*, categories::PkgCategory, categorytile::CategoryTile};
+use super::{categories::PkgCategory, categorytile::CategoryTile, window::*};
 use adw::prelude::*;
-use relm4::{factory::*, *};
 use log::*;
+use relm4::{factory::*, *};
 
 #[tracker::track]
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub enum CategoryPageMsg {
     OpenPkg(String),
     Open(PkgCategory, Vec<CategoryTile>, Vec<CategoryTile>),
     Loading(PkgCategory),
-    UpdateInstalled(Vec<String>, Vec<String>)
+    UpdateInstalled(Vec<String>, Vec<String>),
 }
 
 #[derive(Debug)]
@@ -34,7 +34,6 @@ impl Component for CategoryPageModel {
     type Init = ();
     type Input = CategoryPageMsg;
     type Output = AppMsg;
-    type Widgets = CategoryPageWidgets;
     type CommandOutput = CategoryPageAsyncMsg;
 
     view! {
@@ -125,8 +124,8 @@ impl Component for CategoryPageModel {
                                 set_column_spacing: 14,
                                 set_row_spacing: 14,
                             }
-                        }    
-                    }                    
+                        }
+                    }
                 }
             }
         }
@@ -142,7 +141,7 @@ impl Component for CategoryPageModel {
             recommendedapps: FactoryVecDeque::new(gtk::FlowBox::new(), sender.input_sender()),
             apps: FactoryVecDeque::new(gtk::FlowBox::new(), sender.input_sender()),
             busy: true,
-            tracker: 0
+            tracker: 0,
         };
 
         let recbox = model.recommendedapps.widget();
@@ -153,15 +152,15 @@ impl Component for CategoryPageModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         self.reset();
         match msg {
             CategoryPageMsg::Close => {
-                sender.output(AppMsg::FrontFrontPage)
-            }
+                sender.output(AppMsg::FrontFrontPage);
+            },
             CategoryPageMsg::OpenPkg(pkg) => {
-                sender.output(AppMsg::OpenPkg(pkg))
-            }
+                sender.output(AppMsg::OpenPkg(pkg));
+            },
             CategoryPageMsg::Open(category, catrec, catall) => {
                 info!("CategoryPageMsg::Open");
                 self.set_category(category);
@@ -173,23 +172,27 @@ impl Component for CategoryPageModel {
                 apps_guard.drop();
 
                 sender.command(|out, shutdown| {
-                    shutdown.register(async move {
-                        for app in catrec {
-                            out.send(CategoryPageAsyncMsg::PushRec(app));
-                            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-                        }
-                    }).drop_on_shutdown()
+                    shutdown
+                        .register(async move {
+                            for app in catrec {
+                                out.send(CategoryPageAsyncMsg::PushRec(app));
+                                tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+                            }
+                        })
+                        .drop_on_shutdown()
                 });
 
                 sender.command(|out, shutdown| {
-                    shutdown.register(async move {
-                        for app in catall {
-                            out.send(CategoryPageAsyncMsg::Push(app));
-                            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-                        }
-                    }).drop_on_shutdown()
+                    shutdown
+                        .register(async move {
+                            for app in catall {
+                                out.send(CategoryPageAsyncMsg::Push(app));
+                                tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+                            }
+                        })
+                        .drop_on_shutdown()
                 });
-                
+
                 self.busy = false;
                 info!("DONE CategoryPageMsg::Open");
             }
@@ -231,7 +234,12 @@ impl Component for CategoryPageModel {
         }
     }
 
-    fn update_cmd(&mut self, msg: Self::CommandOutput, _sender: ComponentSender<Self>) {
+    fn update_cmd(
+        &mut self,
+        msg: Self::CommandOutput,
+        _sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         match msg {
             CategoryPageAsyncMsg::PushRec(tile) => {
                 let mut recapps_guard = self.recommendedapps.guard();
@@ -245,5 +253,4 @@ impl Component for CategoryPageModel {
             }
         }
     }
-
 }

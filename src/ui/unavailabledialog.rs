@@ -28,7 +28,6 @@ impl SimpleComponent for UnavailableDialogModel {
     type Init = gtk::Window;
     type Input = UnavailableDialogMsg;
     type Output = UpdatePageMsg;
-    type Widgets = UnavailableDialogWidgets;
 
     view! {
         dialog = adw::MessageDialog {
@@ -166,7 +165,6 @@ impl FactoryComponent for UnavailableItemModel {
     type Init = UnavailableItemModel;
     type Input = ();
     type Output = UnavailableItemMsg;
-    type Widgets = UnavailableItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
     type ParentInput = UnavailableDialogMsg;
 
@@ -257,7 +255,7 @@ impl FactoryComponent for UnavailableItemModel {
     fn init_model(
         init: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         init
     }

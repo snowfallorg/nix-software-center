@@ -29,7 +29,6 @@ impl FactoryComponent for CategoryTile {
     type Init = CategoryTile;
     type Input = ();
     type Output = CategoryTileMsg;
-    type Widgets = CategoryTileWidgets;
     type ParentWidget = gtk::FlowBox;
     type ParentInput = CategoryPageMsg;
 
@@ -151,7 +150,7 @@ impl FactoryComponent for CategoryTile {
     fn init_model(
         parent: Self::Init,
         _index: &DynamicIndex,
-        _sender: FactoryComponentSender<Self>,
+        _sender: FactorySender<Self>,
     ) -> Self {
         let mut sum = parent.summary;
         sum = sum.map(|mut s| {
