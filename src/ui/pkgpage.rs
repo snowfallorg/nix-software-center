@@ -1050,6 +1050,15 @@ impl Component for PkgModel {
                 self.installworker.emit(InstallAsyncHandlerMsg::SetPkgTypes(syspkgs, userpkgs));
             }
             PkgMsg::Open(pkgmodel) => {
+
+                // First clean up from previous package
+                self.summary = None;
+                self.description = None;
+                self.icon = None;
+                let mut scrn_guard = self.screenshots.guard();
+                scrn_guard.clear();
+                scrn_guard.drop();
+
                 self.set_visible(true);
                 self.set_pkg(pkgmodel.pkg);
                 self.set_name(pkgmodel.name);
@@ -1273,13 +1282,6 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::Close => {
-                // self.pkg = String::default();
-                // self.name = String::default();
-                // self.summary = None;
-                // self.description = None;
-                // self.icon = None;
-                // let mut scrn_guard = self.screenshots.guard();
-                // scrn_guard.clear();
                 self.set_visible(false);
                 sender.output(AppMsg::FrontPage)
             }
