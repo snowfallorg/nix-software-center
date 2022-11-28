@@ -228,7 +228,6 @@ impl FactoryComponent for InstalledItemModel {
     type Init = InstalledItem;
     type Input = InstalledItemInputMsg;
     type Output = InstalledItemMsg;
-    type Widgets = InstalledItemWidgets;
     type ParentWidget = adw::gtk::ListBox;
     type ParentInput = InstalledPageMsg;
 

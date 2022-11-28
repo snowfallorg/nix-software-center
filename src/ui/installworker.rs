@@ -16,8 +16,7 @@ pub struct InstallAsyncHandler {
     #[tracker::no_eq]
     process: Option<JoinHandle<()>>,
     work: Option<WorkPkg>,
-    systemconfig: Option<String>,
-    flakeargs: Option<String>,
+    config: NixDataConfig,
     pid: Option<u32>,
     syspkgs: SystemPkgs,
     userpkgs: UserPkgs,
@@ -47,8 +46,12 @@ impl Worker for InstallAsyncHandler {
         Self {
             process: None,
             work: None,
-            systemconfig: None,
-            flakeargs: None,
+            config: NixDataConfig {
+                systemconfig: None,
+                flake: None,
+                flakearg: None,
+                generations: None
+            },
             pid: None,
             syspkgs: params.syspkgs,
             userpkgs: params.userpkgs,
@@ -60,16 +63,7 @@ impl Worker for InstallAsyncHandler {
         self.reset();
         match msg {
             InstallAsyncHandlerMsg::SetConfig(config) => {
-                self.systemconfig = config.systemconfig;
-                self.flakeargs = if let Some(flake) = config.flake {
-                    if let Some(flakearg) = config.flakearg {
-                        Some(format!("{}#{}", flake, flakearg))
-                    } else {
-                        Some(flake)
-                    }
-                } else {
-                    None
-                }
+                self.config = config;
             }
             InstallAsyncHandlerMsg::SetPkgTypes(syspkgs, userpkgs) => {
                 self.syspkgs = syspkgs;
@@ -80,8 +74,7 @@ impl Worker for InstallAsyncHandler {
                 if work.block {
                     return;
                 }
-                let systemconfig = self.systemconfig.clone();
-                let rebuildargs = self.flakeargs.clone();
+                let config = self.config.clone();
                 match work.pkgtype {
                     InstallType::User => match work.action {
                         PkgAction::Install => {
@@ -268,7 +261,7 @@ impl Worker for InstallAsyncHandler {
                     },
                     InstallType::System => {
                         REBUILD_BROKER.send(RebuildMsg::Show);
-                        if let Some(systemconfig) = systemconfig {
+                        if let Some(systemconfig) = &config.systemconfig {
                             match work.action {
                                 PkgAction::Install => {
                                     info!("Installing system package: {}", work.pkg);
@@ -276,8 +269,7 @@ impl Worker for InstallAsyncHandler {
                                         match installsys(
                                             work.pkg.to_string(),
                                             work.action.clone(),
-                                            systemconfig,
-                                            rebuildargs,
+                                            config,
                                             sender.clone(),
                                         )
                                         .await
@@ -305,8 +297,7 @@ impl Worker for InstallAsyncHandler {
                                         match installsys(
                                             work.pkg.to_string(),
                                             work.action.clone(),
-                                            systemconfig,
-                                            rebuildargs,
+                                            config,
                                             sender.clone(),
                                         )
                                         .await
@@ -350,10 +341,19 @@ impl Worker for InstallAsyncHandler {
 async fn installsys(
     pkg: String,
     action: PkgAction,
-    systemconfig: String,
-    flakeargs: Option<String>,
+    config: NixDataConfig,
     _sender: ComponentSender<InstallAsyncHandler>,
 ) -> Result<bool> {
+    let systemconfig = config.systemconfig.unwrap_or_default();
+    let flakeargs = if let Some(flake) = config.flake {
+        if let Some(flakearg) = config.flakearg {
+            Some(format!("{}#{}", flake, flakearg))
+        } else {
+            Some(flake)
+        }
+    } else {
+        None
+    };
     let mut p = pkg;
     let f = fs::read_to_string(&systemconfig)?;
     if let Ok(s) = nix_editor::read::getwithvalue(&f, "environment.systemPackages") {
@@ -415,6 +415,8 @@ async fn installsys(
     let mut cmd = tokio::process::Command::new("pkexec")
         .arg(&exe)
         .arg("config")
+        .arg("--generations")
+        .arg(config.generations.unwrap_or(0).to_string())
         .arg("--output")
         .arg(&systemconfig)
         .arg("--")

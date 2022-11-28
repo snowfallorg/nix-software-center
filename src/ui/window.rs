@@ -415,6 +415,7 @@ impl Component for AppModel {
                     systemconfig: None,
                     flake: None,
                     flakearg: None,
+                    generations: None,
                 },
                 true,
             )
@@ -673,6 +674,7 @@ impl Component for AppModel {
                     systemconfig: systemconfig.clone(),
                     flake: self.config.flake.clone(),
                     flakearg: self.config.flakearg.clone(),
+                    generations: self.config.generations,
                 };
                 if editconfig(self.config.clone()).is_err() {
                     warn!("Failed to update config");
@@ -711,6 +713,7 @@ impl Component for AppModel {
                     systemconfig: self.config.systemconfig.clone(),
                     flake: flake.clone(),
                     flakearg,
+                    generations: self.config.generations,
                 };
                 if editconfig(self.config.clone()).is_err() {
                     warn!("Failed to update config");

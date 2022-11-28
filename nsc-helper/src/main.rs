@@ -12,12 +12,18 @@ enum SubCommands {
         /// Write stdin to file in path output
         #[arg(short, long)]
         output: String,
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
     Rebuild {
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
     },
     Channel {
         /// Whether to rebuild the system after updating channels
@@ -29,6 +35,9 @@ enum SubCommands {
         /// Write stdin to file in path output
         #[arg(short, long)]
         output: String,
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -45,6 +54,9 @@ enum SubCommands {
         /// Write stdin to file in path output
         #[arg(short, long)]
         output: String,
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -65,10 +77,14 @@ fn main() {
     }
 
     match derived_subcommands {
-        SubCommands::Config { output, arguments } => {
+        SubCommands::Config {
+            output,
+            generations,
+            arguments,
+        } => {
             let old = fs::read_to_string(&output);
             match write_file(&output) {
-                Ok(_) => match rebuild(arguments) {
+                Ok(_) => match rebuild(arguments, generations) {
                     Ok(_) => {}
                     Err(err) => {
                         eprintln!("{}", err);
@@ -86,7 +102,10 @@ fn main() {
                 }
             };
         }
-        SubCommands::Rebuild { arguments } => match rebuild(arguments) {
+        SubCommands::Rebuild {
+            generations,
+            arguments,
+        } => match rebuild(arguments, generations) {
             Ok(_) => (),
             Err(err) => {
                 eprintln!("{}", err);
@@ -97,6 +116,7 @@ fn main() {
             rebuild: dorebuild,
             update,
             output,
+            generations,
             arguments,
         } => {
             if update {
@@ -108,7 +128,7 @@ fn main() {
             match channel() {
                 Ok(_) => {
                     if dorebuild {
-                        match rebuild(arguments) {
+                        match rebuild(arguments, generations) {
                             Ok(_) => (),
                             Err(err) => {
                                 eprintln!("{}", err);
@@ -128,6 +148,7 @@ fn main() {
             flakepath,
             update,
             output,
+            generations,
             arguments,
         } => {
             if update {
@@ -139,7 +160,7 @@ fn main() {
             match flake(&flakepath) {
                 Ok(_) => {
                     if dorebuild {
-                        match rebuild(arguments) {
+                        match rebuild(arguments, generations) {
                             Ok(_) => (),
                             Err(err) => {
                                 eprintln!("{}", err);
@@ -166,18 +187,38 @@ fn write_file(path: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn rebuild(args: Vec<String>) -> Result<(), Box<dyn Error>> {
+fn rebuild(args: Vec<String>, generations: Option<u32>) -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::new("nixos-rebuild").args(args).spawn()?;
     let x = cmd.wait()?;
-    if x.success() {
-        Ok(())
-    } else {
+    if !x.success() {
         eprintln!("nixos-rebuild failed with exit code {}", x.code().unwrap());
-        Err(Box::new(io::Error::new(
+        return Err(Box::new(io::Error::new(
             io::ErrorKind::Other,
             "nixos-rebuild failed",
-        )))
+        )));
     }
+    if let Some(g) = generations {
+        if g > 0 {
+            let mut cmd = Command::new("nix-env")
+                .arg("--delete-generations")
+                .arg("-p")
+                .arg("/nix/var/nix/profiles/system")
+                .arg(&format!("+{}", g))
+                .spawn()?;
+            let x = cmd.wait()?;
+            if !x.success() {
+                eprintln!(
+                    "nix-env --delete-generations failed with exit code {}",
+                    x.code().unwrap()
+                );
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "nix-env failed",
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn channel() -> Result<(), Box<dyn Error>> {
