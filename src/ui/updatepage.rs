@@ -1,4 +1,4 @@
-use crate::{APPINFO, ui::unavailabledialog::UnavailableDialogModel};
+use crate::{APPINFO, ui::unavailabledialog::UnavailableDialogModel, parse::util};
 
 use super::{pkgpage::InstallType, window::*, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}, rebuild::RebuildMsg};
 use adw::prelude::*;
@@ -25,6 +25,7 @@ pub struct UpdatePageModel {
     updatetracker: u8,
     #[tracker::no_eq]
     unavailabledialog: Controller<UnavailableDialogModel>,
+    online: bool,
 }
 
 #[derive(Debug)]
@@ -44,6 +45,7 @@ pub enum UpdatePageMsg {
     UpdateAllRm(Vec<String>, Vec<String>),
     DoneWorking,
     FailedWorking,
+    UpdateOnline(bool),
 }
 
 #[derive(Debug)]
@@ -58,6 +60,7 @@ pub struct UpdatePageInit {
     pub systype: SystemPkgs,
     pub usertype: UserPkgs,
     pub config: NixDataConfig,
+    pub online: bool,
 }
 
 #[relm4::component(pub)]
@@ -72,7 +75,25 @@ impl SimpleComponent for UpdatePageModel {
             #[track(model.changed(UpdatePageModel::updatetracker()))]
             set_vadjustment: gtk::Adjustment::NONE,
             adw::Clamp {
-                if model.channelupdate.is_some() || !model.updateuserlist.is_empty() || !model.updatesystemlist.is_empty() {
+                #[name(mainstack)]
+                if !model.online {
+                    adw::StatusPage {
+                        set_icon_name: Some("nsc-network-offline-symbolic"),
+                        set_title: "No internet connection",
+                        set_description: Some("Please connect to the internet to update your system"),
+                        gtk::Button {
+                            add_css_class: "pill",
+                            set_halign: gtk::Align::Center,
+                            adw::ButtonContent {
+                                set_icon_name: "nsc-refresh-symbolic",
+                                set_label: "Refresh",
+                            },
+                            connect_clicked[sender] => move |_| {
+                                sender.output(AppMsg::CheckNetwork);
+                            }
+                        }
+                    }
+                } else if model.channelupdate.is_some() || !model.updateuserlist.is_empty() || !model.updatesystemlist.is_empty() {
                     gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
                         set_valign: gtk::Align::Start,
@@ -218,6 +239,7 @@ impl SimpleComponent for UpdatePageModel {
             systype: initparams.systype,
             usertype: initparams.usertype,
             unavailabledialog,
+            online: initparams.online,
             tracker: 0,
         };
 
@@ -225,6 +247,8 @@ impl SimpleComponent for UpdatePageModel {
         let updatesystemlist = model.updatesystemlist.widget();
 
         let widgets = view_output!();
+        widgets.mainstack.set_hhomogeneous(false);
+        widgets.mainstack.set_vhomogeneous(false);
 
         ComponentParts { model, widgets }
     }
@@ -276,6 +300,12 @@ impl SimpleComponent for UpdatePageModel {
                 }
             },
             UpdatePageMsg::UpdateSystem => {
+                let online = util::checkonline();
+                if !online {
+                    sender.output(AppMsg::CheckNetwork);
+                    self.online = false;
+                    return;
+                }
                 let systype = self.systype.clone();
                 let systemconfig = self.config.systemconfig.clone();
                 let workersender = self.updateworker.sender().clone();
@@ -308,6 +338,12 @@ impl SimpleComponent for UpdatePageModel {
                 warn!("unimplemented");
             }
             UpdatePageMsg::UpdateAllUser => {
+                let online = util::checkonline();
+                if !online {
+                    sender.output(AppMsg::CheckNetwork);
+                    self.online = false;
+                    return;
+                }
                 REBUILD_BROKER.send(RebuildMsg::Show);
                 if self.usertype == UserPkgs::Profile {
                     let workersender = self.updateworker.sender().clone();
@@ -331,6 +367,12 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateUserPkgsRemove(pkgs));
             }
             UpdatePageMsg::UpdateAll => {
+                let online = util::checkonline();
+                if !online {
+                    sender.output(AppMsg::CheckNetwork);
+                    self.online = false;
+                    return;
+                }
                 info!("UpdatePageMsg::UpdateAll");
                 let systype = self.systype.clone();
                 let usertype = self.usertype.clone();
@@ -372,6 +414,9 @@ impl SimpleComponent for UpdatePageModel {
             }
             UpdatePageMsg::FailedWorking => {
                 REBUILD_BROKER.send(RebuildMsg::FinishError(None));
+            }
+            UpdatePageMsg::UpdateOnline(online) => {
+                self.set_online(online);
             }
         }
     }

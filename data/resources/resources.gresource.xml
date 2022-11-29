@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/dev/vlinkz/NixSoftwareCenter/icons/scalable/emblems">
-    <file preprocess="xml-stripblanks" alias="nsc-home-symbolic.svg">../icons/nsc-home-symbolic.svg</file>
-    <file preprocess="xml-stripblanks" alias="nsc-installed-symbolic.svg">../icons/nsc-installed-symbolic.svg</file>
-    <file preprocess="xml-stripblanks" alias="nsc-update-symbolic.svg">../icons/nsc-update-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-audio.svg">../icons/nsc-audio.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-development.svg">../icons/nsc-development.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-gaming.svg">../icons/nsc-gaming.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-graphics.svg">../icons/nsc-graphics.svg</file>
+    <file preprocess="xml-stripblanks" alias="nsc-home-symbolic.svg">../icons/nsc-home-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="nsc-installed-symbolic.svg">../icons/nsc-installed-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="nsc-network-offline-symbolic.svg">../icons/nsc-network-offline-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="nsc-refresh-symbolic.svg">../icons/nsc-refresh-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="nsc-update-symbolic.svg">../icons/nsc-update-symbolic.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-video.svg">../icons/nsc-video.svg</file>
     <file preprocess="xml-stripblanks" alias="nsc-web.svg">../icons/nsc-web.svg</file>
   </gresource>

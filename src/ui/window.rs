@@ -2,9 +2,13 @@ use crate::{
     config,
     parse::{
         config::{editconfig, getconfig},
-        packages::{AppData, LicenseEnum, PkgMaintainer, Platform},
+        packages::{AppData, LicenseEnum, PkgMaintainer, Platform}, util,
     },
-    ui::{installedpage::InstalledItem, pkgpage::PkgPageInit, welcome::WelcomeMsg, rebuild::RebuildMsg, updatepage::UNAVAILABLE_BROKER, unavailabledialog::UnavailableDialogMsg},
+    ui::{
+        installedpage::InstalledItem, pkgpage::PkgPageInit, rebuild::RebuildMsg,
+        unavailabledialog::UnavailableDialogMsg, updatepage::UNAVAILABLE_BROKER,
+        welcome::WelcomeMsg,
+    },
     APPINFO,
 };
 use adw::prelude::*;
@@ -29,10 +33,12 @@ use super::{
     pkgpage::{self, InstallType, PkgInitModel, PkgModel, PkgMsg, WorkPkg},
     pkgtile::PkgTile,
     preferencespage::{PreferencesPageModel, PreferencesPageMsg},
+    rebuild::RebuildModel,
     searchpage::{SearchItem, SearchPageModel, SearchPageMsg},
+    unavailabledialog::UnavailableItemModel,
     updatepage::{UpdateItem, UpdatePageInit, UpdatePageModel, UpdatePageMsg, UpdateType},
     welcome::WelcomeModel,
-    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg}, rebuild::RebuildModel, unavailabledialog::UnavailableItemModel,
+    windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg},
 };
 
 pub static REBUILD_BROKER: MessageBroker<RebuildModel> = MessageBroker::new();
@@ -113,6 +119,7 @@ pub struct AppModel {
     installedpagebusy: Vec<(String, InstallType)>,
     #[tracker::no_eq]
     rebuild: Controller<RebuildModel>,
+    online: bool,
 }
 
 #[derive(Debug)]
@@ -120,6 +127,7 @@ pub enum AppMsg {
     UpdateSysconfig(Option<String>),
     UpdateFlake(Option<String>, Option<String>),
     TryLoad,
+    UpdateDB,
     LoadConfig(NixDataConfig),
     Close,
     LoadError(String, String),
@@ -153,6 +161,7 @@ pub enum AppMsg {
     UpdateRecPkgs(Vec<String>),
     SetDarkMode(bool),
     GetUnavailableItems(HashMap<String, String>, HashMap<String, String>, UpdateType),
+    CheckNetwork,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,6 +180,7 @@ pub enum AppAsyncMsg {
     UpdateRecPkgs(Vec<PkgTile>),
     UpdateInstalledPkgs(HashSet<String>, HashMap<String, String>),
     LoadCategory(PkgCategory, Vec<CategoryTile>, Vec<CategoryTile>),
+    SetNetwork(bool)
 }
 
 #[relm4::component(pub)]
@@ -465,6 +475,8 @@ impl Component for AppModel {
         debug!("userpkgtype: {:?}", userpkgtype);
         debug!("syspkgtype: {:?}", syspkgtype);
 
+        let online = util::checkonline();
+
         let windowloading = WindowAsyncHandler::builder()
             .detach_worker(())
             .forward(sender.input_sender(), identity);
@@ -476,6 +488,7 @@ impl Component for AppModel {
                 userpkgs: userpkgtype.clone(),
                 syspkgs: syspkgtype.clone(),
                 config: config.clone(),
+                online,
             })
             .forward(sender.input_sender(), identity);
         let searchpage = SearchPageModel::builder()
@@ -493,6 +506,7 @@ impl Component for AppModel {
                 systype: syspkgtype.clone(),
                 usertype: userpkgtype.clone(),
                 config: config.clone(),
+                online,
             })
             .forward(sender.input_sender(), identity);
         let rebuild = RebuildModel::builder()
@@ -532,6 +546,7 @@ impl Component for AppModel {
             viewstack,
             installedpagebusy: vec![],
             rebuild,
+            online,
             tracker: 0,
         };
 
@@ -604,7 +619,12 @@ impl Component for AppModel {
     }
 
     #[tokio::main]
-    async fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
+    async fn update(
+        &mut self,
+        msg: Self::Input,
+        sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         self.reset();
         match msg {
             AppMsg::TryLoad => {
@@ -613,6 +633,12 @@ impl Component for AppModel {
                     self.syspkgtype.clone(),
                     self.userpkgtype.clone(),
                     self.config.clone(),
+                ));
+            }
+            AppMsg::UpdateDB => {
+                self.windowloading.emit(WindowAsyncHandlerMsg::UpdateDB(
+                    self.syspkgtype.clone(),
+                    self.userpkgtype.clone(),
                 ));
             }
             AppMsg::LoadConfig(config) => {
@@ -758,12 +784,12 @@ impl Component for AppModel {
                 self.categoryrec = categoryrec;
                 self.categoryall = categoryall;
 
-                self.page = Page::FrontPage;
                 self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
                 self.updatepage
                     .emit(UpdatePageMsg::UpdateConfig(self.config.clone()));
                 sender.input(AppMsg::UpdateRecPkgs(recommendedapps));
                 let mut cat_guard = self.categories.guard();
+                cat_guard.clear();
                 for c in vec![
                     PkgCategory::Audio,
                     PkgCategory::Development,
@@ -824,7 +850,10 @@ impl Component for AppModel {
                                         .and_then(|x| x.get("C"))
                                         .map(|x| x.to_string())
                                         .unwrap_or_default(),
-                                    installeduser: installeduser.contains_key(&match userpkgtype { UserPkgs::Env => pname.0, UserPkgs::Profile => pkg.to_string() }),
+                                    installeduser: installeduser.contains_key(&match userpkgtype {
+                                        UserPkgs::Env => pname.0,
+                                        UserPkgs::Profile => pkg.to_string(),
+                                    }),
                                     installedsystem: installedsystem.contains(&pkg),
                                 })
                             }
@@ -835,6 +864,7 @@ impl Component for AppModel {
             }
             AppMsg::OpenPkg(pkg) => {
                 info!("AppMsg::OpenPkg {}", pkg);
+                sender.input(AppMsg::CheckNetwork);
                 if let Ok(pool) = &SqlitePool::connect(&format!("sqlite://{}", self.pkgdb)).await {
                     let pkgdata: Result<
                         (
@@ -1371,10 +1401,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         .fetch_one(latestpool)
                                         .await
                                         .unwrap();
-                                        debug!(
-                                            "PROFILE: {} {} {}",
-                                            installedpkg, version, newver
-                                        );
+                                        debug!("PROFILE: {} {} {}", installedpkg, version, newver);
                                         if version != newver {
                                             updateuseritems.push(UpdateItem {
                                                 name,
@@ -1550,6 +1577,9 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                     if name != "search" {
                         sender.input(AppMsg::SetSearch(false))
                     }
+                }
+                if name == "updates" && self.online {
+                    sender.input(AppMsg::CheckNetwork);
                 }
             }
             AppMsg::SetVsBar(vsbar) => {
@@ -1869,7 +1899,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                             .as_ref()
                                             .and_then(|x| x.cached.as_ref())
                                             .map(|x| x[0].name.clone()),
-                                        message: msg
+                                        message: msg,
                                     })
                                 } else {
                                     unavailableuser.push(UnavailableItemModel {
@@ -1885,7 +1915,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                             .as_ref()
                                             .and_then(|x| x.cached.as_ref())
                                             .map(|x| x[0].name.clone()),
-                                        message: msg
+                                        message: msg,
                                     })
                                 }
                             } else {
@@ -1894,7 +1924,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                     name: pkg.to_string(),
                                     pname: String::new(),
                                     icon: None,
-                                    message: msg
+                                    message: msg,
                                 })
                             }
                         }
@@ -1921,7 +1951,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                             .as_ref()
                                             .and_then(|x| x.cached.as_ref())
                                             .map(|x| x[0].name.clone()),
-                                        message: msg
+                                        message: msg,
                                     })
                                 } else {
                                     unavailablesys.push(UnavailableItemModel {
@@ -1937,7 +1967,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                             .as_ref()
                                             .and_then(|x| x.cached.as_ref())
                                             .map(|x| x[0].name.clone()),
-                                        message: msg
+                                        message: msg,
                                     })
                                 }
                             } else {
@@ -1946,19 +1976,39 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                     name: pkg.to_string(),
                                     pname: String::new(),
                                     icon: None,
-                                    message: msg
+                                    message: msg,
                                 })
                             }
                         }
-
                     }
-                    UNAVAILABLE_BROKER.send(UnavailableDialogMsg::Show(unavailableuser, unavailablesys, updatetype));
+                    UNAVAILABLE_BROKER.send(UnavailableDialogMsg::Show(
+                        unavailableuser,
+                        unavailablesys,
+                        updatetype,
+                    ));
+                });
+            }
+            AppMsg::CheckNetwork => {
+                let selfonline = self.online;
+                let senderclone = sender.clone();
+                sender.oneshot_command(async move {
+                    info!("AppMsg::CheckNetwork");
+                    let online = util::checkonline();
+                    if online && !selfonline {
+                        senderclone.input(AppMsg::UpdateDB);
+                    }
+                    AppAsyncMsg::SetNetwork(online)
                 });
             }
         }
     }
 
-    fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update_cmd(
+        &mut self,
+        msg: Self::CommandOutput,
+        sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
         match msg {
             AppAsyncMsg::Search(search, pkgitems) => {
                 if search == self.searchquery {
@@ -1990,7 +2040,11 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                     debug!("Got recommended apps guard");
                     for item in recommendedapps_guard.iter_mut() {
                         debug!("Got item {}", item.pkg);
-                        item.installeduser = self.installeduserpkgs.contains_key(match self.userpkgtype { UserPkgs::Env => &item.pname, UserPkgs::Profile => &item.pkg });
+                        item.installeduser =
+                            self.installeduserpkgs.contains_key(match self.userpkgtype {
+                                UserPkgs::Env => &item.pname,
+                                UserPkgs::Profile => &item.pkg,
+                            });
                         item.installedsystem = self.installedsystempkgs.contains(&item.pkg);
                     }
                     if self.searching {
@@ -2005,6 +2059,11 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
             AppAsyncMsg::LoadCategory(category, catrec, catall) => {
                 self.categorypage
                     .emit(CategoryPageMsg::Open(category, catrec, catall));
+            }
+            AppAsyncMsg::SetNetwork(online) => {
+                self.online = online;
+                self.updatepage.emit(UpdatePageMsg::UpdateOnline(online));
+                self.pkgpage.emit(PkgMsg::UpdateOnline(online));
             }
         }
     }

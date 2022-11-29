@@ -24,6 +24,7 @@ use std::{
 use log::*;
 
 use crate::parse::packages::PkgMaintainer;
+use crate::parse::util;
 use crate::ui::installworker::InstallAsyncHandlerMsg;
 
 use super::installworker::InstallAsyncHandler;
@@ -63,6 +64,7 @@ pub struct PkgModel {
 
     workqueue: HashSet<WorkPkg>,
     visible: bool,
+    online: bool,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -156,6 +158,7 @@ pub enum PkgMsg {
     NixShell,
     SetInstallType(InstallType),
     AddToQueue(WorkPkg),
+    UpdateOnline(bool)
 }
 
 #[derive(Debug)]
@@ -169,6 +172,7 @@ pub struct PkgPageInit {
     pub syspkgs: SystemPkgs,
     pub userpkgs: UserPkgs,
     pub config: NixDataConfig,
+    pub online: bool
 }
 
 #[relm4::component(pub)]
@@ -353,6 +357,27 @@ impl Component for PkgModel {
                                                     //             set_sensitive: false,
                                                     //         }
                                                     //     }
+                                                    } else if !model.online {
+                                                        gtk::Box {
+                                                            set_orientation: gtk::Orientation::Horizontal,
+                                                            set_spacing: 10,
+                                                            set_halign: gtk::Align::End,
+                                                            gtk::Button {
+                                                                set_halign: gtk::Align::End,
+                                                                set_valign: gtk::Align::Center,
+                                                                add_css_class: "error",
+                                                                set_label: "Offline",
+                                                                set_can_target: false,
+                                                            },
+                                                            gtk::Button {
+                                                                set_halign: gtk::Align::End,
+                                                                set_valign: gtk::Align::Center,
+                                                                set_icon_name: "nsc-refresh-symbolic",
+                                                                connect_clicked[sender] => move |_| {
+                                                                    sender.output(AppMsg::CheckNetwork);
+                                                                }
+                                                            }
+                                                        }
                                                     } else {
                                                         adw::SplitButton {
                                                             add_css_class: "suggested-action",
@@ -439,6 +464,27 @@ impl Component for PkgModel {
                                                     //             set_sensitive: false,
                                                     //         }
                                                     //     }
+                                                    } else if !model.online {
+                                                        gtk::Box {
+                                                            set_orientation: gtk::Orientation::Horizontal,
+                                                            set_spacing: 10,
+                                                            set_halign: gtk::Align::End,
+                                                            gtk::Button {
+                                                                set_halign: gtk::Align::End,
+                                                                set_valign: gtk::Align::Center,
+                                                                add_css_class: "error",
+                                                                set_label: "Offline",
+                                                                set_can_target: false,
+                                                            },
+                                                            gtk::Button {
+                                                                set_halign: gtk::Align::End,
+                                                                set_valign: gtk::Align::Center,
+                                                                set_icon_name: "nsc-refresh-symbolic",
+                                                                connect_clicked[sender] => move |_| {
+                                                                    sender.output(AppMsg::CheckNetwork);
+                                                                }
+                                                            }
+                                                        }
                                                     } else {
                                                         adw::SplitButton {
                                                             add_css_class: "suggested-action",
@@ -965,6 +1011,7 @@ impl Component for PkgModel {
             workqueue: HashSet::new(),
             launchable: None,
             visible: false,
+            online: initparams.online,
             tracker: 0,
         };
 
@@ -1285,6 +1332,12 @@ impl Component for PkgModel {
                 sender.output(AppMsg::FrontPage);
             }
             PkgMsg::InstallUser => {
+                let online = util::checkonline();
+                if !online {
+                    sender.output(AppMsg::CheckNetwork);
+                    self.online = false;
+                    return;
+                }
                 let w = WorkPkg {
                     pkg: self.pkg.to_string(),
                     pname: self.pname.to_string(),
@@ -1313,6 +1366,12 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::InstallSystem => {
+                let online = util::checkonline();
+                if !online {
+                    sender.output(AppMsg::CheckNetwork);
+                    self.online = false;
+                    return;
+                }
                 let w = WorkPkg {
                     pkg: self.pkg.to_string(),
                     pname: self.pname.to_string(),
@@ -1530,6 +1589,9 @@ impl Component for PkgModel {
                 if self.workqueue.len() == 1 {
                     self.installworker.emit(InstallAsyncHandlerMsg::Process(work));
                 }
+            }
+            PkgMsg::UpdateOnline(online) => {
+                self.set_online(online);
             }
         }
     }

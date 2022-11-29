@@ -18,6 +18,7 @@ pub struct WindowAsyncHandler;
 #[derive(Debug)]
 pub enum WindowAsyncHandlerMsg {
     CheckCache(SystemPkgs, UserPkgs, NixDataConfig),
+    UpdateDB(SystemPkgs, UserPkgs),
 }
 
 impl Worker for WindowAsyncHandler {
@@ -42,9 +43,14 @@ impl Worker for WindowAsyncHandler {
                         Ok(p) => p,
                         Err(e) => {
                             error!("Error getting NixOS pkgs: {}", e);
+                            sender.output(AppMsg::LoadError(
+                                String::from("Error retrieving NixOS package database"),
+                                e.to_string(),
+                            ));
                             return;
                         }
                     };
+
                     let pool = SqlitePool::connect(&format!("sqlite://{}", pkgdb))
                         .await
                         .unwrap();
@@ -381,6 +387,50 @@ impl Worker for WindowAsyncHandler {
                     ));
                 });
             }
+            WindowAsyncHandlerMsg::UpdateDB(syspkgs, userpkgs) => {
+                relm4::spawn(async move {
+                    let _pkgdb = match nix_data::cache::nixos::nixospkgs().await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!("Error getting NixOS pkgs: {}", e);
+                            sender.output(AppMsg::LoadError(
+                                String::from("Error retrieving NixOS package database"),
+                                e.to_string(),
+                            ));
+                            return;
+                        }
+                    };
+
+                    let _nixpkgsdb = match userpkgs {
+                        UserPkgs::Profile => {
+                            if let Ok(x) = nix_data::cache::profile::nixpkgslatest().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        }
+                        UserPkgs::Env => None,
+                    };
+
+                    let _systemdb = match syspkgs {
+                        SystemPkgs::None => None,
+                        SystemPkgs::Legacy => {
+                            if let Ok(x) = nix_data::cache::channel::legacypkgs().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        }
+                        SystemPkgs::Flake => {
+                            if let Ok(x) = nix_data::cache::flakes::flakespkgs().await {
+                                Some(x)
+                            } else {
+                                None
+                            }
+                        }
+                    };
+                });
+            }
         }
     }
 }
@@ -467,8 +517,7 @@ impl SimpleComponent for LoadErrorModel {
             }
             LoadErrorMsg::Close => {
                 sender.output(AppMsg::Close);
-            }
-            // LoadErrorMsg::Preferences => sender.output(AppMsg::ShowPrefMenu),
+            } // LoadErrorMsg::Preferences => sender.output(AppMsg::ShowPrefMenu),
         }
     }
 }
