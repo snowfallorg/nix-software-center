@@ -1675,7 +1675,7 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 [[package]]
 name = "nix-data"
 version = "0.0.2"
-source = "git+https://github.com/snowflakelinux/nix-data#8185976098e741698a625f3d90c13c3a66da74a9"
+source = "git+https://github.com/snowflakelinux/nix-data#31f6997311a16f9661820d8b5f74f41aa3d64eb7"
 dependencies = [
  "anyhow",
  "brotli",
@@ -2957,9 +2957,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "1.8.0"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9724f9a975fb987ef7a3cd9be0350edcbe130698af5b8f7a631e23d42d052484"
+checksum = "d266c00fde287f55d3f1c3e96c500c362a2b8c695076ec180f27918820bc6df8"
 dependencies = [
  "proc-macro2",
  "quote",

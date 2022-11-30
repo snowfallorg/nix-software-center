@@ -1401,6 +1401,7 @@ impl Component for PkgModel {
                 }
             }
             PkgMsg::FinishedProcess(work) => {
+                let _ = nix_data::utils::refreshicons();
                 self.workqueue.remove(&work);
                 trace!("WORK QUEUE: {}", self.workqueue.len());
                 match work.pkgtype {

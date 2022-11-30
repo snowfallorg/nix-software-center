@@ -409,6 +409,7 @@ impl SimpleComponent for UpdatePageModel {
                 self.updateworker.emit(UpdateAsyncHandlerMsg::UpdateAllRemove(userpkgs, syspkgs));
             }
             UpdatePageMsg::DoneWorking => {
+                let _ = nix_data::utils::refreshicons();
                 REBUILD_BROKER.send(RebuildMsg::FinishSuccess);
                 sender.output(AppMsg::UpdateInstalledPkgs);
             }
