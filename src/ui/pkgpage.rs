@@ -661,6 +661,7 @@ impl Component for PkgModel {
                             add_css_class: "linked",
                             set_halign: gtk::Align::Fill,
                             set_hexpand: true,
+                            set_margin_bottom: 10,
                             set_homogeneous: true,
                             set_row_spacing: 5,
                             set_column_spacing: 4,

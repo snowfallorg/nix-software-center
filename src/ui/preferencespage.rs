@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use super::window::AppMsg;
 use adw::prelude::*;
 use nix_data::config::configfile::NixDataConfig;
@@ -47,6 +47,7 @@ impl SimpleComponent for PreferencesPageModel {
             add = &adw::PreferencesPage {
                 add = &adw::PreferencesGroup {
                     // set_title: "Preferences",
+                    set_visible: Path::new("/etc/NIXOS").exists(),
                     add = &adw::ActionRow {
                         set_title: "Configuration file",
                         add_suffix = &gtk::Box {

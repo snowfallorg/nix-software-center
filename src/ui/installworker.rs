@@ -361,7 +361,7 @@ async fn installsys(
             p = format!("pkgs.{}", p);
         }
     } else {
-        return Err(anyhow!("Failed to write configuration.nix"));
+        p = format!("pkgs.{}", p);
     }
 
     let out = match action {

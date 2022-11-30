@@ -11,6 +11,7 @@ use rand::thread_rng;
 use relm4::adw::prelude::*;
 use relm4::*;
 use sqlx::SqlitePool;
+use std::path::Path;
 use std::{collections::HashMap, env};
 
 pub struct WindowAsyncHandler;
@@ -39,15 +40,31 @@ impl Worker for WindowAsyncHandler {
                     let mut catpicks: HashMap<PkgCategory, Vec<String>> = HashMap::new();
                     let mut catpkgs: HashMap<PkgCategory, Vec<String>> = HashMap::new();
 
-                    let pkgdb = match nix_data::cache::nixos::nixospkgs().await {
-                        Ok(p) => p,
-                        Err(e) => {
-                            error!("Error getting NixOS pkgs: {}", e);
-                            sender.output(AppMsg::LoadError(
-                                String::from("Error retrieving NixOS package database"),
-                                e.to_string(),
-                            ));
-                            return;
+                    let nixos = Path::new("/etc/NIXOS").exists();
+
+                    let pkgdb = if nixos {
+                        match nix_data::cache::nixos::nixospkgs().await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                error!("Error getting NixOS pkgs: {}", e);
+                                sender.output(AppMsg::LoadError(
+                                    String::from("Error retrieving NixOS package database"),
+                                    e.to_string(),
+                                ));
+                                return;
+                            }
+                        }
+                    } else {
+                        match nix_data::cache::nonnixos::nixpkgs().await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                error!("Error getting nixpkgs: {}", e);
+                                sender.output(AppMsg::LoadError(
+                                    String::from("Error retrieving nixpkgs package database"),
+                                    e.to_string(),
+                                ));
+                                return;
+                            }
                         }
                     };
 
@@ -389,15 +406,31 @@ impl Worker for WindowAsyncHandler {
             }
             WindowAsyncHandlerMsg::UpdateDB(syspkgs, userpkgs) => {
                 relm4::spawn(async move {
-                    let _pkgdb = match nix_data::cache::nixos::nixospkgs().await {
-                        Ok(p) => p,
-                        Err(e) => {
-                            error!("Error getting NixOS pkgs: {}", e);
-                            sender.output(AppMsg::LoadError(
-                                String::from("Error retrieving NixOS package database"),
-                                e.to_string(),
-                            ));
-                            return;
+                    let nixos = Path::new("/etc/NIXOS").exists();
+
+                    let _pkgdb = if nixos {
+                        match nix_data::cache::nixos::nixospkgs().await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                error!("Error getting NixOS pkgs: {}", e);
+                                sender.output(AppMsg::LoadError(
+                                    String::from("Error retrieving NixOS package database"),
+                                    e.to_string(),
+                                ));
+                                return;
+                            }
+                        }
+                    } else {
+                        match nix_data::cache::nonnixos::nixpkgs().await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                error!("Error getting nixpkgs: {}", e);
+                                sender.output(AppMsg::LoadError(
+                                    String::from("Error retrieving nixpkgs package database"),
+                                    e.to_string(),
+                                ));
+                                return;
+                            }
                         }
                     };
 

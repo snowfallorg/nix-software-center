@@ -2,7 +2,8 @@ use crate::{
     config,
     parse::{
         config::{editconfig, getconfig},
-        packages::{AppData, LicenseEnum, PkgMaintainer, Platform}, util,
+        packages::{AppData, LicenseEnum, PkgMaintainer, Platform},
+        util,
     },
     ui::{
         installedpage::InstalledItem, pkgpage::PkgPageInit, rebuild::RebuildMsg,
@@ -180,7 +181,7 @@ pub enum AppAsyncMsg {
     UpdateRecPkgs(Vec<PkgTile>),
     UpdateInstalledPkgs(HashSet<String>, HashMap<String, String>),
     LoadCategory(PkgCategory, Vec<CategoryTile>, Vec<CategoryTile>),
-    SetNetwork(bool)
+    SetNetwork(bool),
 }
 
 #[relm4::component(pub)]
@@ -448,8 +449,8 @@ impl Component for AppModel {
         } else {
             UserPkgs::Env
         };
-
-        let syspkgtype = if config.systemconfig.is_none() {
+        let nixos = Path::new("/etc/NIXOS").exists();
+        let syspkgtype = if config.systemconfig.is_none() || !nixos {
             SystemPkgs::None
         } else {
             match fs::read_to_string("/run/current-system/nixos-version") {
@@ -558,7 +559,7 @@ impl Component for AppModel {
 
         sender.input(AppMsg::SetDarkMode(adw::StyleManager::default().is_dark()));
 
-        if welcome {
+        if welcome && nixos {
             let welcomepage = WelcomeModel::builder()
                 .launch(root.clone().upcast())
                 .forward(sender.input_sender(), identity);
@@ -647,8 +648,8 @@ impl Component for AppModel {
                 if let Err(e) = editconfig(self.config.clone()) {
                     warn!("Error editing config: {}", e);
                 }
-
-                self.syspkgtype = if self.config.systemconfig.is_none() {
+                let nixos = Path::new("/etc/NIXOS").exists();
+                self.syspkgtype = if self.config.systemconfig.is_none() || !nixos {
                     SystemPkgs::None
                 } else {
                     match fs::read_to_string("/run/current-system/nixos-version") {
@@ -705,8 +706,8 @@ impl Component for AppModel {
                 if editconfig(self.config.clone()).is_err() {
                     warn!("Failed to update config");
                 }
-
-                if systemconfig.is_some() {
+                let nixos = Path::new("/etc/NIXOS").exists();
+                if systemconfig.is_some() &&nixos {
                     if self.syspkgtype == SystemPkgs::None {
                         if self.config.flake.is_some() {
                             self.syspkgtype = SystemPkgs::Flake;
@@ -745,10 +746,13 @@ impl Component for AppModel {
                     warn!("Failed to update config");
                 }
 
-                if flake.is_some() {
-                    self.syspkgtype = SystemPkgs::Flake;
-                } else {
-                    self.syspkgtype = SystemPkgs::Legacy;
+                let nixos = Path::new("/etc/NIXOS").exists();
+                if nixos {
+                    if flake.is_some() {
+                        self.syspkgtype = SystemPkgs::Flake;
+                    } else {
+                        self.syspkgtype = SystemPkgs::Legacy;
+                    }
                 }
 
                 self.pkgpage.emit(PkgMsg::UpdateConfig(self.config.clone()));
