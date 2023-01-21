@@ -396,6 +396,8 @@ async fn runcmd(
                         .arg(&flakepath)
                         .arg("--generations")
                         .arg(config.generations.unwrap_or(0).to_string())
+                        .arg("--output")
+                        .arg(&systemconfig)
                         .arg("--")
                         .arg("switch")
                         .arg("--impure")
