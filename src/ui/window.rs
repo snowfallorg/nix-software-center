@@ -126,6 +126,8 @@ pub struct AppModel {
     installedpagebusy: Vec<(String, InstallType)>,
     #[tracker::no_eq]
     rebuild: Controller<RebuildModel>,
+    #[tracker::no_eq]
+    welcomepage: Controller<WelcomeModel>,
     online: bool,
 }
 
@@ -520,6 +522,9 @@ impl Component for AppModel {
             .launch_with_broker(root.clone().upcast(), &REBUILD_BROKER)
             .forward(sender.input_sender(), identity);
         let viewstack = adw::ViewStack::new();
+        let welcomepage = WelcomeModel::builder()
+                .launch(root.clone().upcast())
+                .forward(sender.input_sender(), identity);
 
         let model = AppModel {
             mainwindow: root.clone(),
@@ -553,6 +558,7 @@ impl Component for AppModel {
             viewstack,
             installedpagebusy: vec![],
             rebuild,
+            welcomepage,
             online,
             tracker: 0,
         };
@@ -566,10 +572,7 @@ impl Component for AppModel {
         sender.input(AppMsg::SetDarkMode(adw::StyleManager::default().is_dark()));
 
         if welcome && nixos {
-            let welcomepage = WelcomeModel::builder()
-                .launch(root.clone().upcast())
-                .forward(sender.input_sender(), identity);
-            welcomepage.emit(WelcomeMsg::Show);
+            model.welcomepage.emit(WelcomeMsg::Show);
         } else {
             model.windowloading.emit(WindowAsyncHandlerMsg::CheckCache(
                 model.syspkgtype.clone(),
