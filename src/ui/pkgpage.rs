@@ -1018,7 +1018,7 @@ impl Component for PkgModel {
 
         let scrnfactory = model.screenshots.widget();
         relm4::set_global_css(
-            b".scrnbox {
+            ".scrnbox {
             border-left-width: 0;
             border-right-width: 0;
             border-top-width: 1px;

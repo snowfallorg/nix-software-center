@@ -15,7 +15,13 @@ use crate::{
 use adw::prelude::*;
 use log::*;
 use nix_data::config::configfile::NixDataConfig;
-use relm4::{actions::*, factory::*, *};
+use relm4::{
+    self,
+    actions::{RelmAction, RelmActionGroup},
+    factory::FactoryVecDeque,
+    Component, ComponentController, ComponentParts, ComponentSender, Controller, MessageBroker,
+    RelmWidgetExt, WorkerController,
+};
 use spdx::Expression;
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use std::{
@@ -707,7 +713,7 @@ impl Component for AppModel {
                     warn!("Failed to update config");
                 }
                 let nixos = Path::new("/etc/NIXOS").exists();
-                if systemconfig.is_some() &&nixos {
+                if systemconfig.is_some() && nixos {
                     if self.syspkgtype == SystemPkgs::None {
                         if self.config.flake.is_some() {
                             self.syspkgtype = SystemPkgs::Flake;
@@ -1429,76 +1435,79 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                     let mut installedsystemitems = vec![];
                     let mut updatesystemitems = vec![];
                     for installedpkg in &self.installedsystempkgs {
-                        let (pname, version): (String, String) =
+                        let versionpname: sqlx::Result<(String, String)> =
                             sqlx::query_as("SELECT pname, version FROM pkgs where attribute = $1")
                                 .bind(installedpkg)
                                 .fetch_one(pool)
-                                .await
-                                .unwrap();
-                        let (description,): (String,) =
-                            sqlx::query_as("SELECT description FROM meta WHERE attribute = $1")
-                                .bind(installedpkg)
-                                .fetch_one(pool)
-                                .await
-                                .unwrap();
-                        let mut name = pname.to_string();
-                        let mut summary = if description.is_empty() {
-                            None
-                        } else {
-                            Some(description)
-                        };
-                        let mut icon = None;
-                        if let Some(data) = self.appdata.get(installedpkg) {
-                            if let Some(n) = &data.name {
-                                if let Some(n) = n.get("C") {
-                                    name = n.to_string();
+                                .await;
+                        if let Ok((version, pname)) = versionpname {
+                            let desc: sqlx::Result<(String,)> =
+                                sqlx::query_as("SELECT description FROM meta WHERE attribute = $1")
+                                    .bind(installedpkg)
+                                    .fetch_one(pool)
+                                    .await;
+                            if let Ok((description,)) = desc {
+                                let mut name = pname.to_string();
+                                let mut summary = if description.is_empty() {
+                                    None
+                                } else {
+                                    Some(description)
+                                };
+                                let mut icon = None;
+                                if let Some(data) = self.appdata.get(installedpkg) {
+                                    if let Some(n) = &data.name {
+                                        if let Some(n) = n.get("C") {
+                                            name = n.to_string();
+                                        }
+                                    }
+                                    if let Some(s) = &data.summary {
+                                        if let Some(s) = s.get("C") {
+                                            summary = Some(s.to_string());
+                                        }
+                                    }
+                                    if let Some(i) = &data.icon {
+                                        if let Some(i) = &i.cached {
+                                            icon = Some(i[0].name.clone());
+                                        }
+                                    }
                                 }
-                            }
-                            if let Some(s) = &data.summary {
-                                if let Some(s) = s.get("C") {
-                                    summary = Some(s.to_string());
-                                }
-                            }
-                            if let Some(i) = &data.icon {
-                                if let Some(i) = &i.cached {
-                                    icon = Some(i[0].name.clone());
-                                }
-                            }
-                        }
-                        // if let Some(item) = self.pkgitems.get(installedpkg) {
-                        installedsystemitems.push(InstalledItem {
-                            name: name.to_string(),
-                            pname: pname.to_string(),
-                            pkg: Some(installedpkg.clone()),
-                            summary: summary.clone(),
-                            icon: icon.clone(),
-                            pkgtype: InstallType::System,
-                            busy: self
-                                .installedpagebusy
-                                .contains(&(installedpkg.clone(), InstallType::System)),
-                        });
-                        if let Some(current) = &self.systemdb {
-                            if let Ok(currentpool) =
-                                &SqlitePool::connect(&format!("sqlite://{}", current)).await
-                            {
-                                let (currver,): (String,) =
-                                    sqlx::query_as("SELECT version FROM pkgs WHERE attribute = $1")
+                                // if let Some(item) = self.pkgitems.get(installedpkg) {
+                                installedsystemitems.push(InstalledItem {
+                                    name: name.to_string(),
+                                    pname: pname.to_string(),
+                                    pkg: Some(installedpkg.clone()),
+                                    summary: summary.clone(),
+                                    icon: icon.clone(),
+                                    pkgtype: InstallType::System,
+                                    busy: self
+                                        .installedpagebusy
+                                        .contains(&(installedpkg.clone(), InstallType::System)),
+                                });
+                                if let Some(current) = &self.systemdb {
+                                    if let Ok(currentpool) =
+                                        &SqlitePool::connect(&format!("sqlite://{}", current)).await
+                                    {
+                                        let (currver,): (String,) = sqlx::query_as(
+                                            "SELECT version FROM pkgs WHERE attribute = $1",
+                                        )
                                         .bind(installedpkg)
                                         .fetch_one(currentpool)
                                         .await
                                         .unwrap();
-                                debug!("SYSTEM: {} {} {}", installedpkg, currver, version);
-                                if version != currver {
-                                    updatesystemitems.push(UpdateItem {
-                                        name,
-                                        pname,
-                                        pkg: Some(installedpkg.clone()),
-                                        summary,
-                                        icon,
-                                        pkgtype: InstallType::System,
-                                        verfrom: Some(currver.clone()),
-                                        verto: Some(version.clone()),
-                                    })
+                                        debug!("SYSTEM: {} {} {}", installedpkg, currver, version);
+                                        if version != currver {
+                                            updatesystemitems.push(UpdateItem {
+                                                name,
+                                                pname,
+                                                pkg: Some(installedpkg.clone()),
+                                                summary,
+                                                icon,
+                                                pkgtype: InstallType::System,
+                                                verfrom: Some(currver.clone()),
+                                                verto: Some(version.clone()),
+                                            })
+                                        }
+                                    }
                                 }
                             }
                         }

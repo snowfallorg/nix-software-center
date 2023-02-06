@@ -5,19 +5,19 @@ edition = "2021"
 default-run = "nix-software-center"
 
 [dependencies]
-relm4 = { version = "0.5.0-beta.5", features = ["libadwaita", "macros"]  }
-relm4-components = { package = "relm4-components", version = "0.5.0-beta.5"}
+relm4 = { version = "0.5.0-rc.2", features = ["libadwaita", "macros"]  }
+relm4-components = { package = "relm4-components", version = "0.5.0-rc.2"}
 adw = { package = "libadwaita", version = "0.2", features = ["v1_2", "gtk_v4_6"] }
 gtk = { package = "gtk4", version = "0.5", features = ["v4_6"] }
 sourceview5 = { version = "0.5", features = ["v5_4"] }
-tokio = { version = "1.21", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
-tracker = "0.1"
+tokio = { version = "1.25", features = ["rt", "macros", "time", "rt-multi-thread", "sync", "process"] }
+tracker = "0.2"
 
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 
-nix-editor = "0.3.0-beta.1"
+nix-editor = "0.3.0"
 nix-data = { git = "https://github.com/snowflakelinux/nix-data" }
 
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "sqlite" ] }
@@ -26,12 +26,12 @@ html2pango = "0.5"
 log = "0.4"
 pretty_env_logger = "0.4"
 flate2 = "1.0"
-quick-xml = { version = "0.25", features = ["serialize"] }
+quick-xml = { version = "0.27", features = ["serialize"] }
 rand = "0.8"
 reqwest = { version = "0.11", features = ["blocking"] }
-sha256 = "1.0"
+sha256 = "1.1"
 image = "0.24"
-spdx = "0.9"
+spdx = "0.10"
 
 anyhow = "1.0"
 
