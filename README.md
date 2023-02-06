@@ -25,6 +25,24 @@ A graphical app store for Nix built with [libadwaita](https://gitlab.gnome.org/G
 - Search for packages
 - Launch applications without installing via `nix-shell` and `nix run`
 
+## NixOS Flakes Installation
+`flake.nix`
+```nix
+{
+  inputs = {
+    # other inputs
+    nix-software-center.url = "github:vlinkz/nix-software-center";
+# rest of flake.nix
+```
+
+`configuration.nix`
+```
+environment.systemPackages = with pkgs; [
+    inputs.nix-software-center.packages.${system}.nix-software-center
+    # rest of your packages
+];
+```
+
 ## NixOS Installation
 
 Head of `configuration.nix`
@@ -35,8 +53,8 @@ let
   nix-software-center = (import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
-    rev = "0.1.0";
-    sha256 = "d4LAIaiCU91LAXfgPCWOUr2JBkHj6n0JQ25EqRIBtBM=";
+    rev = "0.1.1";
+    sha256 = "0frigabszyfkphfbsniaa1d546zm8a2gx0cqvk2fr2qfa71kd41n";
   })) {};
 in
 ```
@@ -49,7 +67,8 @@ with pkgs; [
   # rest of your packages
 ];
 ```
-For any other method of installation, when rebuilding you will be prompted to authenticate twice in a row by `pkexec`
+
+For any other method of installation, when rebuilding you might be prompted to authenticate twice in a row by `pkexec`
 
 ## 'nix profile' installation
 ```bash
