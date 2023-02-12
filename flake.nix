@@ -20,12 +20,11 @@
       in
       rec
       {
-        packages.${name} = pkgs.callPackage ./default.nix {
-          inherit (inputs);
-        };
+        packages.${name} = pkgs.callPackage ./default.nix { };
 
         # `nix build`
-        defaultPackage = packages.${name};
+        defaultPackage = packages.${name}; # legacy
+        packages.default = packages.${name};
 
         # `nix run`
         apps.${name} = utils.lib.mkApp {
