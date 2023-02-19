@@ -335,7 +335,7 @@ impl Component for AppModel {
                                                 set_selection_mode: gtk::SelectionMode::None,
                                                 set_homogeneous: true,
                                                 set_max_children_per_line: 3,
-                                                set_min_children_per_line: 2,
+                                                set_min_children_per_line: 1,
                                                 set_column_spacing: 14,
                                                 set_row_spacing: 14,
                                             },

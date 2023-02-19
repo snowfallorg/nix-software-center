@@ -199,6 +199,7 @@ impl Component for PkgModel {
                 },
                 #[wrap(Some)]
                 set_title_widget = &gtk::Label {
+                    set_ellipsize: pango::EllipsizeMode::End,
                     #[watch]
                     set_label: &model.name
                 },
@@ -263,32 +264,44 @@ impl Component for PkgModel {
                                     set_pixel_size: 128,
                                 }
                             },
-                            gtk::Box {
+                            gtk::FlowBox {
                                 set_halign: gtk::Align::Fill,
+                                set_orientation: gtk::Orientation::Horizontal,
+                                set_min_children_per_line: 1,
+                                set_max_children_per_line: 2,
+                                set_selection_mode: gtk::SelectionMode::None,
                                 // Details
-                                gtk::Box {
-                                    set_halign: gtk::Align::Fill,
-                                    set_valign: gtk::Align::Center,
-                                    set_hexpand: true,
-                                    set_orientation: gtk::Orientation::Vertical,
-                                    set_spacing: 6,
-                                    gtk::Label {
-                                        add_css_class: "title-1",
-                                        set_halign: gtk::Align::Start,
-                                        #[watch]
-                                        set_label: &model.name,
-                                    },
-                                    gtk::Label {
-                                        add_css_class: "dim-label",
-                                        add_css_class: "heading",
-                                        set_halign: gtk::Align::Start,
-                                        #[watch]
-                                        set_label: &model.pkg,
+                                append = &gtk::FlowBoxChild {
+                                    gtk::Box {
+                                        set_halign: gtk::Align::Fill,
+                                        set_valign: gtk::Align::Center,
+                                        set_hexpand: true,
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 6,
+                                        gtk::Label {
+                                            add_css_class: "title-1",
+                                            set_halign: gtk::Align::Start,
+                                            set_wrap: true,
+                                            set_wrap_mode: pango::WrapMode::WordChar,
+                                            set_natural_wrap_mode: gtk::NaturalWrapMode::Word,
+                                            #[watch]
+                                            set_label: &model.name,
+                                        },
+                                        gtk::Label {
+                                            add_css_class: "dim-label",
+                                            add_css_class: "heading",
+                                            set_halign: gtk::Align::Start,
+                                            set_wrap: true,
+                                            set_wrap_mode: pango::WrapMode::WordChar,
+                                            set_natural_wrap_mode: gtk::NaturalWrapMode::Word,
+                                            #[watch]
+                                            set_label: &model.pkg,
+                                        },
                                     },
                                 },
+
                                 // Install options
-                                adw::Bin {
-                                    set_width_request: 150,
+                                append = &gtk::FlowBoxChild {
                                     set_halign: gtk::Align::End,
                                     gtk::Box {
                                         set_halign: gtk::Align::End,
@@ -296,6 +309,7 @@ impl Component for PkgModel {
                                         match model.installtype {
                                             InstallType::User => {
                                                 gtk::Box {
+                                                    #[name(userinstallstack)]
                                                     if model.workqueue.iter().any(|x| x.pkg == model.pkg && x.pkgtype == InstallType::User) /*model.installinguserpkgs.contains(&model.pkg)*/ {
                                                         gtk::Box {
                                                             gtk::Spinner {
@@ -399,6 +413,7 @@ impl Component for PkgModel {
                                             }
                                             InstallType::System => {
                                                 gtk::Box {
+                                                    #[name(systeminstallstack)]
                                                     if model.workqueue.iter().any(|x| x.pkg == model.pkg && x.pkgtype == InstallType::System) {
                                                         gtk::Box {
                                                             gtk::Spinner {
@@ -1026,6 +1041,8 @@ impl Component for PkgModel {
         }",
         );
         let widgets = view_output!();
+        widgets.userinstallstack.set_hhomogeneous(false);
+        widgets.systeminstallstack.set_hhomogeneous(false);
 
         let group = RelmActionGroup::<ModeActionGroup>::new();
         let nixenv: RelmAction<NixEnvAction> = {
