@@ -1443,7 +1443,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                 .bind(installedpkg)
                                 .fetch_one(pool)
                                 .await;
-                        if let Ok((version, pname)) = versionpname {
+                        if let Ok((pname, version)) = versionpname {
                             let desc: sqlx::Result<(String,)> =
                                 sqlx::query_as("SELECT description FROM meta WHERE attribute = $1")
                                     .bind(installedpkg)
@@ -1474,7 +1474,6 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                                         }
                                     }
                                 }
-                                // if let Some(item) = self.pkgitems.get(installedpkg) {
                                 installedsystemitems.push(InstalledItem {
                                     name: name.to_string(),
                                     pname: pname.to_string(),
