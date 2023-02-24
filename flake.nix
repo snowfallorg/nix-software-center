@@ -16,22 +16,15 @@
           rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
           hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
         };
-        name = "nix-software-center";
       in
       rec
       {
-        packages.${name} = pkgs.callPackage ./default.nix { };
-
-        # `nix build`
-        defaultPackage = packages.${name}; # legacy
-        packages.default = packages.${name};
-
-        # `nix run`
-        apps.${name} = utils.lib.mkApp {
-          inherit name;
-          drv = packages.${name};
+        packages = let
+          nix-software-center = pkgs.callPackage ./default.nix {};
+        in {
+          inherit nix-software-center;
+          default = nix-software-center;
         };
-        defaultApp = apps.${name};
 
         checks = self.packages.${system};
         hydraJobs = self.packages.${system};
