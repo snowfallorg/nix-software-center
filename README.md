@@ -47,16 +47,33 @@ environment.systemPackages = with pkgs; [
 
 Head of `configuration.nix`
 
+if you are on unstable channel or any version after 22.11:
 ```nix
 { config, pkgs, lib, ... }:
 let
-  nix-software-center = (import (pkgs.fetchFromGitHub {
+  nix-software-center = import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
     rev = "0.1.1";
     sha256 = "0frigabszyfkphfbsniaa1d546zm8a2gx0cqvk2fr2qfa71kd41n";
-  })) {};
+  }) {};
 in
+```
+if you are on 22.11:
+```nix
+{ config, pkgs, lib, ... }:
+let
+  unstable = import (builtins.fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
+  }) {config = config.nixpkgs.config;};
+  nix-software-center = import (pkgs.fetchFromGitHub {
+    owner = "vlinkz";
+    repo = "nix-software-center";
+    rev = "0.1.1";
+    sha256 = "0frigabszyfkphfbsniaa1d546zm8a2gx0cqvk2fr2qfa71kd41n";
+  }) {pkgs = unstable;};
+in
+
 ```
 Packages:
 
