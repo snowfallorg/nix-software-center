@@ -3,61 +3,53 @@ use relm4::*;
 
 use crate::config;
 
-use super::window::AppMsg;
-
 #[derive(Debug)]
-pub struct AboutPageModel {
-    hidden: bool,
-}
+pub struct AboutPageModel {}
 
 #[derive(Debug)]
 pub enum AboutPageMsg {
     Show,
+    Hide,
 }
 
-#[relm4::component(pub)]
+pub struct Widgets {
+    parent_window: gtk::Window,
+}
+
 impl SimpleComponent for AboutPageModel {
     type Init = gtk::Window;
-    type Input = AboutPageMsg;
-    type Output = AppMsg;
+    type Widgets = Widgets;
+    type Input = ();
+    type Output = ();
+    type Root = ();
 
-    view! {
-        adw::AboutWindow {
-            #[watch]
-            set_visible: !model.hidden,
-            set_transient_for: Some(&parent_window),
-            set_modal: true,
-            set_application_name: "Nix Software Center",
-            set_application_icon: config::APP_ID,
-            set_developer_name: "Victor Fuentes",
-            set_version: config::VERSION,
-            set_issue_url: "https://github.com/vlinkz/nix-software-center/issues",
-            set_license_type: gtk::License::Gpl30,
-            set_website: "https://github.com/vlinkz/nix-software-center",
-            set_developers: &["Victor Fuentes https://github.com/vlinkz"],
-        }
-    }
+    fn init_root() -> Self::Root {}
 
     fn init(
         parent_window: Self::Init,
-        root: &Self::Root,
+        _root: &Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = AboutPageModel {
-            hidden: true,
-        };
+        let model = Self {};
 
-        let widgets = view_output!();
+        let widgets = Widgets { parent_window };
 
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, _sender: ComponentSender<Self>) {
-        match msg {
-            AboutPageMsg::Show => {
-                self.hidden = false;
-            }
-        }
+    fn update_view(&self, dialog: &mut Self::Widgets, _sender: ComponentSender<Self>) {
+        let dialog = adw::AboutWindow::builder()
+            .application_icon(config::APP_ID)
+            .application_name("Nix Software Center")
+            .developer_name("Victor Fuentes")
+            .developers(vec!["Victor Fuentes https://github.com/vlinkz".into()])
+            .issue_url("https://github.com/vlinkz/nix-software-center/issues")
+            .license_type(gtk::License::Gpl30)
+            .modal(true)
+            .transient_for(&dialog.parent_window)
+            .version(config::VERSION)
+            .website("https://github.com/vlinkz/nix-software-center")
+            .build();
+        dialog.present();
     }
-
 }

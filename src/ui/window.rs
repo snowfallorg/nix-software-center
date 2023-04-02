@@ -119,6 +119,10 @@ pub struct AppModel {
     vschild: String,
     showvsbar: bool,
     #[tracker::no_eq]
+    aboutpage: Controller<AboutPageModel>,
+    #[tracker::no_eq]
+    preferencespage: Controller<PreferencesPageModel>,
+    #[tracker::no_eq]
     installedpage: Controller<InstalledPageModel>,
     #[tracker::no_eq]
     updatepage: Controller<UpdatePageModel>,
@@ -161,8 +165,6 @@ pub enum AppMsg {
     SetVsBar(bool),
     SetVsChild(String),
     Search(String),
-    OpenAboutPage,
-    OpenPreferencesPage,
     AddInstalledToWorkQueue(WorkPkg),
     RemoveInstalledBusy(WorkPkg),
     OpenCategoryPage(PkgCategory),
@@ -523,8 +525,14 @@ impl Component for AppModel {
             .forward(sender.input_sender(), identity);
         let viewstack = adw::ViewStack::new();
         let welcomepage = WelcomeModel::builder()
-                .launch(root.clone().upcast())
-                .forward(sender.input_sender(), identity);
+            .launch(root.clone().upcast())
+            .forward(sender.input_sender(), identity);
+        let aboutpage = AboutPageModel::builder()
+            .launch(root.clone().upcast())
+            .detach();
+        let preferencespage = PreferencesPageModel::builder()
+            .launch(root.clone().upcast())
+            .forward(sender.input_sender(), identity);
 
         let model = AppModel {
             mainwindow: root.clone(),
@@ -559,6 +567,8 @@ impl Component for AppModel {
             installedpagebusy: vec![],
             rebuild,
             welcomepage,
+            aboutpage,
+            preferencespage,
             online,
             tracker: 0,
         };
@@ -588,16 +598,19 @@ impl Component for AppModel {
 
         let group = RelmActionGroup::<MenuActionGroup>::new();
         let aboutpage: RelmAction<AboutAction> = {
-            let sender = sender.clone();
+            let sender = model.aboutpage.sender().clone();
             RelmAction::new_stateless(move |_| {
-                sender.input(AppMsg::OpenAboutPage);
+                sender.send(()).unwrap();
             })
         };
 
         let prefernecespage: RelmAction<PreferencesAction> = {
-            let sender = sender;
+            let sender = model.preferencespage.sender().clone();
+            let preferencespage = model.preferencespage.widget().clone();
+            let config = model.config.clone();
             RelmAction::new_stateless(move |_| {
-                sender.input(AppMsg::OpenPreferencesPage);
+                sender.send(PreferencesPageMsg::Show(config.clone())).unwrap();
+                preferencespage.present();
             })
         };
 
@@ -1717,18 +1730,6 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
                         }
                     }).drop_on_shutdown()
                 })
-            }
-            AppMsg::OpenAboutPage => {
-                let aboutpage = AboutPageModel::builder()
-                    .launch(self.mainwindow.clone().upcast())
-                    .forward(sender.input_sender(), identity);
-                aboutpage.emit(AboutPageMsg::Show);
-            }
-            AppMsg::OpenPreferencesPage => {
-                let preferencespage = PreferencesPageModel::builder()
-                    .launch(self.mainwindow.clone().upcast())
-                    .forward(sender.input_sender(), identity);
-                preferencespage.emit(PreferencesPageMsg::Show(self.config.clone()));
             }
             AppMsg::AddInstalledToWorkQueue(work) => {
                 let p = match work.pkgtype {

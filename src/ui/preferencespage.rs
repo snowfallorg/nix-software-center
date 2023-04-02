@@ -8,7 +8,6 @@ use relm4_components::open_dialog::*;
 #[tracker::track]
 #[derive(Debug)]
 pub struct PreferencesPageModel {
-    hidden: bool,
     configpath: Option<PathBuf>,
     flake: Option<PathBuf>,
     flakearg: Option<String>,
@@ -39,8 +38,7 @@ impl SimpleComponent for PreferencesPageModel {
 
     view! {
         adw::PreferencesWindow {
-            #[watch]
-            set_visible: !model.hidden,
+			set_hide_on_close: true,
             set_transient_for: Some(&parent_window),
             set_modal: true,
             set_search_enabled: false,
@@ -153,6 +151,7 @@ impl SimpleComponent for PreferencesPageModel {
                         #[watch]
                         set_visible: model.flake.is_some(),
                         set_title: "Flake arguments (--flake path/to/flake.nix#<THIS ENTRY>)",
+                        set_use_markup: false,
                         connect_changed[sender] => move |x| {
                             sender.input(PreferencesPageMsg::SetFlakeArg({
                                 let text = x.text().to_string();
@@ -192,7 +191,6 @@ impl SimpleComponent for PreferencesPageModel {
                 OpenDialogResponse::Cancel => PreferencesPageMsg::Ignore,
             });
         let model = PreferencesPageModel {
-            hidden: true,
             configpath: None,
             flake: None,
             flakearg: None,
@@ -213,7 +211,6 @@ impl SimpleComponent for PreferencesPageModel {
                 self.configpath = config.systemconfig.as_ref().map(PathBuf::from);
                 self.set_flake(config.flake.as_ref().map(PathBuf::from));
                 self.set_flakearg(config.flakearg);
-                self.hidden = false;
             }
             PreferencesPageMsg::Open => self.open_dialog.emit(OpenDialogMsg::Open),
             PreferencesPageMsg::OpenFlake => self.flake_file_dialog.emit(OpenDialogMsg::Open),
