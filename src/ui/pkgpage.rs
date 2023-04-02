@@ -43,6 +43,7 @@ pub struct PkgModel {
     summary: Option<String>,
     description: Option<String>,
     icon: Option<String>,
+    version: Option<String>,
 
     homepage: Option<String>,
     licenses: Vec<License>,
@@ -126,6 +127,7 @@ pub struct PkgInitModel {
     pub pname: String,
     pub summary: Option<String>,
     pub description: Option<String>,
+    pub version: Option<String>,
     pub icon: Option<String>,
     pub screenshots: Vec<String>,
     pub homepage: Option<String>,
@@ -296,6 +298,15 @@ impl Component for PkgModel {
                                             set_natural_wrap_mode: gtk::NaturalWrapMode::Word,
                                             #[watch]
                                             set_label: &model.pkg,
+                                        },
+                                        gtk::Label {
+                                            add_css_class: "dim-label",
+                                            set_halign: gtk::Align::Start,
+                                            set_wrap: true,
+                                            set_wrap_mode: pango::WrapMode::WordChar,
+                                            set_natural_wrap_mode: gtk::NaturalWrapMode::Word,
+                                            #[watch]
+                                            set_label: &model.version.clone().unwrap_or_else(|| "Unknown".to_string()),
                                         },
                                     },
                                 },
@@ -1011,6 +1022,7 @@ impl Component for PkgModel {
             pname: String::default(),
             summary: None,
             description: None,
+            version: None,
             icon: None,
             homepage: None,
             licenses: vec![],
@@ -1127,6 +1139,7 @@ impl Component for PkgModel {
                 self.set_pkg(pkgmodel.pkg);
                 self.set_name(pkgmodel.name);
                 self.set_icon(pkgmodel.icon);
+                self.set_version(pkgmodel.version);
                 self.set_platforms(pkgmodel.platforms);
                 self.set_maintainers(pkgmodel.maintainers);
                 self.set_licenses(pkgmodel.licenses);

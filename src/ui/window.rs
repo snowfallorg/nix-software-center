@@ -902,11 +902,12 @@ impl Component for AppModel {
                             String,
                             String,
                             String,
+                            String,
                         ),
                         _,
                     > = sqlx::query_as(
                         r#"
-SELECT pname, system, description, longdescription, homepage, license, platforms, maintainers
+SELECT pname, version, system, description, longdescription, homepage, license, platforms, maintainers
 FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = $1
                     "#,
                     )
@@ -916,6 +917,7 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
 
                     if let Ok((
                         pname,
+                        version,
                         system,
                         description,
                         longdescription,
@@ -1154,6 +1156,11 @@ FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE pkgs.attribute = 
 
                         let out = PkgInitModel {
                             name,
+                            version: if version.is_empty() {
+                                None
+                            } else {
+                                Some(version.to_string())
+                            },
                             pname,
                             summary,
                             description,
