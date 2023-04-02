@@ -13,14 +13,15 @@ let
 in
 pkgs.stdenv.mkDerivation rec {
   pname = "nix-software-center";
-  version = "0.1.1";
+  version = "0.1.2";
 
   src = [ ./. ];
 
-  cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
-    inherit src;
-    name = "${pname}-${version}";
-    hash = "sha256-zNE50V8GEhksSm30qZ/cnqSRsKxNJ13s9zUpBDgXJdo=";
+  cargoDeps = pkgs.rustPlatform.importCargoLock {
+    lockFile = ./Cargo.lock;
+    outputHashes = {
+      "nix-data-0.0.2" = "sha256-yts2bkp9cn4SuYPYjgTNbOwTtpFxps3TU8zmS/ftN/Q=";
+    };
   };
 
   nativeBuildInputs = with pkgs; [
