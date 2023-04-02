@@ -47,7 +47,7 @@ impl Worker for WindowAsyncHandler {
                             Ok(p) => p,
                             Err(e) => {
                                 error!("Error getting NixOS pkgs: {}", e);
-                                sender.output(AppMsg::LoadError(
+                                let _ = sender.output(AppMsg::LoadError(
                                     String::from("Error retrieving NixOS package database"),
                                     e.to_string(),
                                 ));
@@ -59,7 +59,7 @@ impl Worker for WindowAsyncHandler {
                             Ok(p) => p,
                             Err(e) => {
                                 error!("Error getting nixpkgs: {}", e);
-                                sender.output(AppMsg::LoadError(
+                                let _ = sender.output(AppMsg::LoadError(
                                     String::from("Error retrieving nixpkgs package database"),
                                     e.to_string(),
                                 ));
@@ -68,9 +68,17 @@ impl Worker for WindowAsyncHandler {
                         }
                     };
 
-                    let pool = SqlitePool::connect(&format!("sqlite://{}", pkgdb))
-                        .await
-                        .unwrap();
+                    let pool = match SqlitePool::connect(&format!("sqlite://{}", pkgdb)).await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            error!("Error connecting to pkgdb: {}", e);
+                            let _ = sender.output(AppMsg::LoadError(
+                                String::from("Error connecting to package database"),
+                                e.to_string(),
+                            ));
+                            return;
+                        }
+                    };
 
                     let nixpkgsdb = match userpkgs {
                         UserPkgs::Profile => {
@@ -101,19 +109,49 @@ impl Worker for WindowAsyncHandler {
                         }
                     };
 
-                    let pkglist: Vec<(String,)> = sqlx::query_as("SELECT attribute FROM pkgs")
+                    let pkglist: Vec<(String,)> = match sqlx::query_as("SELECT attribute FROM pkgs")
                         .fetch_all(&pool)
                         .await
-                        .unwrap();
+                    {
+                        Ok(x) => x,
+                        Err(e) => {
+                            error!("Error getting pkglist: {}", e);
+                            let _ = sender.output(AppMsg::LoadError(
+                                String::from("Malformed package database"),
+                                e.to_string(),
+                            ));
+                            return;
+                        }
+                    };
+
                     let pkglist = pkglist.iter().map(|x| x.0.clone()).collect::<Vec<String>>();
 
                     let posvec: Vec<(String, String)> =
-                        sqlx::query_as("SELECT attribute, position FROM meta")
+                        match sqlx::query_as("SELECT attribute, position FROM meta")
                             .fetch_all(&pool)
                             .await
-                            .unwrap();
-                    let appdata = appsteamdata().unwrap();
-
+                        {
+                            Ok(x) => x,
+                            Err(e) => {
+                                error!("Error getting package metadata: {}", e);
+                                let _ = sender.output(AppMsg::LoadError(
+                                    String::from("Malformed package database"),
+                                    e.to_string(),
+                                ));
+                                return;
+                            }
+                        };
+                    let appdata = match appsteamdata() {
+                        Ok(x) => x,
+                        Err(e) => {
+                            error!("Error getting appdata: {}", e);
+                            let _ = sender.output(AppMsg::LoadError(
+                                String::from("Error retrieving appstream data"),
+                                e.to_string(),
+                            ));
+                            return;
+                        }
+                    };
                     let desktopenv = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
 
                     let mut recpkgs = pkglist
