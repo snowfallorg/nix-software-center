@@ -54,8 +54,8 @@ let
   nix-software-center = import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
-    rev = "0.1.1";
-    sha256 = "0frigabszyfkphfbsniaa1d546zm8a2gx0cqvk2fr2qfa71kd41n";
+    rev = "0.1.2";
+    sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
   }) {};
 in
 ```
@@ -69,8 +69,8 @@ let
   nix-software-center = import (pkgs.fetchFromGitHub {
     owner = "vlinkz";
     repo = "nix-software-center";
-    rev = "0.1.1";
-    sha256 = "0frigabszyfkphfbsniaa1d546zm8a2gx0cqvk2fr2qfa71kd41n";
+    rev = "0.1.2";
+    sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
   }) {pkgs = unstable;};
 in
 
