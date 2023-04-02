@@ -307,6 +307,8 @@ async fn runcmd(
         NscCmd::Channel => tokio::process::Command::new("pkexec")
             .arg(&exe)
             .arg("channel")
+            .arg("--output")
+            .arg(&systemconfig)
             .stderr(Stdio::piped())
             .spawn()?,
         NscCmd::All => match syspkgs {
