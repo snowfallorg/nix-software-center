@@ -36,8 +36,8 @@ pkgs.stdenv.mkDerivation rec {
     wrapGAppsHook4
   ] ++ (with pkgs.rustPlatform; [
     cargoSetupHook
-    rust.cargo
-    rust.rustc
+    cargo
+    rustc
   ]);
 
   buildInputs = with pkgs; [
