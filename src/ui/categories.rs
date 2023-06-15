@@ -93,7 +93,7 @@ impl FactoryComponent for PkgGroup {
         }
     }
 
-    fn output_to_parent_input(output: Self::Output) -> Option<AppMsg> {
+    fn forward_to_parent(output: Self::Output) -> Option<AppMsg> {
         Some(match output {
             PkgCategoryMsg::Open(x) => AppMsg::OpenCategoryPage(x),
         })

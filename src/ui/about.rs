@@ -42,7 +42,7 @@ impl SimpleComponent for AboutPageModel {
             .application_icon(config::APP_ID)
             .application_name("Nix Software Center")
             .developer_name("Victor Fuentes")
-            .developers(vec!["Victor Fuentes https://github.com/vlinkz".into()])
+            .developers(vec!["Victor Fuentes https://github.com/vlinkz"])
             .issue_url("https://github.com/vlinkz/nix-software-center/issues")
             .license_type(gtk::License::Gpl30)
             .modal(true)

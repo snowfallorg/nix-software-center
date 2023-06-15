@@ -175,7 +175,7 @@ impl FactoryComponent for CategoryTile {
         }
     }
 
-    fn output_to_parent_input(output: Self::Output) -> Option<CategoryPageMsg> {
+    fn forward_to_parent(output: Self::Output) -> Option<CategoryPageMsg> {
         Some(match output {
             CategoryTileMsg::Open(x) => CategoryPageMsg::OpenPkg(x),
         })

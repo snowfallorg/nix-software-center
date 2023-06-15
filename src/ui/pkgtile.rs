@@ -170,7 +170,7 @@ impl FactoryComponent for PkgTile {
         }
     }
 
-    fn output_to_parent_input(output: Self::Output) -> Option<AppMsg> {
+    fn forward_to_parent(output: Self::Output) -> Option<AppMsg> {
         Some(match output {
             PkgTileMsg::Open(x) => AppMsg::OpenPkg(x),
         })
