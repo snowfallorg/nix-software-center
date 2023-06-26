@@ -48,7 +48,7 @@ use super::{
     windowloading::{LoadErrorModel, LoadErrorMsg, WindowAsyncHandler, WindowAsyncHandlerMsg},
 };
 
-pub static REBUILD_BROKER: MessageBroker<RebuildModel> = MessageBroker::new();
+pub static REBUILD_BROKER: MessageBroker<RebuildMsg> = MessageBroker::new();
 
 #[derive(PartialEq)]
 enum Page {
@@ -596,7 +596,7 @@ impl Component for AppModel {
 
         let widgets = view_output!();
 
-        let group = RelmActionGroup::<MenuActionGroup>::new();
+        let mut group = RelmActionGroup::<MenuActionGroup>::new();
         let aboutpage: RelmAction<AboutAction> = {
             let sender = model.aboutpage.sender().clone();
             RelmAction::new_stateless(move |_| {
@@ -614,8 +614,8 @@ impl Component for AppModel {
             })
         };
 
-        group.add_action(&aboutpage);
-        group.add_action(&prefernecespage);
+        group.add_action(aboutpage);
+        group.add_action(prefernecespage);
         let actions = group.into_action_group();
         widgets
             .main_window

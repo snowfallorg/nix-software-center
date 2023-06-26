@@ -1056,7 +1056,7 @@ impl Component for PkgModel {
         widgets.userinstallstack.set_hhomogeneous(false);
         widgets.systeminstallstack.set_hhomogeneous(false);
 
-        let group = RelmActionGroup::<ModeActionGroup>::new();
+        let mut group = RelmActionGroup::<ModeActionGroup>::new();
         let nixenv: RelmAction<NixEnvAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
@@ -1078,16 +1078,16 @@ impl Component for PkgModel {
             })
         };
 
-        group.add_action(&nixenv);
-        group.add_action(&nixprofile);
-        group.add_action(&nixsystem);
+        group.add_action(nixenv);
+        group.add_action(nixprofile);
+        group.add_action(nixsystem);
 
         let actions = group.into_action_group();
         widgets
             .pkg_window
             .insert_action_group("mode", Some(&actions));
 
-        let rungroup = RelmActionGroup::<RunActionGroup>::new();
+        let mut rungroup = RelmActionGroup::<RunActionGroup>::new();
         let launchaction: RelmAction<LaunchAction> = {
             let sender = sender.clone();
             RelmAction::new_stateless(move |_| {
@@ -1102,8 +1102,8 @@ impl Component for PkgModel {
             })
         };
 
-        rungroup.add_action(&launchaction);
-        rungroup.add_action(&termaction);
+        rungroup.add_action(launchaction);
+        rungroup.add_action(termaction);
 
         let runactions = rungroup.into_action_group();
         widgets

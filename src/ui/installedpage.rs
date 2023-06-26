@@ -362,7 +362,7 @@ impl FactoryComponent for InstalledItemModel {
         }
     }
 
-    fn output_to_parent_input(output: Self::Output) -> Option<InstalledPageMsg> {
+    fn forward_to_parent(output: Self::Output) -> Option<InstalledPageMsg> {
         Some(match output {
             InstalledItemMsg::Delete(item) => InstalledPageMsg::Remove(item),
         })

@@ -1,13 +1,13 @@
 use crate::{APPINFO, ui::unavailabledialog::UnavailableDialogModel, parse::util};
 
-use super::{pkgpage::InstallType, window::*, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}, rebuild::RebuildMsg};
+use super::{pkgpage::InstallType, window::*, updateworker::{UpdateAsyncHandler, UpdateAsyncHandlerMsg, UpdateAsyncHandlerInit}, rebuild::RebuildMsg, unavailabledialog::UnavailableDialogMsg};
 use adw::prelude::*;
 use nix_data::config::configfile::NixDataConfig;
 use relm4::{factory::*, gtk::pango, *};
 use std::{path::Path, convert::identity, collections::HashMap};
 use log::*;
 
-pub static UNAVAILABLE_BROKER: MessageBroker<UnavailableDialogModel> = MessageBroker::new();
+pub static UNAVAILABLE_BROKER: MessageBroker<UnavailableDialogMsg> = MessageBroker::new();
 
 #[tracker::track]
 #[derive(Debug)]
