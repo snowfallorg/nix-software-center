@@ -28,7 +28,7 @@ pretty_env_logger = "0.5"
 flate2 = "1.0"
 quick-xml = { version = "0.29", features = ["serialize"] }
 rand = "0.8"
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.11", features = ["blocking", "socks"] }
 sha256 = "1.1"
 image = "0.24"
 spdx = "0.10"
