@@ -61,13 +61,14 @@
       })
     // {
       overlays = {
-        default = final: prev: {
+        pkgs = final: prev: {
           nix-software-center = self.packages.${final.system}.nix-software-center;
         };
-        pkgs = final: prev: {
+        nixSoftwareCenterPkgs = final: prev: {
           nixSoftwareCenterPkgs = self.packages.${prev.system};
         };
+        default = self.overlays.nixSoftwareCenterPkgs;
       };
-      overlay = self.overlays.default;
+      overlay = self.overlays.pkgs;
     };
 }
