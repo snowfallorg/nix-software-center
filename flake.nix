@@ -4,7 +4,7 @@
     utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, utils }:
+  outputs = { self, nixpkgs, utils, ... }:
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -58,5 +58,17 @@
           ];
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
         };
-      });
+      })
+    // {
+      overlays = {
+        pkgs = final: prev: {
+          nix-software-center = self.packages.${final.system}.nix-software-center;
+        };
+        nixSoftwareCenterPkgs = final: prev: {
+          nixSoftwareCenterPkgs = self.packages.${prev.system};
+        };
+        default = self.overlays.nixSoftwareCenterPkgs;
+      };
+      overlay = self.overlays.pkgs;
+    };
 }
