@@ -31,7 +31,7 @@ A graphical app store for Nix built with [libadwaita](https://gitlab.gnome.org/G
 {
   inputs = {
     # other inputs
-    nix-software-center.url = "github:vlinkz/nix-software-center";
+    nix-software-center.url = "github:snowfallorg/nix-software-center";
 # rest of flake.nix
 ```
 
@@ -52,7 +52,7 @@ if you are on unstable channel or any version after 22.11:
 { config, pkgs, lib, ... }:
 let
   nix-software-center = import (pkgs.fetchFromGitHub {
-    owner = "vlinkz";
+    owner = "snowfallorg";
     repo = "nix-software-center";
     rev = "0.1.2";
     sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
@@ -67,7 +67,7 @@ let
     url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
   }) {config = config.nixpkgs.config;};
   nix-software-center = import (pkgs.fetchFromGitHub {
-    owner = "vlinkz";
+    owner = "snowfallorg";
     repo = "nix-software-center";
     rev = "0.1.2";
     sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
@@ -89,24 +89,24 @@ For any other method of installation, when rebuilding you might be prompted to a
 
 ## 'nix profile' installation
 ```bash
-nix profile install github:vlinkz/nix-software-center
+nix profile install github:snowfallorg/nix-software-center
 ```
 
 ## 'nix-env' Installation
 
 ```bash
-git clone https://github.com/vlinkz/nix-software-center
+git clone https://github.com/snowfallorg/nix-software-center
 nix-env -f nix-software-center -i nix-software-center
 ```
 
 ## Single run on an flakes enabled system:
 ```bash
-nix run github:vlinkz/nix-software-center
+nix run github:snowfallorg/nix-software-center
 ```
 
 ## Single run on non-flakes enabled system:
 ```bash
-nix --extra-experimental-features "nix-command flakes" run github:vlinkz/nix-software-center
+nix --extra-experimental-features "nix-command flakes" run github:snowfallorg/nix-software-center
 ```
 
 ## Debugging
