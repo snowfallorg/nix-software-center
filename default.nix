@@ -60,6 +60,10 @@ pkgs.stdenv.mkDerivation rec {
   '';
 
   postInstall = ''
-    wrapProgram $out/bin/nix-software-center --prefix PATH : '${lib.makeBinPath [ pkgs.gnome-console pkgs.sqlite ]}'
+    wrapProgram $out/bin/nix-software-center --prefix PATH : '${lib.makeBinPath [
+      pkgs.gnome-console
+      pkgs.gtk3 # provides gtk-launch
+      pkgs.sqlite
+    ]}'
   '';
 }
