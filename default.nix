@@ -1,17 +1,14 @@
 { pkgs ? import <nixpkgs> { }
 , lib ? import <nixpkgs/lib>
-}:
-let
-  nixos-appstream-data = (import
-    (pkgs.fetchFromGitHub {
-      owner = "vlinkz";
-      repo = "nixos-appstream-data";
-      rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
-      hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
-    })
-    { set = "all"; stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; });
-in
-pkgs.stdenv.mkDerivation rec {
+, nixos-appstream-data ? (import
+  (pkgs.fetchFromGitHub {
+    owner = "vlinkz";
+    repo = "nixos-appstream-data";
+    rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
+    hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
+  })
+  { set = "all"; stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; })
+}: pkgs.stdenv.mkDerivation rec {
   pname = "nix-software-center";
   version = "0.1.2";
 

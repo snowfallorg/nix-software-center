@@ -2,25 +2,24 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
+    nixos-appstream-data = {
+      url = "github:korfuri/nixos-appstream-data/flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "utils";
+    };
   };
 
-  outputs = { self, nixpkgs, utils, ... }:
+  outputs = { self, nixpkgs, utils, nixos-appstream-data, ... }:
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
         };
-        nixos-appstream-data = pkgs.fetchFromGitHub {
-          owner = "vlinkz";
-          repo = "nixos-appstream-data";
-          rev = "66b3399e6d81017c10265611a151d1109ff1af1b";
-          hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
-        };
       in
       rec
       {
         packages = let
-          nix-software-center = pkgs.callPackage ./default.nix {};
+          nix-software-center = pkgs.callPackage ./default.nix { inherit (nixos-appstream-data.packages."${system}") nixos-appstream-data; };
         in {
           inherit nix-software-center;
           default = nix-software-center;
@@ -54,7 +53,7 @@
             polkit
             sqlite
             wrapGAppsHook4
-            nixos-appstream-data
+            nixos-appstream-data.packages."${system}".nixos-appstream-data
           ];
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
         };
