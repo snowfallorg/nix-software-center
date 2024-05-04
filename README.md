@@ -59,20 +59,6 @@ let
   }) {};
 in
 ```
-if you are on 22.11:
-```nix
-{ config, pkgs, lib, ... }:
-let
-  unstable = import (builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
-  }) {config = config.nixpkgs.config;};
-  nix-software-center = import (pkgs.fetchFromGitHub {
-    owner = "snowfallorg";
-    repo = "nix-software-center";
-    rev = "0.1.2";
-    sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
-  }) {pkgs = unstable;};
-in
 
 ```
 Packages:
