@@ -58,12 +58,9 @@ let
     sha256 = "xiqF1mP8wFubdsAQ1BmfjzCgOD3YZf7EGWl9i69FTls=";
   }) {};
 in
-```
 
-```
-Packages:
+...
 
-```nix
 environment.systemPackages =
 with pkgs; [
   nix-software-center
