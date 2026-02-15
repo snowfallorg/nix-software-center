@@ -46,7 +46,7 @@
     libxml2
     openssl
     wayland
-    gnome.adwaita-icon-theme
+    adwaita-icon-theme
     desktop-file-utils
     nixos-appstream-data
   ];
