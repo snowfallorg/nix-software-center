@@ -8,7 +8,7 @@
     hash = "sha256-oiEZD4sMpb2djxReg99GUo0RHWAehxSyQBbiz8Z4DJk=";
   })
   { set = "all"; stdenv = pkgs.stdenv; lib = pkgs.lib; pkgs = pkgs; })
-}: pkgs.stdenv.mkDerivation rec {
+}: pkgs.stdenv.mkDerivation {
   pname = "nix-software-center";
   version = "0.1.2";
 
