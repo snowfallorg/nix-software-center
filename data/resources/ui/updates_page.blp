@@ -1,0 +1,10 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscUpdatesPage: Adw.Bin {
+  child: Adw.StatusPage {
+    icon-name: "software-update-available-symbolic";
+    title: _("Updates");
+    description: _("Available package updates");
+  };
+}

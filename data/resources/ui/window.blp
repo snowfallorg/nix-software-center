@@ -1,0 +1,94 @@
+using Gtk 4.0;
+using Adw 1;
+
+menu primary_menu {
+  section {
+    item {
+      action: "app.preferences";
+      label: _("_Preferences");
+    }
+
+    item {
+      action: "win.show-help-overlay";
+      label: _("_Keyboard Shortcuts");
+    }
+
+    item {
+      action: "app.about";
+      label: _("_About Nix Software Center");
+    }
+  }
+}
+
+template $NscWindow: Adw.ApplicationWindow {
+  width-request: 360;
+  height-request: 294;
+
+  Adw.Breakpoint {
+    condition ("max-width: 550sp")
+
+    setters {
+      switcher_bar.visible: true;
+      header_switcher.visible: false;
+    }
+  }
+
+  content: Adw.NavigationView navigation_view {
+    Adw.NavigationPage {
+      title: _("Nix Software Center");
+      tag: "main";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar headerbar {
+          [title]
+          Adw.ViewSwitcher header_switcher {
+            stack: view_stack;
+            policy: wide;
+          }
+
+          [end]
+          MenuButton appmenu_button {
+            icon-name: "open-menu-symbolic";
+            menu-model: primary_menu;
+            primary: true;
+            tooltip-text: _("Main Menu");
+          }
+        }
+
+        content: Adw.ViewStack view_stack {
+          Adw.ViewStackPage {
+            name: "explore";
+            title: _("Explore");
+            icon-name: "explore-symbolic";
+
+            child: $NscExplorePage {};
+          }
+
+          Adw.ViewStackPage {
+            name: "installed";
+            title: _("Installed");
+            icon-name: "check-plain-symbolic";
+
+            child: $NscInstalledPage {};
+          }
+
+          Adw.ViewStackPage {
+            name: "updates";
+            title: _("Updates");
+            icon-name: "software-update-available-symbolic";
+
+            child: $NscUpdatesPage {};
+          }
+        };
+
+        [bottom]
+        Adw.ViewSwitcher switcher_bar {
+          stack: view_stack;
+          policy: wide;
+          visible: false;
+        }
+      };
+    }
+  };
+}

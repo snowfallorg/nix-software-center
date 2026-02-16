@@ -1,0 +1,28 @@
+use adw::subclass::prelude::*;
+use glib::subclass::InitializingObject;
+use gtk::{glib, CompositeTemplate};
+
+#[derive(Debug, Default, CompositeTemplate)]
+#[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/explore_page.ui")]
+pub struct ExplorePage {}
+
+#[glib::object_subclass]
+impl ObjectSubclass for ExplorePage {
+    const NAME: &'static str = "NscExplorePage";
+    type Type = super::ExplorePage;
+    type ParentType = adw::Bin;
+
+    fn class_init(klass: &mut Self::Class) {
+        klass.bind_template();
+    }
+
+    fn instance_init(obj: &InitializingObject<Self>) {
+        obj.init_template();
+    }
+}
+
+impl ObjectImpl for ExplorePage {}
+
+impl WidgetImpl for ExplorePage {}
+
+impl BinImpl for ExplorePage {}

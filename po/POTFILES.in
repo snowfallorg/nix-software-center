@@ -1,0 +1,6 @@
+data/org.snowflakeos.NixSoftwareCenter.desktop.in.in
+data/org.snowflakeos.NixSoftwareCenter.gschema.xml.in
+data/org.snowflakeos.NixSoftwareCenter.metainfo.xml.in.in
+data/resources/ui/shortcuts.ui
+data/resources/ui/window.ui
+src/application.rs

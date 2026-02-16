@@ -1,0 +1,10 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscExplorePage: Adw.Bin {
+  child: Adw.StatusPage {
+    icon-name: "explore-symbolic";
+    title: _("Explore");
+    description: _("Browse available packages");
+  };
+}

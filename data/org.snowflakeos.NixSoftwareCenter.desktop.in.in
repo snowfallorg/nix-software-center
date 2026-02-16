@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Nix Software Center
+# FIXME Set the project summary
+Comment=Write a GTK + Rust application
+Type=Application
+Exec=nix-software-center
+Terminal=false
+Categories=GNOME;GTK;Development;
+# Translators: Search terms to find this application. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+Keywords=Gnome;GTK;
+# Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+Icon=@icon@
+StartupNotify=true
+DBusActivatable=true

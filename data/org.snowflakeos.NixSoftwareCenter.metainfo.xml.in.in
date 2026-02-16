@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@app-id@</id>
+  <metadata_license>CC0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Nix Software Center</name>
+  <summary>A simple application to manage Nix packages.</summary>
+  <description>
+    <p>A simple software center to install and manage Nix packages, built with libadwaita and GTK4.</p>
+  </description>
+  <url type="homepage">https://github.com/snowfallorg/nix-software-center</url>
+  <url type="bugtracker">https://github.com/snowfallorg/nix-software-center/issues</url>
+  <url type="vcs-browser">https://github.com/snowfallorg/nix-software-center</url>
+  <content_rating type="oars-1.1" />
+  <developer id="org.snowflakeos">
+    <name translate="no">Victor Fuentes</name>
+  </developer>
+  <update_contact>vlinkz@snowflakeos.org</update_contact>
+  <translation type="gettext">@gettext-package@</translation>
+  <launchable type="desktop-id">@app-id@.desktop</launchable>
+</component>

@@ -1,0 +1,10 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscInstalledPage: Adw.Bin {
+  child: Adw.StatusPage {
+    icon-name: "check-plain-symbolic";
+    title: _("Installed");
+    description: _("Manage your installed packages");
+  };
+}

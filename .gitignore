@@ -1,0 +1,9 @@
+/target/
+/build/
+/_build/
+/builddir/
+*.ui.in~
+*.ui~
+/.vscode
+/result
+/.direnv

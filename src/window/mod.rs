@@ -1,0 +1,49 @@
+mod imp;
+
+use adw::prelude::*;
+use adw::subclass::prelude::*;
+use gtk::{gio, glib};
+
+use crate::application::NscApplication;
+
+glib::wrapper! {
+    pub struct NscWindow(ObjectSubclass<imp::NscWindow>)
+        @extends gtk::Widget, gtk::Window, gtk::ApplicationWindow, adw::ApplicationWindow,
+        @implements gio::ActionGroup, gio::ActionMap,
+                    gtk::Root, gtk::Native, gtk::ShortcutManager,
+                    gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+}
+
+impl NscWindow {
+    pub fn new(app: &NscApplication) -> Self {
+        glib::Object::builder().property("application", app).build()
+    }
+
+    fn save_window_size(&self) -> Result<(), glib::BoolError> {
+        let imp = self.imp();
+
+        let (width, height) = self.default_size();
+
+        imp.settings.set_int("window-width", width)?;
+        imp.settings.set_int("window-height", height)?;
+
+        imp.settings
+            .set_boolean("is-maximized", self.is_maximized())?;
+
+        Ok(())
+    }
+
+    fn load_window_size(&self) {
+        let imp = self.imp();
+
+        let width = imp.settings.int("window-width");
+        let height = imp.settings.int("window-height");
+        let is_maximized = imp.settings.boolean("is-maximized");
+
+        self.set_default_size(width, height);
+
+        if is_maximized {
+            self.maximize();
+        }
+    }
+}
