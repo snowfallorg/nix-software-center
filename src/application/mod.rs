@@ -86,7 +86,7 @@ impl NscApplication {
             sender
                 .send(result)
                 .await
-                .expect("The channel needs to be open.");
+                .expect("metadata channel must be open");
         });
 
         let app = self.clone();
@@ -96,6 +96,7 @@ impl NscApplication {
                     Ok(metadata) => {
                         info!("Metadata loaded successfully");
                         app.imp().metadata.replace(Some(metadata));
+                        app.try_populate_views();
                     }
                     Err(err) => {
                         warn!("Failed to load metadata: {}", err);
@@ -125,19 +126,46 @@ impl NscApplication {
                     let count = pool.components().map(|cbox| cbox.size()).unwrap_or(0);
                     info!("AppStream pool loaded: {} components", count);
 
-                    if let Some(window) = app.imp().window.get()
-                        && let Some(window) = window.upgrade()
-                    {
-                        window.explore_page().populate(&pool);
+                    let mut pkgname_map = std::collections::HashMap::new();
+                    if let Some(cbox) = pool.components() {
+                        for component in cbox.as_array() {
+                            if let Some(pkgname) = component.pkgname() {
+                                pkgname_map.insert(pkgname.to_string(), component);
+                            }
+                        }
                     }
+                    info!("Built pkgname map: {} entries", pkgname_map.len());
+                    app.imp().pkgname_map.replace(pkgname_map);
 
                     app.imp().appstream_pool.replace(Some(pool));
+                    app.try_populate_views();
                 }
                 Err(err) => {
                     warn!("Failed to load AppStream pool: {}", err);
                 }
             }
         });
+    }
+
+    fn try_populate_views(&self) {
+        let imp = self.imp();
+
+        if imp.views_populated.get() {
+            return;
+        }
+
+        let metadata = imp.metadata.borrow();
+        let pool = imp.appstream_pool.borrow();
+        let pkgname_map = imp.pkgname_map.borrow();
+
+        if let (Some(md), Some(pool)) = (metadata.as_ref(), pool.as_ref())
+            && let Some(window) = imp.window.get()
+            && let Some(window) = window.upgrade()
+        {
+            window.explore_page().populate(md, pool);
+            window.installed_page().populate(md, &pkgname_map);
+            imp.views_populated.set(true);
+        }
     }
 
     pub fn run(&self) -> glib::ExitCode {

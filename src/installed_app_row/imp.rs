@@ -3,21 +3,21 @@ use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, glib};
 
 #[derive(Debug, Default, CompositeTemplate)]
-#[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/app_tile.ui")]
-pub struct NscAppTile {
+#[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/installed_app_row.ui")]
+pub struct NscInstalledAppRow {
     #[template_child]
     pub icon: TemplateChild<gtk::Image>,
     #[template_child]
     pub name_label: TemplateChild<gtk::Label>,
     #[template_child]
-    pub summary_label: TemplateChild<gtk::Label>,
+    pub version_label: TemplateChild<gtk::Label>,
 }
 
 #[glib::object_subclass]
-impl ObjectSubclass for NscAppTile {
-    const NAME: &'static str = "NscAppTile";
-    type Type = super::NscAppTile;
-    type ParentType = gtk::Button;
+impl ObjectSubclass for NscInstalledAppRow {
+    const NAME: &'static str = "NscInstalledAppRow";
+    type Type = super::NscInstalledAppRow;
+    type ParentType = gtk::ListBoxRow;
 
     fn class_init(klass: &mut Self::Class) {
         klass.bind_template();
@@ -28,6 +28,6 @@ impl ObjectSubclass for NscAppTile {
     }
 }
 
-impl ObjectImpl for NscAppTile {}
-impl WidgetImpl for NscAppTile {}
-impl ButtonImpl for NscAppTile {}
+impl ObjectImpl for NscInstalledAppRow {}
+impl WidgetImpl for NscInstalledAppRow {}
+impl ListBoxRowImpl for NscInstalledAppRow {}

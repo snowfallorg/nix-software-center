@@ -2,12 +2,13 @@ mod app_tile;
 mod application;
 mod config;
 mod explore_page;
+mod installed_app_row;
 mod installed_page;
 mod runtime;
 mod updates_page;
 mod window;
 
-use gettextrs::{gettext, LocaleCategory};
+use gettextrs::{LocaleCategory, gettext};
 use gtk::{gio, glib};
 
 use self::application::NscApplication;

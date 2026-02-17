@@ -2,9 +2,10 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::WeakRef;
 use gtk::glib;
-use libappstream::Pool;
+use libappstream::{Component, Pool};
 use libsnow::metadata::Metadata;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::HashMap;
 use tracing::debug;
 
 use crate::config::APP_ID;
@@ -15,6 +16,8 @@ pub struct NscApplication {
     pub window: OnceCell<WeakRef<NscWindow>>,
     pub metadata: RefCell<Option<Metadata>>,
     pub appstream_pool: RefCell<Option<Pool>>,
+    pub pkgname_map: RefCell<HashMap<String, Component>>,
+    pub views_populated: Cell<bool>,
 }
 
 #[glib::object_subclass]
@@ -43,6 +46,8 @@ impl ApplicationImpl for NscApplication {
             .set(window.downgrade())
             .expect("Window already set.");
 
+        // Data may have loaded before the window was created
+        app.try_populate_views();
         app.main_window().present();
     }
 
@@ -55,10 +60,10 @@ impl ApplicationImpl for NscApplication {
         gtk::Window::set_default_icon_name(*APP_ID);
 
         app.setup_css();
-        app.load_metadata();
-        app.load_appstream();
         app.setup_gactions();
         app.setup_accels();
+        app.load_metadata();
+        app.load_appstream();
     }
 }
 

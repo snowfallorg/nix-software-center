@@ -5,24 +5,30 @@ use gtk::glib;
 use libappstream::prelude::*;
 
 glib::wrapper! {
-    pub struct NscAppTile(ObjectSubclass<imp::NscAppTile>)
-        @extends gtk::Button, gtk::Widget,
+    pub struct NscInstalledAppRow(ObjectSubclass<imp::NscInstalledAppRow>)
+        @extends gtk::ListBoxRow, gtk::Widget,
         @implements gtk::Accessible, gtk::Actionable, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-impl NscAppTile {
-    pub fn new(component: &libappstream::Component) -> Self {
-        let tile: Self = glib::Object::new();
-        let imp = tile.imp();
+impl NscInstalledAppRow {
+    pub fn new(component: &libappstream::Component, package: &libsnow::Package) -> Self {
+        let row: Self = glib::Object::new();
+        let imp = row.imp();
 
         if let Some(name) = component.name() {
             imp.name_label.set_label(name.as_str());
         }
 
-        if let Some(summary) = component.summary() {
-            imp.summary_label.set_label(summary.as_str());
+        if let Some(version) = &package.version {
+            imp.version_label.set_label(version.as_str());
         }
 
+        Self::load_icon(imp, component);
+
+        row
+    }
+
+    fn load_icon(imp: &imp::NscInstalledAppRow, component: &libappstream::Component) {
         if let Some(icon) =
             component.icon_by_size(imp.icon.pixel_size() as u32, imp.icon.pixel_size() as u32)
         {
@@ -48,7 +54,5 @@ impl NscAppTile {
         } else {
             imp.icon.set_icon_name(Some("application-x-executable"));
         }
-
-        tile
     }
 }

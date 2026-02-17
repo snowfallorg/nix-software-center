@@ -29,6 +29,15 @@ impl NscWindow {
             .expect("explore page must be an ExplorePage")
     }
 
+    pub fn installed_page(&self) -> crate::installed_page::InstalledPage {
+        self.imp()
+            .view_stack
+            .child_by_name("installed")
+            .expect("installed page must exist in view stack")
+            .downcast::<crate::installed_page::InstalledPage>()
+            .expect("installed page must be an InstalledPage")
+    }
+
     fn save_window_size(&self) -> Result<(), glib::BoolError> {
         let imp = self.imp();
 

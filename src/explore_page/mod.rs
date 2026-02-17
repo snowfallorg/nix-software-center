@@ -15,7 +15,7 @@ glib::wrapper! {
 }
 
 impl ExplorePage {
-    pub fn populate(&self, pool: &libappstream::Pool) {
+    pub fn populate(&self, _metadata: &libsnow::metadata::Metadata, pool: &libappstream::Pool) {
         let flow_box = &self.imp().flow_box;
 
         while let Some(child) = flow_box.first_child() {

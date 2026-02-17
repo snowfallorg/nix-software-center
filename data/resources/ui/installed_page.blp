@@ -2,9 +2,85 @@ using Gtk 4.0;
 using Adw 1;
 
 template $NscInstalledPage: Adw.Bin {
-  child: Adw.StatusPage {
-    icon-name: "check-plain-symbolic";
-    title: _("Installed");
-    description: _("Manage your installed packages");
+  child: Gtk.ScrolledWindow {
+    child: Adw.Clamp {
+      maximum-size: 800;
+      tightening-threshold: 600;
+
+      child: Gtk.Box {
+        orientation: vertical;
+        margin-start: 12;
+        margin-end: 12;
+        margin-top: 12;
+        margin-bottom: 12;
+        spacing: 18;
+
+        Gtk.Box nixos_section {
+          orientation: vertical;
+          spacing: 6;
+
+          Gtk.Label {
+            styles [
+              "title-4",
+            ]
+
+            label: _("NixOS System");
+            xalign: 0;
+          }
+
+          Gtk.ListBox nixos_list_box {
+            styles [
+              "boxed-list",
+            ]
+
+            selection-mode: none;
+          }
+        }
+
+        Gtk.Box hm_section {
+          orientation: vertical;
+          spacing: 6;
+
+          Gtk.Label {
+            styles [
+              "title-4",
+            ]
+
+            label: _("Home Manager");
+            xalign: 0;
+          }
+
+          Gtk.ListBox hm_list_box {
+            styles [
+              "boxed-list",
+            ]
+
+            selection-mode: none;
+          }
+        }
+
+        Gtk.Box profile_section {
+          orientation: vertical;
+          spacing: 6;
+
+          Gtk.Label {
+            styles [
+              "title-4",
+            ]
+
+            label: _("User Profile");
+            xalign: 0;
+          }
+
+          Gtk.ListBox profile_list_box {
+            styles [
+              "boxed-list",
+            ]
+
+            selection-mode: none;
+          }
+        }
+      };
+    };
   };
 }
