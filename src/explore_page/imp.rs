@@ -4,7 +4,10 @@ use gtk::{glib, CompositeTemplate};
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/explore_page.ui")]
-pub struct ExplorePage {}
+pub struct ExplorePage {
+    #[template_child]
+    pub flow_box: TemplateChild<gtk::FlowBox>,
+}
 
 #[glib::object_subclass]
 impl ObjectSubclass for ExplorePage {

@@ -18,3 +18,4 @@ reqwest = { version = "0.13", features = ["json", "brotli"] }
 libsnow = { git = "https://github.com/snowfallorg/libsnow" }
 libappstream = "0.4"
 async-channel = "2"
+rand = "0.10"

@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1771276974,
-        "narHash": "sha256-b8DyyZvlCLQzZzZcuaOMC5KeJY7FD6VbR3ORHS0nX2c=",
+        "lastModified": 1771305854,
+        "narHash": "sha256-XrmLvPSYLCJOo3yvRJfycnPcedWAzxbk62XL7M9UXs4=",
         "owner": "snowfallorg",
         "repo": "nixos-appstream-data",
-        "rev": "f70922d320cd8383dc447b386bb905498aa09888",
+        "rev": "e8c1042424e444f698a4d129d5a993629e981dc9",
         "type": "github"
       },
       "original": {

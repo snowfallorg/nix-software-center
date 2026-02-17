@@ -5,6 +5,7 @@ use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
 use crate::application::NscApplication;
+use crate::explore_page::ExplorePage;
 
 glib::wrapper! {
     pub struct NscWindow(ObjectSubclass<imp::NscWindow>)
@@ -17,6 +18,15 @@ glib::wrapper! {
 impl NscWindow {
     pub fn new(app: &NscApplication) -> Self {
         glib::Object::builder().property("application", app).build()
+    }
+
+    pub fn explore_page(&self) -> ExplorePage {
+        self.imp()
+            .view_stack
+            .child_by_name("explore")
+            .expect("explore page must exist in view stack")
+            .downcast::<ExplorePage>()
+            .expect("explore page must be an ExplorePage")
     }
 
     fn save_window_size(&self) -> Result<(), glib::BoolError> {

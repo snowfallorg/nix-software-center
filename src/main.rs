@@ -1,3 +1,4 @@
+mod app_tile;
 mod application;
 mod config;
 mod explore_page;

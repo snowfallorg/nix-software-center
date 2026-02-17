@@ -20,7 +20,12 @@ glib::wrapper! {
 
 impl NscApplication {
     fn main_window(&self) -> NscWindow {
-        self.imp().window.get().unwrap().upgrade().unwrap()
+        self.imp()
+            .window
+            .get()
+            .expect("window must be set before calling main_window")
+            .upgrade()
+            .expect("window must not be finalized")
     }
 
     fn setup_gactions(&self) {
@@ -119,6 +124,13 @@ impl NscApplication {
                 Ok(()) => {
                     let count = pool.components().map(|cbox| cbox.size()).unwrap_or(0);
                     info!("AppStream pool loaded: {} components", count);
+
+                    if let Some(window) = app.imp().window.get()
+                        && let Some(window) = window.upgrade()
+                    {
+                        window.explore_page().populate(&pool);
+                    }
+
                     app.imp().appstream_pool.replace(Some(pool));
                 }
                 Err(err) => {

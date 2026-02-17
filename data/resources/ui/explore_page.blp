@@ -2,9 +2,26 @@ using Gtk 4.0;
 using Adw 1;
 
 template $NscExplorePage: Adw.Bin {
-  child: Adw.StatusPage {
-    icon-name: "explore-symbolic";
-    title: _("Explore");
-    description: _("Browse available packages");
+  child: Gtk.ScrolledWindow {
+    child: Adw.Clamp {
+      maximum-size: 1500;
+      tightening-threshold: 1400;
+
+      child: Gtk.Box {
+        orientation: vertical;
+        margin-start: 30;
+        margin-end: 30;
+        margin-top: 30;
+        margin-bottom: 30;
+
+        Gtk.FlowBox flow_box {
+          homogeneous: true;
+          selection-mode: none;
+          column-spacing: 5;
+          row-spacing: 5;
+          max-children-per-line: 4;
+        }
+      };
+    };
   };
 }

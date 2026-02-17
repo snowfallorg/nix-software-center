@@ -28,8 +28,8 @@ template $NscWindow: Adw.ApplicationWindow {
     condition ("max-width: 550sp")
 
     setters {
-      switcher_bar.visible: true;
-      header_switcher.visible: false;
+      headerbar.title-widget: null;
+      switcher_bar.reveal: true;
     }
   }
 
@@ -83,10 +83,8 @@ template $NscWindow: Adw.ApplicationWindow {
         };
 
         [bottom]
-        Adw.ViewSwitcher switcher_bar {
+        Adw.ViewSwitcherBar switcher_bar {
           stack: view_stack;
-          policy: wide;
-          visible: false;
         }
       };
     }

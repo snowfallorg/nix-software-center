@@ -3,6 +3,7 @@
   <gresource prefix="/org/snowflakeos/NixSoftwareCenter/">
     <file compressed="true" preprocess="xml-stripblanks" alias="gtk/help-overlay.ui">ui/shortcuts.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/window.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/app_tile.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/explore_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/updates_page.ui</file>

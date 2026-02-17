@@ -33,7 +33,7 @@ impl ApplicationImpl for NscApplication {
         let app = self.obj();
 
         if let Some(window) = self.window.get() {
-            let window = window.upgrade().unwrap();
+            let window = window.upgrade().expect("window must not be finalized");
             window.present();
             return;
         }
