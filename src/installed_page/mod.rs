@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
+use libappstream::prelude::ComponentExt;
 
 use crate::installed_app_row::NscInstalledAppRow;
 
@@ -46,13 +47,26 @@ impl InstalledPage {
         }
 
         let mut count = 0;
+        let mut sorted_components = Vec::new();
         for pkg in packages {
             let attr = pkg.attr.to_string();
             if let Some(component) = pkgname_map.get(&attr) {
-                let row = NscInstalledAppRow::new(component, pkg);
-                list_box.append(&row);
-                count += 1;
+                sorted_components.push((component.clone(), pkg));
             }
+        }
+
+        sorted_components.sort_by_key(|(component, _pkg)| {
+            component
+                .name()
+                .unwrap_or_default()
+                .to_string()
+                .to_lowercase()
+        });
+
+        for (component, pkg) in sorted_components {
+            let row = NscInstalledAppRow::new(&component, pkg);
+            list_box.append(&row);
+            count += 1;
         }
         count
     }
