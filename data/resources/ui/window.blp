@@ -41,6 +41,12 @@ template $NscWindow: Adw.ApplicationWindow {
       child: Adw.ToolbarView {
         [top]
         Adw.HeaderBar headerbar {
+          [start]
+          ToggleButton search_button {
+            icon-name: "system-search-symbolic";
+            tooltip-text: _("Search");
+          }
+
           [title]
           Adw.ViewSwitcher header_switcher {
             stack: view_stack;
@@ -54,6 +60,20 @@ template $NscWindow: Adw.ApplicationWindow {
             primary: true;
             tooltip-text: _("Main Menu");
           }
+        }
+
+        [top]
+        Gtk.SearchBar search_bar {
+          search-mode-enabled: bind search_button.active bidirectional;
+
+          child: Adw.Clamp {
+            maximum-size: 500;
+
+            child: Gtk.SearchEntry search_entry {
+              hexpand: true;
+              placeholder-text: _("Search apps");
+            };
+          };
         }
 
         content: Adw.ViewStack view_stack {
@@ -79,6 +99,13 @@ template $NscWindow: Adw.ApplicationWindow {
             icon-name: "software-update-available-symbolic";
 
             child: $NscUpdatesPage {};
+          }
+
+          Adw.ViewStackPage {
+            name: "search";
+            visible: false;
+
+            child: $NscSearchPage search_page {};
           }
         };
 

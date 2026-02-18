@@ -13,7 +13,12 @@ glib::wrapper! {
 impl NscAppTile {
     pub fn new(component: &libappstream::Component) -> Self {
         let tile: Self = glib::Object::new();
-        let imp = tile.imp();
+        tile.bind(component);
+        tile
+    }
+
+    pub fn bind(&self, component: &libappstream::Component) {
+        let imp = self.imp();
 
         if let Some(name) = component.name() {
             imp.name_label.set_label(name.as_str());
@@ -23,6 +28,17 @@ impl NscAppTile {
             imp.summary_label.set_label(summary.as_str());
         }
 
+        Self::load_icon(imp, component);
+    }
+
+    pub fn unbind(&self) {
+        let imp = self.imp();
+        imp.name_label.set_label("");
+        imp.summary_label.set_label("");
+        imp.icon.set_icon_name(Some("application-x-executable"));
+    }
+
+    fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {
         if let Some(icon) =
             component.icon_by_size(imp.icon.pixel_size() as u32, imp.icon.pixel_size() as u32)
         {
@@ -48,7 +64,5 @@ impl NscAppTile {
         } else {
             imp.icon.set_icon_name(Some("application-x-executable"));
         }
-
-        tile
     }
 }

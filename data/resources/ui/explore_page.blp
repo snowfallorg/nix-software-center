@@ -1,16 +1,19 @@
 using Gtk 4.0;
 using Adw 1;
 
-template $NscExplorePage: Adw.Bin {
+template $NscExplorePage: Adw.BreakpointBin {
+  width-request: 360;
+  height-request: 200;
+
   child: Gtk.ScrolledWindow {
     child: Adw.Clamp {
       maximum-size: 1500;
-      tightening-threshold: 1400;
+      tightening-threshold: 800;
 
       child: Gtk.Box {
         orientation: vertical;
-        margin-start: 30;
-        margin-end: 30;
+        margin-start: 10;
+        margin-end: 10;
         margin-top: 30;
         margin-bottom: 30;
 

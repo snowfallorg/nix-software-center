@@ -7,6 +7,7 @@
     <file compressed="true" preprocess="xml-stripblanks">ui/explore_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_app_row.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_page.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/search_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/updates_page.ui</file>
     <file compressed="true">style.css</file>
   </gresource>

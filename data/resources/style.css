@@ -3,7 +3,16 @@
   font-weight: bold;
 }
 
-.transparent-flowboxchild {
+.transparent-container {
   background-color: transparent;
   box-shadow: none;
+}
+
+.app-grid {
+  background-color: transparent;
+}
+
+.app-grid>child {
+  padding: 0;
+  margin: 5px 5px;
 }

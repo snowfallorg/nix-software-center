@@ -5,6 +5,7 @@ mod explore_page;
 mod installed_app_row;
 mod installed_page;
 mod runtime;
+mod search_page;
 mod updates_page;
 mod window;
 

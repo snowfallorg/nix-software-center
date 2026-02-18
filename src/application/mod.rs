@@ -47,6 +47,7 @@ impl NscApplication {
     fn setup_accels(&self) {
         self.set_accels_for_action("app.quit", &["<Control>q"]);
         self.set_accels_for_action("window.close", &["<Control>w"]);
+        self.set_accels_for_action("win.search", &["<Control>f"]);
     }
 
     fn setup_css(&self) {
@@ -164,6 +165,7 @@ impl NscApplication {
         {
             window.explore_page().populate(md, pool);
             window.installed_page().populate(md, &pkgname_map);
+            window.search_page().set_pool(pool);
             imp.views_populated.set(true);
         }
     }

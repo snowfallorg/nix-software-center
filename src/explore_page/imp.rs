@@ -13,7 +13,7 @@ pub struct ExplorePage {
 impl ObjectSubclass for ExplorePage {
     const NAME: &'static str = "NscExplorePage";
     type Type = super::ExplorePage;
-    type ParentType = adw::Bin;
+    type ParentType = adw::BreakpointBin;
 
     fn class_init(klass: &mut Self::Class) {
         klass.bind_template();
@@ -28,4 +28,4 @@ impl ObjectImpl for ExplorePage {}
 
 impl WidgetImpl for ExplorePage {}
 
-impl BinImpl for ExplorePage {}
+impl BreakpointBinImpl for ExplorePage {}

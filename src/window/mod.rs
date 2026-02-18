@@ -6,6 +6,7 @@ use gtk::{gio, glib};
 
 use crate::application::NscApplication;
 use crate::explore_page::ExplorePage;
+use crate::search_page::SearchPage;
 
 glib::wrapper! {
     pub struct NscWindow(ObjectSubclass<imp::NscWindow>)
@@ -36,6 +37,10 @@ impl NscWindow {
             .expect("installed page must exist in view stack")
             .downcast::<crate::installed_page::InstalledPage>()
             .expect("installed page must be an InstalledPage")
+    }
+
+    pub fn search_page(&self) -> SearchPage {
+        self.imp().search_page.clone()
     }
 
     fn save_window_size(&self) -> Result<(), glib::BoolError> {

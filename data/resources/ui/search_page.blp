@@ -1,0 +1,37 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscSearchPage: Adw.Bin {
+  child: Gtk.Stack results_stack {
+    Gtk.StackPage {
+      name: "status";
+
+      child: Adw.StatusPage status_page {
+        icon-name: "system-search-symbolic";
+        title: _("Search for Apps");
+        description: _("Type a query to find applications");
+      };
+    }
+
+    Gtk.StackPage {
+      name: "results";
+
+      child: Gtk.ScrolledWindow scrolled_window {
+        child: Adw.ClampScrollable clamp {
+          maximum-size: 1500;
+          tightening-threshold: 800;
+
+          child: Gtk.GridView grid_view {
+            styles [
+              "app-grid",
+            ]
+
+            max-columns: 4;
+            min-columns: 1;
+            focusable: false;
+          };
+        };
+      };
+    }
+  };
+}
