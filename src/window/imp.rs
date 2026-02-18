@@ -137,7 +137,9 @@ impl ObjectImpl for NscWindow {
                         }
                         view_stack.set_visible_child_name("search");
                         search_entry.grab_focus();
-                    } else {
+                    } else if let Some(name) = view_stack.visible_child_name()
+                        && name == "search"
+                    {
                         let tab = last_tab.borrow().clone();
                         view_stack.set_visible_child_name(&tab);
                     }

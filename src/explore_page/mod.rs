@@ -29,10 +29,14 @@ impl ExplorePage {
         let array = cbox.as_array();
         let mut components: Vec<_> = array
             .iter()
-            .filter(|c| !c.icons().is_empty() && !c.screenshots_all().is_empty())
+            .filter(|c| {
+                !c.icons().is_empty()
+                    && !c.screenshots_all().is_empty()
+                    && c.kind() == libappstream::ComponentKind::DesktopApp
+            })
             .collect();
         tracing::debug!(
-            "Explore: {}/{} components have icons and screenshots",
+            "Explore: {}/{} components match explore criteria",
             components.len(),
             array.len()
         );

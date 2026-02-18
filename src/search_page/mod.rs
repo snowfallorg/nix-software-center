@@ -55,7 +55,10 @@ impl SearchPage {
         let array = cbox.as_array();
         let components: Vec<libappstream::Component> = array
             .iter()
-            .filter(|c| !c.icons().is_empty())
+            .filter(|c| {
+                c.kind() == libappstream::ComponentKind::DesktopApp
+                    || c.kind() == libappstream::ComponentKind::ConsoleApp
+            })
             .cloned()
             .collect();
 
@@ -66,13 +69,6 @@ impl SearchPage {
                 .set_description(Some("Try a different search term"));
             return;
         }
-
-        tracing::debug!(
-            "Search '{}': {} results ({} with icons)",
-            query,
-            array.len(),
-            components.len()
-        );
 
         imp.results_stack.set_visible_child_name("results");
 
