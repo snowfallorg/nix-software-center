@@ -37,7 +37,7 @@ resources = gnome.compile_resources(
   'resources',
   'resources.gresource.xml',
   gresource_bundle: true,
-  source_dir: meson.current_build_dir(),
+  source_dir: [meson.current_build_dir(), meson.project_source_root() / 'data' / 'icons'],
   dependencies: blueprints_ui,
   install: true,
   install_dir: pkgdatadir,

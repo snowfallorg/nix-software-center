@@ -51,6 +51,7 @@ impl ExplorePage {
                 .expect("tile must have a FlowBoxChild parent")
                 .downcast::<gtk::FlowBoxChild>()
                 .expect("parent must be a FlowBoxChild");
+            flow_child.set_focusable(false);
             flow_child.add_css_class("transparent-container");
         }
     }

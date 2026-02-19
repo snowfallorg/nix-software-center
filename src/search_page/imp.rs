@@ -12,8 +12,6 @@ pub struct SearchPage {
     #[template_child]
     pub results_stack: TemplateChild<gtk::Stack>,
     #[template_child]
-    pub status_page: TemplateChild<adw::StatusPage>,
-    #[template_child]
     pub grid_view: TemplateChild<gtk::GridView>,
     pub model: gio::ListStore,
     pub pool: RefCell<Option<libappstream::Pool>>,
@@ -24,7 +22,6 @@ impl Default for SearchPage {
     fn default() -> Self {
         Self {
             results_stack: TemplateChild::default(),
-            status_page: TemplateChild::default(),
             grid_view: TemplateChild::default(),
             model: gio::ListStore::new::<libappstream::Component>(),
             pool: RefCell::default(),

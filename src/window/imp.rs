@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
-use gtk::{CompositeTemplate, gio, glib};
+use gtk::{CompositeTemplate, gdk, gio, glib};
 
 use crate::config::{APP_ID, PROFILE};
 use crate::explore_page::ExplorePage;
@@ -15,6 +15,8 @@ use crate::updates_page::UpdatesPage;
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/window.ui")]
 pub struct NscWindow {
     #[template_child]
+    pub split_view: TemplateChild<adw::OverlaySplitView>,
+    #[template_child]
     pub headerbar: TemplateChild<adw::HeaderBar>,
     #[template_child]
     pub navigation_view: TemplateChild<adw::NavigationView>,
@@ -22,6 +24,8 @@ pub struct NscWindow {
     pub view_stack: TemplateChild<adw::ViewStack>,
     #[template_child]
     pub search_button: TemplateChild<gtk::ToggleButton>,
+    #[template_child]
+    pub sidebar_button: TemplateChild<gtk::ToggleButton>,
     #[template_child]
     pub search_bar: TemplateChild<gtk::SearchBar>,
     #[template_child]
@@ -35,10 +39,12 @@ pub struct NscWindow {
 impl Default for NscWindow {
     fn default() -> Self {
         Self {
+            split_view: TemplateChild::default(),
             headerbar: TemplateChild::default(),
             navigation_view: TemplateChild::default(),
             view_stack: TemplateChild::default(),
             search_button: TemplateChild::default(),
+            sidebar_button: TemplateChild::default(),
             search_bar: TemplateChild::default(),
             search_entry: TemplateChild::default(),
             search_page: TemplateChild::default(),
@@ -84,8 +90,14 @@ impl ObjectImpl for NscWindow {
         // Search action activates search; if already active, re-focuses the entry
         let search_button = self.search_button.clone();
         let search_entry = self.search_entry.clone();
+        let nav_view = self.navigation_view.clone();
         let action_search = gio::ActionEntry::builder("search")
-            .activate(move |_, _, _| {
+            .activate(move |win: &super::NscWindow, _, _| {
+                if let Some(focus) = gtk::prelude::GtkWindowExt::focus(win)
+                    && !gtk::prelude::WidgetExt::is_ancestor(&focus, &nav_view)
+                {
+                    return;
+                }
                 search_button.set_active(true);
                 search_entry.grab_focus();
             })
@@ -93,32 +105,60 @@ impl ObjectImpl for NscWindow {
         obj.add_action_entries([action_search]);
 
         // Accept keyboard input even when search bar is hidden
-        self.search_bar.set_key_capture_widget(Some(&*obj));
         self.search_bar.connect_entry(&*self.search_entry);
 
-        let search_bar_ref = self.search_bar.clone();
+        let search_button_ref = self.search_button.clone();
         let search_entry_ref = self.search_entry.clone();
+        let search_bar_ref = self.search_bar.clone();
+        let nav_view_ref = self.navigation_view.clone();
         let key_controller = gtk::EventControllerKey::new();
         key_controller.set_propagation_phase(gtk::PropagationPhase::Capture);
-        key_controller.connect_key_pressed(move |_, keyval, _keycode, _state| {
-            if search_bar_ref.is_search_mode()
-                && !search_entry_ref.has_focus()
-                && let Some(ch) = keyval.to_unicode()
+        key_controller.connect_key_pressed(move |controller, keyval, _keycode, state| {
+            // Only handle keys when focus is within the main content
+            if let Some(window) = controller.widget().and_downcast::<gtk::Window>()
+                && let Some(focus) = gtk::prelude::GtkWindowExt::focus(&window)
+                && !gtk::prelude::WidgetExt::is_ancestor(&focus, &nav_view_ref)
+            {
+                return glib::Propagation::Proceed;
+            }
+
+            // Ignore shortcuts
+            let shortcut = state & (gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+            if !shortcut.is_empty() {
+                return glib::Propagation::Proceed;
+            }
+
+            if let Some(ch) = keyval.to_unicode()
                 && !ch.is_control()
             {
-                search_entry_ref.grab_focus();
-                let pos = search_entry_ref.position();
-                let s = ch.to_string();
-                search_entry_ref.insert_text(&s, &mut pos.clone());
-                search_entry_ref.set_position(pos + s.len() as i32);
-                return glib::Propagation::Stop;
+                // If search is already active, recapture stray keys to the entry
+                if search_bar_ref.is_search_mode() && !search_entry_ref.has_focus() {
+                    search_entry_ref.grab_focus();
+                    search_entry_ref.delete_selection();
+                    let mut pos = search_entry_ref.position();
+                    let s = ch.to_string();
+                    search_entry_ref.insert_text(&s, &mut pos);
+                    search_entry_ref.set_position(pos);
+                    return glib::Propagation::Stop;
+                }
+
+                // If search is not active, activate it and start typing
+                if !search_bar_ref.is_search_mode() {
+                    search_button_ref.set_active(true);
+                    search_entry_ref.grab_focus();
+                    let s = ch.to_string();
+                    search_entry_ref.insert_text(&s, &mut 0);
+                    search_entry_ref.set_position(s.len() as i32);
+                    return glib::Propagation::Stop;
+                }
             }
             glib::Propagation::Proceed
         });
         obj.add_controller(key_controller);
 
-        // When search mode is enabled, switch view stack to the hidden "search" tab
-        // Restore the previous tab when disabled
+        // When search mode is enabled, focus the entry
+        // When text is typed, switch to the search page
+        // When disabled, restore the previous tab if we're still on the search page
         let view_stack = self.view_stack.clone();
         let search_entry = self.search_entry.clone();
         let last_tab = self.last_tab.clone();
@@ -135,7 +175,6 @@ impl ObjectImpl for NscWindow {
                         {
                             *last_tab.borrow_mut() = name.to_string();
                         }
-                        view_stack.set_visible_child_name("search");
                         search_entry.grab_focus();
                     } else if let Some(name) = view_stack.visible_child_name()
                         && name == "search"
@@ -146,19 +185,23 @@ impl ObjectImpl for NscWindow {
                 }
             ));
 
-        // When search text changes, run query
+        // When search text changes, switch to the search page and run the query
         let search_page = self.search_page.clone();
+        let search_bar = self.search_bar.clone();
         let view_stack = self.view_stack.clone();
         self.search_entry.connect_search_changed(glib::clone!(
             #[weak]
             search_page,
             #[weak]
+            search_bar,
+            #[weak]
             view_stack,
             move |entry| {
-                let query = entry.text();
-                if !query.is_empty() {
-                    view_stack.set_visible_child_name("search");
+                if !search_bar.is_search_mode() {
+                    return;
                 }
+                let query = entry.text();
+                view_stack.set_visible_child_name("search");
                 search_page.perform_search(&query);
             }
         ));

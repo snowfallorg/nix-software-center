@@ -20,35 +20,26 @@ impl SearchPage {
     pub fn perform_search(&self, query: &str) {
         let imp = self.imp();
 
+        if query.is_empty() {
+            // Keep showing whatever results are already on screen
+            return;
+        }
+
         let generation = imp.search_generation.get().wrapping_add(1);
         imp.search_generation.set(generation);
 
         imp.model.remove_all();
 
-        if query.is_empty() {
-            imp.results_stack.set_visible_child_name("status");
-            imp.status_page.set_title("Search for Apps");
-            imp.status_page
-                .set_description(Some("Type a query to find applications"));
-            return;
-        }
-
         let pool = imp.pool.borrow();
         let Some(pool) = pool.as_ref() else {
-            imp.results_stack.set_visible_child_name("status");
-            imp.status_page.set_title("Not Ready");
-            imp.status_page
-                .set_description(Some("AppStream data is still loading"));
+            imp.results_stack.set_visible_child_name("loading");
             return;
         };
 
         let results = pool.search(query);
 
         let Some(cbox) = &results else {
-            imp.results_stack.set_visible_child_name("status");
-            imp.status_page.set_title("No Results");
-            imp.status_page
-                .set_description(Some("Try a different search term"));
+            imp.results_stack.set_visible_child_name("no-results");
             return;
         };
 
@@ -63,10 +54,7 @@ impl SearchPage {
             .collect();
 
         if components.is_empty() {
-            imp.results_stack.set_visible_child_name("status");
-            imp.status_page.set_title("No Results");
-            imp.status_page
-                .set_description(Some("Try a different search term"));
+            imp.results_stack.set_visible_child_name("no-results");
             return;
         }
 

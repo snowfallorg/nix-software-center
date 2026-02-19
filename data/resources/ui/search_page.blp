@@ -4,12 +4,32 @@ using Adw 1;
 template $NscSearchPage: Adw.Bin {
   child: Gtk.Stack results_stack {
     Gtk.StackPage {
-      name: "status";
+      name: "ready";
 
-      child: Adw.StatusPage status_page {
+      child: Adw.StatusPage {
         icon-name: "system-search-symbolic";
         title: _("Search for Apps");
         description: _("Type a query to find applications");
+      };
+    }
+
+    Gtk.StackPage {
+      name: "loading";
+
+      child: Adw.StatusPage {
+        icon-name: "content-loading-symbolic";
+        title: _("Not Ready");
+        description: _("AppStream data is still loading");
+      };
+    }
+
+    Gtk.StackPage {
+      name: "no-results";
+
+      child: Adw.StatusPage {
+        icon-name: "edit-find-symbolic";
+        title: _("No Results Found");
+        description: _("Try a different search term");
       };
     }
 
