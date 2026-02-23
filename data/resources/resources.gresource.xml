@@ -3,10 +3,12 @@
   <gresource prefix="/org/snowflakeos/NixSoftwareCenter/">
     <file compressed="true" preprocess="xml-stripblanks" alias="shortcuts-dialog.ui">ui/shortcuts.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/window.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/app_detail.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/app_tile.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/explore_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_app_row.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_page.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/screenshot_slot.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/search_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/updates_page.ui</file>
     <file compressed="true">style.css</file>
@@ -14,6 +16,7 @@
   <gresource prefix="/org/snowflakeos/NixSoftwareCenter/icons/scalable/actions/">
     <file compressed="true" preprocess="xml-stripblanks">nsc-bag-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">nsc-explore-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">nsc-heart-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">nsc-installed-symbolic.svg</file>
   </gresource>
 </gresources>

@@ -1,0 +1,56 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscScreenshotSlot: Gtk.Widget {
+  Gtk.Stack stack {
+    height-request: 360;
+    transition-type: crossfade;
+    transition-duration: 200;
+
+    Gtk.StackPage {
+      name: "loading";
+
+      child: Adw.Spinner {
+        halign: center;
+        valign: center;
+      };
+    }
+
+    Gtk.StackPage {
+      name: "error";
+
+      child: Gtk.Box {
+        orientation: vertical;
+        spacing: 12;
+        halign: center;
+        valign: center;
+
+        Gtk.Image {
+          icon-name: "image-missing-symbolic";
+          pixel-size: 64;
+
+          styles [
+            "dim-label",
+          ]
+        }
+
+        Gtk.Label {
+          label: _("Failed to load image");
+
+          styles [
+            "dim-label",
+          ]
+        }
+      };
+    }
+
+    Gtk.StackPage {
+      name: "image";
+
+      child: Gtk.Picture picture {
+        can-shrink: true;
+        content-fit: contain;
+      };
+    }
+  }
+}

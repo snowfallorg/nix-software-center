@@ -28,6 +28,10 @@ impl NscApplication {
             .expect("window must not be finalized")
     }
 
+    pub fn metadata(&self) -> &std::cell::RefCell<Option<libsnow::metadata::Metadata>> {
+        &self.imp().metadata
+    }
+
     fn setup_gactions(&self) {
         let action_quit = gio::ActionEntry::builder("quit")
             .activate(move |app: &Self, _, _| {

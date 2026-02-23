@@ -1,6 +1,7 @@
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, glib};
+use std::cell::RefCell;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/installed_app_row.ui")]
@@ -11,6 +12,7 @@ pub struct NscInstalledAppRow {
     pub name_label: TemplateChild<gtk::Label>,
     #[template_child]
     pub version_label: TemplateChild<gtk::Label>,
+    pub component: RefCell<Option<libappstream::Component>>,
 }
 
 #[glib::object_subclass]

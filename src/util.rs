@@ -1,0 +1,49 @@
+use adw::prelude::*;
+use libappstream::prelude::{ComponentExt, IconExt};
+
+/// Walk up the widget tree from `widget` to find the nearest `NavigationView`.
+pub fn find_navigation_view(widget: &impl IsA<gtk::Widget>) -> Option<adw::NavigationView> {
+    let mut ancestor = widget.parent();
+    while let Some(w) = ancestor {
+        if let Ok(nav) = w.clone().downcast::<adw::NavigationView>() {
+            return Some(nav);
+        }
+        ancestor = w.parent();
+    }
+    None
+}
+
+/// Load an icon from an AppStream component into a `GtkImage`.
+pub fn load_component_icon(image: &gtk::Image, component: &libappstream::Component, sizes: &[u32]) {
+    for &size in sizes {
+        if let Some(icon) = component.icon_by_size(size, size) {
+            match IconExt::kind(&icon) {
+                libappstream::IconKind::Cached => {
+                    if let Some(filename) = icon.filename() {
+                        let path = std::path::Path::new(filename.as_str());
+                        if path.exists() {
+                            image.set_from_file(Some(filename.as_str()));
+                            return;
+                        }
+                    }
+                }
+                libappstream::IconKind::Stock => {
+                    if let Some(name) = IconExt::name(&icon) {
+                        image.set_icon_name(Some(name.as_str()));
+                        return;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Fall back to stock icon or generic
+    if let Some(icon) = component.icon_stock()
+        && let Some(name) = IconExt::name(&icon)
+    {
+        image.set_icon_name(Some(name.as_str()));
+        return;
+    }
+    image.set_icon_name(Some("application-x-executable"));
+}

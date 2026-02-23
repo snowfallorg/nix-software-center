@@ -15,6 +15,8 @@ impl NscInstalledAppRow {
         let row: Self = glib::Object::new();
         let imp = row.imp();
 
+        imp.component.replace(Some(component.clone()));
+
         if let Some(name) = component.name() {
             imp.name_label.set_label(name.as_str());
         }
@@ -28,31 +30,12 @@ impl NscInstalledAppRow {
         row
     }
 
+    pub fn component(&self) -> Option<libappstream::Component> {
+        self.imp().component.borrow().clone()
+    }
+
     fn load_icon(imp: &imp::NscInstalledAppRow, component: &libappstream::Component) {
-        if let Some(icon) =
-            component.icon_by_size(imp.icon.pixel_size() as u32, imp.icon.pixel_size() as u32)
-        {
-            use libappstream::prelude::IconExt;
-            match IconExt::kind(&icon) {
-                libappstream::IconKind::Cached => {
-                    if let Some(filename) = icon.filename() {
-                        imp.icon.set_from_file(Some(filename.as_str()));
-                    }
-                }
-                libappstream::IconKind::Stock => {
-                    if let Some(name) = IconExt::name(&icon) {
-                        imp.icon.set_icon_name(Some(name.as_str()));
-                    }
-                }
-                _ => {}
-            }
-        } else if let Some(icon) = component.icon_stock() {
-            use libappstream::prelude::IconExt;
-            if let Some(name) = IconExt::name(&icon) {
-                imp.icon.set_icon_name(Some(name.as_str()));
-            }
-        } else {
-            imp.icon.set_icon_name(Some("application-x-executable"));
-        }
+        let size = imp.icon.pixel_size() as u32;
+        crate::util::load_component_icon(&imp.icon, component, &[size]);
     }
 }

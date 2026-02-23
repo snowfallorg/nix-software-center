@@ -16,3 +16,37 @@
   padding: 0;
   margin: 5px 5px;
 }
+
+.screenshot-frame {
+  border-left-width: 0;
+  border-right-width: 0;
+}
+
+.app-description {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+.app-description text {
+  background: none;
+  color: inherit;
+}
+
+.screenshot-nav-button {
+  min-width: 42px;
+  min-height: 42px;
+}
+
+.support-button {
+  background-color: rgba(230, 90, 160, 0.2);
+  color: #e05a9e;
+  border-radius: 99px;
+  padding: 5px 12px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.support-button:hover {
+  background-color: rgba(230, 90, 160, 0.3);
+}

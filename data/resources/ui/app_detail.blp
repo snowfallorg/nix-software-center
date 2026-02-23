@@ -1,0 +1,399 @@
+using Gtk 4.0;
+using Adw 1;
+
+menu primary_menu {
+  section {
+    item {
+      action: "app.preferences";
+      label: _("_Preferences");
+    }
+
+    item {
+      action: "app.shortcuts";
+      label: _("_Keyboard Shortcuts");
+    }
+
+    item {
+      action: "app.about";
+      label: _("_About Nix Software Center");
+    }
+  }
+}
+
+template $NscAppDetail: Adw.NavigationPage {
+  tag: "detail";
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar detail_headerbar {
+      show-title: false;
+
+      [end]
+      MenuButton {
+        icon-name: "open-menu-symbolic";
+        menu-model: primary_menu;
+        primary: true;
+        tooltip-text: _("Main Menu");
+      }
+
+      [end]
+      ToggleButton sidebar_button {
+        icon-name: "nsc-bag-symbolic";
+        tooltip-text: _("Pending Changes Sidebar");
+      }
+    }
+
+    content: Adw.BreakpointBin {
+      width-request: 300;
+      height-request: 200;
+
+      Adw.Breakpoint {
+        condition ("max-width: 500sp")
+
+        setters {
+          header_box.orientation: vertical;
+          install_button.halign: fill;
+          install_button.hexpand: true;
+        }
+      }
+
+      child: Gtk.ScrolledWindow {
+        hscrollbar-policy: never;
+
+        child: Gtk.Box {
+          orientation: vertical;
+          spacing: 24;
+
+          Adw.Clamp {
+            maximum-size: 900;
+            tightening-threshold: 600;
+
+            child: Gtk.Box {
+              orientation: vertical;
+              spacing: 24;
+              margin-start: 18;
+              margin-end: 18;
+              margin-top: 24;
+
+              Gtk.Box header_box {
+                orientation: horizontal;
+                spacing: 18;
+
+                Gtk.Box {
+                  orientation: horizontal;
+                  spacing: 18;
+                  hexpand: true;
+
+                  Gtk.Image icon {
+                    styles [
+                      "icon-dropshadow",
+                    ]
+
+                    pixel-size: 128;
+                  }
+
+                  Gtk.Box {
+                    orientation: vertical;
+                    spacing: 6;
+                    valign: center;
+                    hexpand: true;
+
+                    Gtk.Label name_label {
+                      styles [
+                        "title-1",
+                      ]
+
+                      halign: start;
+                      wrap: true;
+                      xalign: 0;
+                    }
+
+                    Gtk.Label developer_label {
+                      styles [
+                        "dim-label",
+                      ]
+
+                      halign: start;
+                      xalign: 0;
+                      wrap: true;
+                    }
+
+                    Gtk.Button support_button {
+                      styles [
+                        "support-button",
+                      ]
+
+                      halign: start;
+                      margin-top: 5;
+                      visible: false;
+
+                      child: Adw.ButtonContent {
+                        icon-name: "nsc-heart-symbolic";
+                        label: _("Support");
+                      };
+                    }
+                  }
+                }
+
+                Gtk.Button install_button {
+                  styles [
+                    "suggested-action",
+                    "pill",
+                  ]
+
+                  label: _("Install");
+                  halign: end;
+                  valign: center;
+                }
+              }
+            };
+          }
+
+          Gtk.Box screenshot_box {
+            orientation: vertical;
+            spacing: 12;
+            visible: false;
+
+            Gtk.Box {
+              orientation: vertical;
+
+              styles [
+                "frame",
+                "view",
+                "screenshot-frame",
+              ]
+
+              Gtk.Overlay {
+                child: Adw.Carousel screenshot_carousel {
+                  hexpand: true;
+                  allow-long-swipes: true;
+                  allow-scroll-wheel: false;
+                  margin-top: 20;
+                  margin-bottom: 10;
+                  spacing: 60;
+                };
+
+                [overlay]
+                Gtk.Revealer screenshot_prev_revealer {
+                  halign: start;
+                  valign: center;
+                  transition-type: crossfade;
+                  transition-duration: 200;
+                  reveal-child: false;
+                  can-target: false;
+
+                  child: Gtk.Button screenshot_prev {
+                    icon-name: "go-previous-symbolic";
+                    margin-start: 20;
+
+                    styles [
+                      "osd",
+                      "circular",
+                      "screenshot-nav-button",
+                    ]
+                  };
+                }
+
+                [overlay]
+                Gtk.Revealer screenshot_next_revealer {
+                  halign: end;
+                  valign: center;
+                  transition-type: crossfade;
+                  transition-duration: 200;
+                  reveal-child: false;
+                  can-target: false;
+
+                  child: Gtk.Button screenshot_next {
+                    icon-name: "go-next-symbolic";
+                    margin-end: 20;
+
+                    styles [
+                      "osd",
+                      "circular",
+                      "screenshot-nav-button",
+                    ]
+                  };
+                }
+              }
+
+              Adw.CarouselIndicatorDots screenshot_dots {
+                carousel: screenshot_carousel;
+                halign: center;
+              }
+            }
+          }
+
+          Adw.Clamp {
+            maximum-size: 900;
+            tightening-threshold: 600;
+
+            child: Gtk.Box {
+              orientation: vertical;
+              spacing: 24;
+              margin-start: 18;
+              margin-end: 18;
+              margin-bottom: 24;
+
+              Gtk.Box description_section {
+                orientation: vertical;
+                spacing: 12;
+                visible: false;
+
+                Gtk.Label summary_label {
+                  styles [
+                    "title-2",
+                  ]
+
+                  halign: start;
+                  wrap: true;
+                  xalign: 0;
+                  selectable: true;
+                }
+
+                $NscHeightClamp description_clamp {
+                  max-height: 180;
+
+                  child: Gtk.TextView description_view {
+                    styles [
+                      "app-description",
+                    ]
+
+                    editable: false;
+                    cursor-visible: false;
+                    wrap-mode: word_char;
+                    hexpand: true;
+                  };
+                }
+
+                Gtk.Button description_toggle {
+                  styles [
+                    "pill",
+                  ]
+
+                  label: _("Show More");
+                  halign: center;
+                  visible: false;
+                }
+              }
+
+              Adw.PreferencesGroup details_group {
+                title: _("Details");
+
+                Adw.ActionRow version_row {
+                  title: _("Version");
+                  visible: false;
+
+                  [suffix]
+                  Gtk.Label version_label {
+                    valign: center;
+                    hexpand: true;
+                    halign: end;
+                    wrap: true;
+                    justify: right;
+                    xalign: 1.0;
+                  }
+                }
+
+                Adw.ActionRow license_row {
+                  title: _("License");
+                  visible: false;
+
+                  [suffix]
+                  Gtk.Label license_label {
+                    valign: center;
+                    hexpand: true;
+                    halign: end;
+                    wrap: true;
+                    justify: right;
+                    xalign: 1.0;
+                  }
+                }
+
+                Adw.ActionRow package_row {
+                  title: _("Package Name");
+                  visible: false;
+
+                  [suffix]
+                  Gtk.Label package_label {
+                    valign: center;
+                    hexpand: true;
+                    halign: end;
+                    wrap: true;
+                    justify: right;
+                    xalign: 1.0;
+                    selectable: true;
+
+                    styles [
+                      "monospace",
+                    ]
+                  }
+                }
+              }
+
+              Adw.PreferencesGroup links_group {
+                title: _("Links");
+                visible: false;
+
+                Adw.ActionRow homepage_row {
+                  title: _("Homepage");
+                  activatable: true;
+                  visible: false;
+                  use-markup: false;
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "external-link-symbolic";
+                    valign: center;
+                    pixel-size: 16;
+                  }
+                }
+
+                Adw.ActionRow bugtracker_row {
+                  title: _("Report an Issue");
+                  activatable: true;
+                  visible: false;
+                  use-markup: false;
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "external-link-symbolic";
+                    valign: center;
+                    pixel-size: 16;
+                  }
+                }
+
+                Adw.ActionRow help_row {
+                  title: _("Help & Documentation");
+                  activatable: true;
+                  visible: false;
+                  use-markup: false;
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "external-link-symbolic";
+                    valign: center;
+                    pixel-size: 16;
+                  }
+                }
+
+                Adw.ActionRow donate_row {
+                  title: _("Donate");
+                  activatable: true;
+                  visible: false;
+                  use-markup: false;
+
+                  [suffix]
+                  Gtk.Image {
+                    icon-name: "external-link-symbolic";
+                    valign: center;
+                    pixel-size: 16;
+                  }
+                }
+              }
+            };
+          }
+        };
+      };
+    };
+  };
+}

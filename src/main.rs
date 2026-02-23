@@ -1,12 +1,16 @@
+mod app_detail;
 mod app_tile;
 mod application;
 mod config;
 mod explore_page;
+mod height_clamp;
 mod installed_app_row;
 mod installed_page;
 mod runtime;
+mod screenshot_slot;
 mod search_page;
 mod updates_page;
+mod util;
 mod window;
 
 use gettextrs::{LocaleCategory, gettext};

@@ -9,7 +9,7 @@ lto = true
 
 [dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
-gtk = { version = "0.10", package = "gtk4", features = ["v4_8"] }
+gtk = { version = "0.10", package = "gtk4", features = ["v4_10"] }
 adw = { version = "0.8.1", package = "libadwaita", features = ["v1_8"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3"
@@ -19,3 +19,6 @@ libsnow = { git = "https://github.com/snowfallorg/libsnow" }
 libappstream = "0.4"
 async-channel = "2"
 rand = "0.10"
+quick-xml = "0.39"
+spdx = { version = "0.13", features = ["text"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
