@@ -50,3 +50,11 @@
 .support-button:hover {
   background-color: rgba(230, 90, 160, 0.3);
 }
+
+.pending-install {
+  background-color: alpha(@accent_bg_color, 0.15);
+}
+
+.pending-remove {
+  background-color: alpha(@error_bg_color, 0.15);
+}

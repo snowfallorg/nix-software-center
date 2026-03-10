@@ -1,3 +1,5 @@
+use std::cell::{Cell, RefCell};
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
@@ -12,6 +14,8 @@ const DESCRIPTION_COLLAPSED_HEIGHT: i32 = 180;
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/app_detail.ui")]
 pub struct NscAppDetail {
+    pub component: RefCell<Option<libappstream::Component>>,
+
     // Header bar
     #[template_child]
     pub detail_headerbar: TemplateChild<adw::HeaderBar>,
@@ -33,6 +37,24 @@ pub struct NscAppDetail {
     // Actions
     #[template_child]
     pub install_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub trash_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub run_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub target_dropdown: TemplateChild<gtk::DropDown>,
+
+    pub installed_nixos: Cell<bool>,
+    pub installed_hm: Cell<bool>,
+
+    pub run_cancel: RefCell<Option<crate::app_detail::RunCancel>>,
+
+    pub pending_changed_handler: RefCell<
+        Option<(
+            glib::SignalHandlerId,
+            crate::pending_changes::PendingChanges,
+        )>,
+    >,
 
     // Screenshots
     #[template_child]
@@ -106,6 +128,10 @@ impl ObjectSubclass for NscAppDetail {
 }
 
 impl ObjectImpl for NscAppDetail {
+    fn dispose(&self) {
+        super::NscAppDetail::disconnect_pending_changed(self);
+    }
+
     fn constructed(&self) {
         self.parent_constructed();
 

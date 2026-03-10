@@ -4,6 +4,28 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use libappstream::prelude::*;
+use std::os::unix::process::CommandExt;
+use std::sync::{Arc, Mutex};
+
+use crate::pending_item::InstallTarget;
+use crate::window::NscWindow;
+
+#[derive(Debug)]
+pub struct RunCancel {
+    abort_handle: tokio::task::AbortHandle,
+    child_pid: Arc<Mutex<Option<u32>>>,
+}
+
+impl RunCancel {
+    fn cancel(&self) {
+        if let Some(pid) = self.child_pid.lock().unwrap().take() {
+            let _ = std::process::Command::new("kill")
+                .args(["--", &format!("-{pid}")])
+                .status();
+        }
+        self.abort_handle.abort();
+    }
+}
 
 glib::wrapper! {
     pub struct NscAppDetail(ObjectSubclass<imp::NscAppDetail>)
@@ -27,6 +49,8 @@ impl NscAppDetail {
         metadata: &libsnow::metadata::Metadata,
     ) {
         let imp = self.imp();
+
+        imp.component.replace(Some(component.clone()));
 
         let pkg_info = component
             .pkgname()
@@ -53,6 +77,31 @@ impl NscAppDetail {
 
         // Icon
         Self::load_icon(imp, component);
+
+        // flat needs to be applied to the child rather than the GtkDropDown itself
+        if let Some(child) = imp.target_dropdown.first_child() {
+            child.add_css_class("flat");
+        }
+
+        if let Some(pkgname) = component.pkgname() {
+            let pkgname_str = pkgname.as_str();
+            let nixos_pkgs =
+                libsnow::nixos::list::list_systempackages(metadata).unwrap_or_default();
+            let installed_nixos = nixos_pkgs.iter().any(|p| p.attr.to_string() == pkgname_str);
+            imp.installed_nixos.set(installed_nixos);
+
+            let hm_pkgs = libsnow::homemanager::list::list(metadata).unwrap_or_default();
+            let installed_hm = hm_pkgs.iter().any(|p| p.attr.to_string() == pkgname_str);
+            imp.installed_hm.set(installed_hm);
+
+            if installed_hm && !installed_nixos {
+                imp.target_dropdown.set_selected(1);
+            } else {
+                imp.target_dropdown.set_selected(0);
+            }
+        }
+
+        Self::setup_action_buttons(self, imp, component);
 
         // Description
         if let Some(desc) = component.description() {
@@ -212,6 +261,483 @@ impl NscAppDetail {
         }
 
         imp.links_group.set_visible(has_links);
+    }
+
+    fn selected_target(imp: &imp::NscAppDetail) -> InstallTarget {
+        match imp.target_dropdown.selected() {
+            0 => InstallTarget::NixOS,
+            _ => InstallTarget::HomeManager,
+        }
+    }
+
+    fn is_installed_for_target(imp: &imp::NscAppDetail, target: InstallTarget) -> bool {
+        match target {
+            InstallTarget::NixOS => imp.installed_nixos.get(),
+            InstallTarget::HomeManager => imp.installed_hm.get(),
+        }
+    }
+
+    fn setup_action_buttons(
+        page: &Self,
+        imp: &imp::NscAppDetail,
+        component: &libappstream::Component,
+    ) {
+        let component_install = component.clone();
+        let page_weak_install = page.downgrade();
+        imp.install_button.connect_clicked(move |_button| {
+            let Some(page) = page_weak_install.upgrade() else {
+                return;
+            };
+            let imp = page.imp();
+            let target = Self::selected_target(imp);
+            let installed = Self::is_installed_for_target(imp, target);
+
+            if installed {
+                Self::launch_app(&component_install);
+                return;
+            }
+
+            let Some(window) = page
+                .root()
+                .and_downcast::<adw::ApplicationWindow>()
+                .and_then(|w| w.downcast::<NscWindow>().ok())
+            else {
+                return;
+            };
+
+            let pending = window.pending_changes();
+            if pending.contains(&component_install, target) {
+                pending.remove_by_component(&component_install, target);
+            } else {
+                pending.add_install(&component_install, target);
+            }
+        });
+
+        let component_remove = component.clone();
+        let page_weak_remove = page.downgrade();
+        imp.trash_button.connect_clicked(move |_button| {
+            let Some(page) = page_weak_remove.upgrade() else {
+                return;
+            };
+            let Some(window) = page
+                .root()
+                .and_downcast::<adw::ApplicationWindow>()
+                .and_then(|w| w.downcast::<NscWindow>().ok())
+            else {
+                return;
+            };
+
+            let target = Self::selected_target(page.imp());
+            let pending = window.pending_changes();
+            if pending.contains(&component_remove, target) {
+                pending.remove_by_component(&component_remove, target);
+            } else {
+                pending.add_remove(&component_remove, target);
+            }
+        });
+
+        let component_run = component.clone();
+        let page_weak_run = page.downgrade();
+        imp.run_button.connect_clicked(move |button| {
+            let Some(page) = page_weak_run.upgrade() else {
+                return;
+            };
+            let imp = page.imp();
+
+            // If a build is running, cancel it
+            if let Some(cancel) = imp.run_cancel.borrow_mut().take() {
+                cancel.cancel();
+                Self::reset_run_button(button);
+                return;
+            }
+
+            let Some(pkgname) = component_run.pkgname() else {
+                return;
+            };
+
+            button.set_tooltip_text(Some("Cancel"));
+            button.set_icon_name("");
+            let spinner = adw::Spinner::builder()
+                .margin_start(10)
+                .margin_end(10)
+                .margin_top(10)
+                .margin_bottom(10)
+                .build();
+            button.set_child(Some(&spinner));
+
+            let attr = pkgname.to_string();
+            let component_for_launch = component_run.clone();
+            let (sender, receiver) = async_channel::bounded(1);
+
+            let child_pid: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+            let child_pid_task = child_pid.clone();
+
+            let join_handle = crate::runtime::runtime().spawn(async move {
+                let output = match tokio::process::Command::new("nix")
+                    .args([
+                        "build",
+                        &format!("nixpkgs#{attr}"),
+                        "--no-link",
+                        "--print-out-paths",
+                    ])
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .process_group(0)
+                    .spawn()
+                {
+                    Ok(child) => {
+                        if let Some(pid) = child.id() {
+                            *child_pid_task.lock().unwrap() = Some(pid);
+                        }
+                        child.wait_with_output().await
+                    }
+                    Err(e) => Err(e),
+                };
+                let _ = sender.send(output).await;
+            });
+
+            imp.run_cancel.replace(Some(RunCancel {
+                abort_handle: join_handle.abort_handle(),
+                child_pid,
+            }));
+
+            let btn = button.clone();
+            let page_weak = page.downgrade();
+            glib::spawn_future_local(async move {
+                if let Ok(result) = receiver.recv().await {
+                    if let Some(page) = page_weak.upgrade() {
+                        page.imp().run_cancel.replace(None);
+                    }
+
+                    Self::reset_run_button(&btn);
+
+                    match result {
+                        Ok(output) if output.status.success() => {
+                            let store_path =
+                                String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            Self::launch_from_store_path(&store_path, &component_for_launch);
+                        }
+                        Ok(output) => {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            tracing::warn!("nix build failed: {stderr}");
+                        }
+                        Err(err) => {
+                            tracing::warn!("Failed to run nix build: {err}");
+                        }
+                    }
+                }
+            });
+        });
+
+        let page_weak_dd = page.downgrade();
+        imp.target_dropdown
+            .connect_selected_notify(move |_dropdown| {
+                if let Some(page) = page_weak_dd.upgrade() {
+                    Self::sync_button_states(&page);
+                }
+            });
+
+        let page_weak_unmap = page.downgrade();
+        page.connect_unmap(move |_| {
+            if let Some(page) = page_weak_unmap.upgrade() {
+                Self::cancel_run_build(page.imp());
+                Self::disconnect_pending_changed(page.imp());
+            }
+        });
+
+        let page_weak_map = page.downgrade();
+        page.connect_map(move |_| {
+            let Some(page) = page_weak_map.upgrade() else {
+                return;
+            };
+            let Some(window) = page
+                .root()
+                .and_downcast::<adw::ApplicationWindow>()
+                .and_then(|w| w.downcast::<NscWindow>().ok())
+            else {
+                return;
+            };
+
+            Self::sync_button_states(&page);
+            Self::sync_sidebar_button_style(&page.imp().sidebar_button, window.pending_changes());
+            Self::ensure_pending_changed_connected(&page, &window);
+        });
+    }
+
+    fn ensure_pending_changed_connected(page: &Self, window: &NscWindow) {
+        let imp = page.imp();
+        if imp.pending_changed_handler.borrow().is_some() {
+            return;
+        }
+
+        let pending = window.pending_changes();
+        let page_weak = page.downgrade();
+        let prev_count = std::cell::Cell::new(pending.n_items());
+        let handler_id = pending.connect_items_changed(move |pc, _, _, _| {
+            let Some(page) = page_weak.upgrade() else {
+                return;
+            };
+            Self::sync_button_states(&page);
+
+            let n = pc.n_items();
+            let was = prev_count.replace(n);
+            Self::sync_sidebar_button_style(&page.imp().sidebar_button, pc);
+            if n > was {
+                crate::window::NscWindow::shake_widget(&*page.imp().sidebar_button);
+            }
+        });
+        imp.pending_changed_handler
+            .replace(Some((handler_id, pending.clone())));
+    }
+
+    fn disconnect_pending_changed(imp: &imp::NscAppDetail) {
+        if let Some((handler_id, pending)) = imp.pending_changed_handler.take() {
+            pending.disconnect(handler_id);
+        }
+    }
+
+    fn sync_button_states(page: &Self) {
+        let Some(window) = page
+            .root()
+            .and_downcast::<adw::ApplicationWindow>()
+            .and_then(|w| w.downcast::<NscWindow>().ok())
+        else {
+            return;
+        };
+
+        let imp = page.imp();
+        let Some(component) = imp.component.borrow().clone() else {
+            return;
+        };
+
+        let target = Self::selected_target(imp);
+        let installed = Self::is_installed_for_target(imp, target);
+        let pending = window.pending_changes();
+        let is_pending = pending.contains(&component, target);
+
+        if installed {
+            imp.install_button.set_visible(true);
+            imp.install_button.set_label("Open");
+            imp.install_button.remove_css_class("destructive-action");
+            imp.install_button.add_css_class("suggested-action");
+
+            imp.trash_button.set_visible(true);
+            imp.run_button.set_visible(false);
+
+            if is_pending {
+                imp.trash_button.add_css_class("destructive-action");
+                imp.trash_button.set_tooltip_text(Some("Undo Removal"));
+            } else {
+                imp.trash_button.remove_css_class("destructive-action");
+                imp.trash_button.set_tooltip_text(Some("Remove"));
+            }
+        } else {
+            imp.trash_button.set_visible(false);
+            imp.run_button.set_visible(true);
+
+            imp.install_button.set_visible(true);
+            if is_pending {
+                imp.install_button.set_label("Pending");
+                imp.install_button.remove_css_class("suggested-action");
+                imp.install_button.add_css_class("destructive-action");
+            } else {
+                imp.install_button.set_label("Install");
+                imp.install_button.remove_css_class("destructive-action");
+                imp.install_button.add_css_class("suggested-action");
+            }
+        }
+    }
+
+    fn sync_sidebar_button_style(
+        button: &gtk::ToggleButton,
+        pending: &crate::pending_changes::PendingChanges,
+    ) {
+        if pending.n_items() > 0 {
+            button.add_css_class("suggested-action");
+        } else {
+            button.remove_css_class("suggested-action");
+        }
+    }
+
+    fn reset_run_button(button: &gtk::Button) {
+        button.set_child(None::<&gtk::Widget>);
+        button.set_icon_name("media-playback-start-symbolic");
+        button.set_sensitive(true);
+        button.set_tooltip_text(Some("Run without installing"));
+    }
+
+    fn cancel_run_build(imp: &imp::NscAppDetail) {
+        if let Some(cancel) = imp.run_cancel.borrow_mut().take() {
+            cancel.cancel();
+            Self::reset_run_button(&imp.run_button);
+        }
+    }
+
+    fn launch_app(component: &libappstream::Component) {
+        let desktop_id = component
+            .launchable(libappstream::LaunchableKind::DesktopId)
+            .and_then(|l| l.entries().into_iter().next())
+            .or_else(|| component.id());
+
+        let Some(id) = desktop_id else {
+            tracing::warn!("No desktop ID found for component");
+            return;
+        };
+
+        let Some(app_info) = gio::DesktopAppInfo::new(&id) else {
+            tracing::warn!("Could not find desktop file for {id}");
+            return;
+        };
+
+        if let Err(err) = app_info.launch(&[], gio::AppLaunchContext::NONE) {
+            tracing::warn!("Failed to launch {id}: {err}");
+        }
+    }
+
+    fn launch_from_store_path(store_path: &str, component: &libappstream::Component) {
+        use gio::prelude::*;
+
+        let apps_dir = std::path::Path::new(store_path).join("share/applications");
+        let Ok(entries) = std::fs::read_dir(&apps_dir) else {
+            tracing::warn!("No share/applications in {store_path}");
+            return;
+        };
+
+        let desktop_files: Vec<std::path::PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|ext| ext == "desktop"))
+            .collect();
+
+        if desktop_files.is_empty() {
+            tracing::warn!("No .desktop files found in {}", apps_dir.display());
+            return;
+        }
+
+        let preferred_id = component
+            .launchable(libappstream::LaunchableKind::DesktopId)
+            .and_then(|l| l.entries().into_iter().next())
+            .or_else(|| component.id());
+
+        let desktop_file = if let Some(ref id) = preferred_id {
+            desktop_files
+                .iter()
+                .find(|p| {
+                    p.file_name()
+                        .is_some_and(|name| name.to_string_lossy() == id.as_str())
+                })
+                .unwrap_or(&desktop_files[0])
+        } else {
+            &desktop_files[0]
+        };
+
+        let keyfile = glib::KeyFile::new();
+        if let Err(err) = keyfile.load_from_file(desktop_file, glib::KeyFileFlags::NONE) {
+            tracing::warn!("Failed to load {}: {err}", desktop_file.display());
+            return;
+        }
+
+        let bin_dir = std::path::Path::new(store_path).join("bin");
+        let bin_dir_str = bin_dir.to_string_lossy().to_string();
+        let share_dir = format!("{store_path}/share");
+        let new_path = format!("{bin_dir_str}:{}", std::env::var("PATH").unwrap_or_default());
+        let new_xdg = format!(
+            "{share_dir}:{}",
+            std::env::var("XDG_DATA_DIRS").unwrap_or_default()
+        );
+
+        let resolve_store_command = |command: &str| {
+            if command.contains('/') {
+                return Some(command.to_string());
+            }
+            let candidate = bin_dir.join(command);
+            if candidate.exists() {
+                Some(candidate.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        };
+
+        if let Ok(try_exec) = keyfile.string("Desktop Entry", "TryExec")
+            && let Some(resolved_try_exec) = resolve_store_command(try_exec.as_str())
+        {
+            keyfile.set_string("Desktop Entry", "TryExec", &resolved_try_exec);
+        }
+
+        if let Ok(exec_line) = keyfile.string("Desktop Entry", "Exec") {
+            let trimmed = exec_line.trim_start();
+            if let Some(command) = trimmed.split_whitespace().next()
+                && let Some(resolved) = resolve_store_command(command)
+                && let Some(command_offset) = exec_line.find(command)
+            {
+                let command_end = command_offset + command.len();
+                let rewritten_exec = format!(
+                    "{}{}{}",
+                    &exec_line[..command_offset],
+                    resolved,
+                    &exec_line[command_end..]
+                );
+                keyfile.set_string("Desktop Entry", "Exec", &rewritten_exec);
+            }
+        }
+
+        let app_info = gio::DesktopAppInfo::from_keyfile(&keyfile);
+
+        if let Some(app_info) = app_info {
+            let ctx = gio::AppLaunchContext::new();
+            ctx.setenv("PATH", &new_path);
+            ctx.setenv("XDG_DATA_DIRS", &new_xdg);
+
+            match app_info.launch(&[], Some(&ctx)) {
+                Ok(()) => return,
+                Err(err) => {
+                    tracing::warn!("gio launch failed, falling back to Exec: {err}");
+                }
+            }
+        }
+
+        tracing::info!(
+            "Falling back to parsing Exec= for {}",
+            desktop_file.display()
+        );
+        let Ok(exec_line) = keyfile.string("Desktop Entry", "Exec") else {
+            tracing::warn!("No Exec= in {}", desktop_file.display());
+            return;
+        };
+
+        let argv: Vec<&str> = exec_line
+            .split_whitespace()
+            .filter(|arg| !arg.starts_with('%'))
+            .collect();
+
+        let Some(command) = argv.first() else {
+            tracing::warn!("Empty Exec= in {}", desktop_file.display());
+            return;
+        };
+
+        let resolved = if !command.contains('/') {
+            let candidate = bin_dir.join(command);
+            if candidate.exists() {
+                candidate.to_string_lossy().to_string()
+            } else {
+                command.to_string()
+            }
+        } else {
+            command.to_string()
+        };
+
+        let mut cmd = std::process::Command::new(&resolved);
+        cmd.args(&argv[1..])
+            .env("PATH", &new_path)
+            .env("XDG_DATA_DIRS", &new_xdg)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .process_group(0);
+
+        if let Err(err) = cmd.spawn() {
+            tracing::warn!("Failed to launch {resolved}: {err}");
+        }
     }
 
     fn load_icon(imp: &imp::NscAppDetail, component: &libappstream::Component) {

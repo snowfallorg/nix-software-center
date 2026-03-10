@@ -6,6 +6,7 @@ use gtk::{gio, glib};
 
 use crate::application::NscApplication;
 use crate::explore_page::ExplorePage;
+use crate::pending_changes::PendingChanges;
 use crate::search_page::SearchPage;
 
 glib::wrapper! {
@@ -41,6 +42,14 @@ impl NscWindow {
 
     pub fn search_page(&self) -> SearchPage {
         self.imp().search_page.clone()
+    }
+
+    pub fn pending_changes(&self) -> &PendingChanges {
+        &self.imp().pending_changes
+    }
+
+    pub fn shake_widget(widget: &impl IsA<gtk::Widget>) {
+        imp::NscWindow::shake_widget(widget);
     }
 
     fn save_window_size(&self) -> Result<(), glib::BoolError> {

@@ -4,10 +4,16 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, gdk, gio, glib};
+use libappstream::prelude::ComponentExt;
 
+use crate::app_detail::NscAppDetail;
+use crate::application::NscApplication;
 use crate::config::{APP_ID, PROFILE};
 use crate::explore_page::ExplorePage;
 use crate::installed_page::InstalledPage;
+use crate::pending_changes::PendingChanges;
+use crate::pending_item::{InstallTarget, PendingItem};
+use crate::pending_row::NscPendingRow;
 use crate::search_page::SearchPage;
 use crate::updates_page::UpdatesPage;
 
@@ -32,6 +38,13 @@ pub struct NscWindow {
     pub search_entry: TemplateChild<gtk::SearchEntry>,
     #[template_child]
     pub search_page: TemplateChild<SearchPage>,
+    #[template_child]
+    pub pending_stack: TemplateChild<gtk::Stack>,
+    #[template_child]
+    pub pending_content_box: TemplateChild<gtk::Box>,
+    #[template_child]
+    pub sidebar_back_button: TemplateChild<gtk::Button>,
+    pub pending_changes: PendingChanges,
     pub settings: gio::Settings,
     pub last_tab: RefCell<String>,
 }
@@ -48,6 +61,10 @@ impl Default for NscWindow {
             search_bar: TemplateChild::default(),
             search_entry: TemplateChild::default(),
             search_page: TemplateChild::default(),
+            pending_stack: TemplateChild::default(),
+            pending_content_box: TemplateChild::default(),
+            sidebar_back_button: TemplateChild::default(),
+            pending_changes: PendingChanges::default(),
             settings: gio::Settings::new(*APP_ID),
             last_tab: RefCell::new("explore".to_string()),
         }
@@ -65,6 +82,7 @@ impl ObjectSubclass for NscWindow {
         InstalledPage::ensure_type();
         UpdatesPage::ensure_type();
         SearchPage::ensure_type();
+        NscPendingRow::ensure_type();
 
         klass.bind_template();
     }
@@ -79,13 +97,15 @@ impl ObjectImpl for NscWindow {
         self.parent_constructed();
         let obj = self.obj();
 
-        // Devel Profile
         if *PROFILE == "Devel" {
             obj.add_css_class("devel");
         }
 
         // Load latest window state
         obj.load_window_size();
+
+        // Wire up pending changes sidebar
+        self.setup_pending_sidebar();
 
         // Search action activates search; if already active, re-focuses the entry
         let search_button = self.search_button.clone();
@@ -247,3 +267,213 @@ impl WindowImpl for NscWindow {
 impl ApplicationWindowImpl for NscWindow {}
 
 impl AdwApplicationWindowImpl for NscWindow {}
+
+impl NscWindow {
+    fn setup_pending_sidebar(&self) {
+        let pending_changes = &self.pending_changes;
+        let pending_stack = self.pending_stack.clone();
+        let pending_content_box = self.pending_content_box.clone();
+        let sidebar_button = self.sidebar_button.clone();
+
+        let pc = pending_changes.clone();
+        let stack = pending_stack.clone();
+        let content_box = pending_content_box.clone();
+        let btn = sidebar_button.clone();
+        let prev_count = std::cell::Cell::new(0u32);
+        pending_changes.connect_items_changed(move |_, _, _, _| {
+            Self::rebuild_pending_list(&pc, &stack, &content_box);
+
+            let n = pc.n_items();
+            let was = prev_count.replace(n);
+
+            if n > 0 {
+                btn.set_tooltip_text(Some(&format!("Pending Changes ({})", n)));
+                btn.add_css_class("suggested-action");
+            } else {
+                btn.set_tooltip_text(Some("Pending Changes Sidebar"));
+                btn.remove_css_class("suggested-action");
+            }
+
+            if n > was {
+                Self::shake_widget(&btn);
+            }
+        });
+
+        let split_view = self.split_view.clone();
+        self.sidebar_back_button.connect_clicked(move |_| {
+            split_view.set_show_sidebar(false);
+        });
+
+        Self::rebuild_pending_list(pending_changes, &pending_stack, &pending_content_box);
+    }
+
+    fn rebuild_pending_list(
+        pending_changes: &PendingChanges,
+        stack: &gtk::Stack,
+        content_box: &gtk::Box,
+    ) {
+        while let Some(child) = content_box.first_child() {
+            content_box.remove(&child);
+        }
+
+        let n = pending_changes.n_items();
+
+        if n == 0 {
+            stack.set_visible_child_name("empty");
+            return;
+        }
+
+        stack.set_visible_child_name("list");
+
+        let nixos_items = pending_changes.items_for_target(InstallTarget::NixOS);
+        let hm_items = pending_changes.items_for_target(InstallTarget::HomeManager);
+
+        if !nixos_items.is_empty() {
+            Self::append_section(content_box, "NixOS", &nixos_items, pending_changes);
+        }
+
+        if !hm_items.is_empty() {
+            Self::append_section(content_box, "Home Manager", &hm_items, pending_changes);
+        }
+    }
+
+    fn append_section(
+        content_box: &gtk::Box,
+        title: &str,
+        items: &[PendingItem],
+        pending_changes: &PendingChanges,
+    ) {
+        let section = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .build();
+
+        let label = gtk::Label::builder()
+            .label(title)
+            .xalign(0.0)
+            .css_classes(["title-4"])
+            .build();
+        section.append(&label);
+
+        let list_box = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .build();
+
+        list_box.connect_row_activated(|_list_box, row| {
+            let Some(row) = row.downcast_ref::<NscPendingRow>() else {
+                return;
+            };
+            let Some(component) = row.component() else {
+                return;
+            };
+            let target = row.target();
+
+            let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
+                return;
+            };
+
+            let metadata_ref = app.metadata().borrow();
+            let Some(metadata) = metadata_ref.as_ref() else {
+                return;
+            };
+
+            let Some(window) = row.root().and_downcast::<super::NscWindow>() else {
+                return;
+            };
+
+            let imp = window.imp();
+
+            let existing_detail = imp
+                .navigation_view
+                .visible_page()
+                .and_downcast::<NscAppDetail>()
+                .filter(|detail| {
+                    detail
+                        .imp()
+                        .component
+                        .borrow()
+                        .as_ref()
+                        .and_then(|c| c.pkgname())
+                        == component.pkgname()
+                });
+
+            if let Some(detail) = existing_detail {
+                let target_index = match target {
+                    InstallTarget::NixOS => 0,
+                    InstallTarget::HomeManager => 1,
+                };
+                detail.imp().target_dropdown.set_selected(target_index);
+            } else {
+                let detail = NscAppDetail::new(&component, metadata);
+                detail.imp().target_dropdown.set_selected(match target {
+                    InstallTarget::NixOS => 0,
+                    InstallTarget::HomeManager => 1,
+                });
+                imp.navigation_view.push(&detail);
+            }
+            imp.split_view.set_show_sidebar(false);
+        });
+
+        for item in items {
+            let row = NscPendingRow::new(item);
+            let pc = pending_changes.clone();
+            let target = item.target();
+            let item_clone = item.clone();
+            row.connect_remove(move |_| {
+                if let Some(component) = item_clone.component() {
+                    pc.remove_by_component(&component, target);
+                }
+            });
+            list_box.append(&row);
+        }
+
+        section.append(&list_box);
+        content_box.append(&section);
+    }
+
+    pub fn shake_widget(widget: &impl IsA<gtk::Widget>) {
+        let w = widget.as_ref().clone();
+        let amplitude = 15.0f64;
+
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let css_class = format!("nsc-shake-{id}");
+
+        w.add_css_class(&css_class);
+
+        let provider = gtk::CssProvider::new();
+        let display = w.display();
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
+
+        let css_class_anim = css_class.clone();
+        let provider_anim = provider.clone();
+        let target = adw::CallbackAnimationTarget::new(move |value| {
+            let oscillation = (value * std::f64::consts::PI * 6.0).sin();
+            let decay = 1.0 - value;
+            let angle = amplitude * oscillation * decay;
+            let css = format!(
+                ".{css_class_anim} {{ transition: none; transform: rotate({angle:.2}deg); }}"
+            );
+            #[allow(deprecated)]
+            provider_anim.load_from_data(&css);
+        });
+
+        let anim = adw::TimedAnimation::new(&w, 0.0, 1.0, 400, target);
+        anim.set_easing(adw::Easing::Linear);
+
+        let w_done = w.clone();
+        let display_done = display.clone();
+        let provider_done = provider.clone();
+        anim.connect_done(move |_| {
+            w_done.remove_css_class(&css_class);
+            gtk::style_context_remove_provider_for_display(&display_done, &provider_done);
+        });
+
+        anim.play();
+    }
+}

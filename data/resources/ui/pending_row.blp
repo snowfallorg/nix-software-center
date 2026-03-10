@@ -1,0 +1,61 @@
+using Gtk 4.0;
+
+template $NscPendingRow: Gtk.ListBoxRow {
+  activatable: true;
+  selectable: false;
+
+  child: Gtk.Box {
+    orientation: horizontal;
+    spacing: 10;
+    margin-top: 6;
+    margin-bottom: 6;
+    margin-start: 12;
+    margin-end: 12;
+
+    Gtk.Image icon {
+      pixel-size: 48;
+
+      styles [
+        "icon-dropshadow",
+      ]
+    }
+
+    Gtk.Box {
+      orientation: vertical;
+      spacing: 2;
+      valign: center;
+      hexpand: true;
+
+      Gtk.Label name_label {
+        styles [
+          "heading",
+        ]
+
+        halign: start;
+        ellipsize: end;
+        xalign: 0;
+      }
+
+      Gtk.Label kind_label {
+        styles [
+          "caption",
+          "dim-label",
+        ]
+
+        halign: start;
+        xalign: 0;
+      }
+    }
+
+    Gtk.Button remove_button {
+      styles [
+        "flat",
+        "circular",
+      ]
+
+      icon-name: "window-close-symbolic";
+      valign: center;
+      tooltip-text: _("Remove from pending changes");
+    }
+  };
+}

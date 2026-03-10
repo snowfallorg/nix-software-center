@@ -44,6 +44,12 @@ template $NscWindow: Adw.ApplicationWindow {
       Adw.HeaderBar {
         show-start-title-buttons: false;
 
+        [start]
+        Gtk.Button sidebar_back_button {
+          icon-name: "go-previous-symbolic";
+          tooltip-text: _("Close Sidebar");
+        }
+
         [title]
         Gtk.Label {
           styles [
@@ -54,10 +60,35 @@ template $NscWindow: Adw.ApplicationWindow {
         }
       }
 
-      content: Adw.StatusPage {
-        icon-name: "list-add-symbolic";
-        title: _("No Changes");
-        description: _("Packages you add or remove will appear here");
+      content: Gtk.Stack pending_stack {
+        transition-type: crossfade;
+
+        Gtk.StackPage {
+          name: "empty";
+
+          child: Adw.StatusPage {
+            icon-name: "list-add-symbolic";
+            title: _("No Changes");
+            description: _("Packages you add or remove will appear here");
+          };
+        }
+
+        Gtk.StackPage {
+          name: "list";
+
+          child: Gtk.ScrolledWindow {
+            hscrollbar-policy: never;
+
+            child: Gtk.Box pending_content_box {
+              orientation: vertical;
+              margin-start: 12;
+              margin-end: 12;
+              margin-top: 12;
+              margin-bottom: 12;
+              spacing: 18;
+            };
+          };
+        }
       };
     };
 

@@ -21,8 +21,6 @@ menu primary_menu {
 }
 
 template $NscAppDetail: Adw.NavigationPage {
-  tag: "detail";
-
   child: Adw.ToolbarView {
     [top]
     Adw.HeaderBar detail_headerbar {
@@ -52,8 +50,11 @@ template $NscAppDetail: Adw.NavigationPage {
 
         setters {
           header_box.orientation: vertical;
-          install_button.halign: fill;
-          install_button.hexpand: true;
+          install_box.halign: fill;
+          install_box.hexpand: true;
+          target_dropdown.halign: center;
+          action_buttons_box.halign: fill;
+          action_buttons_box.hexpand: true;
         }
       }
 
@@ -135,15 +136,59 @@ template $NscAppDetail: Adw.NavigationPage {
                   }
                 }
 
-                Gtk.Button install_button {
-                  styles [
-                    "suggested-action",
-                    "pill",
-                  ]
-
-                  label: _("Install");
-                  halign: end;
+                Gtk.Box install_box {
+                  orientation: vertical;
+                  spacing: 8;
                   valign: center;
+                  halign: end;
+
+                  Gtk.Box action_buttons_box {
+                    orientation: horizontal;
+                    spacing: 8;
+                    halign: end;
+
+                    Gtk.Button install_button {
+                      styles [
+                        "suggested-action",
+                        "pill",
+                      ]
+
+                      label: _("Install");
+                    }
+
+                    Gtk.Button trash_button {
+                      styles [
+                        "circular",
+                      ]
+
+                      icon-name: "user-trash-symbolic";
+                      tooltip-text: _("Remove");
+                      visible: false;
+                      width-request: 45;
+                    }
+
+                    Gtk.Button run_button {
+                      styles [
+                        "circular",
+                      ]
+
+                      icon-name: "media-playback-start-symbolic";
+                      tooltip-text: _("Run without installing");
+                      visible: false;
+                      width-request: 45;
+                    }
+                  }
+
+                  Gtk.DropDown target_dropdown {
+                    halign: end;
+
+                    model: Gtk.StringList {
+                      strings [
+                        "NixOS",
+                        "Home Manager",
+                      ]
+                    };
+                  }
                 }
               }
             };
