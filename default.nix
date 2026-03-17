@@ -15,7 +15,7 @@ pkgs.stdenv.mkDerivation {
   cargoDeps = pkgs.rustPlatform.importCargoLock {
     lockFile = ./Cargo.lock;
     outputHashes = {
-      "libsnow-0.0.2-alpha.1" = "sha256-PjEehXjy1SdqN28Z3QUDr8YHqd/J024NIwuNDhYHwAY=";
+      "libsnow-0.0.2-alpha.1" = "sha256-5/tUsUZUel4jASOcQhstuh+E6sP3qHr3stVSDCvTwGA=";
     };
   };
 
