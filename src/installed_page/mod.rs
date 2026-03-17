@@ -18,17 +18,16 @@ glib::wrapper! {
 impl InstalledPage {
     pub fn populate(
         &self,
-        metadata: &libsnow::metadata::Metadata,
+        nixos_pkgs: &[libsnow::Package],
+        hm_pkgs: &[libsnow::Package],
         pkgname_map: &HashMap<String, libappstream::Component>,
     ) {
         let imp = self.imp();
 
-        let nixos_pkgs = libsnow::nixos::list::list_systempackages(metadata).unwrap_or_default();
-        let nixos_count = Self::fill_list_box(&imp.nixos_list_box, &nixos_pkgs, pkgname_map);
+        let nixos_count = Self::fill_list_box(&imp.nixos_list_box, nixos_pkgs, pkgname_map);
         imp.nixos_section.set_visible(nixos_count > 0);
 
-        let hm_pkgs = libsnow::homemanager::list::list(metadata).unwrap_or_default();
-        let hm_count = Self::fill_list_box(&imp.hm_list_box, &hm_pkgs, pkgname_map);
+        let hm_count = Self::fill_list_box(&imp.hm_list_box, hm_pkgs, pkgname_map);
         imp.hm_section.set_visible(hm_count > 0);
 
         let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();

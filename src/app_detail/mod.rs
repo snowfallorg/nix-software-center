@@ -4,6 +4,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use libappstream::prelude::*;
+use std::collections::HashSet;
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 
@@ -37,9 +38,16 @@ impl NscAppDetail {
     pub fn new(
         component: &libappstream::Component,
         metadata: &libsnow::metadata::Metadata,
+        installed_nixos_attrs: &HashSet<String>,
+        installed_hm_attrs: &HashSet<String>,
     ) -> Self {
         let page: Self = glib::Object::new();
-        page.populate(component, metadata);
+        page.populate(
+            component,
+            metadata,
+            installed_nixos_attrs,
+            installed_hm_attrs,
+        );
         page
     }
 
@@ -47,6 +55,8 @@ impl NscAppDetail {
         &self,
         component: &libappstream::Component,
         metadata: &libsnow::metadata::Metadata,
+        installed_nixos_attrs: &HashSet<String>,
+        installed_hm_attrs: &HashSet<String>,
     ) {
         let imp = self.imp();
 
@@ -85,13 +95,10 @@ impl NscAppDetail {
 
         if let Some(pkgname) = component.pkgname() {
             let pkgname_str = pkgname.as_str();
-            let nixos_pkgs =
-                libsnow::nixos::list::list_systempackages(metadata).unwrap_or_default();
-            let installed_nixos = nixos_pkgs.iter().any(|p| p.attr.to_string() == pkgname_str);
+            let installed_nixos = installed_nixos_attrs.contains(pkgname_str);
             imp.installed_nixos.set(installed_nixos);
 
-            let hm_pkgs = libsnow::homemanager::list::list(metadata).unwrap_or_default();
-            let installed_hm = hm_pkgs.iter().any(|p| p.attr.to_string() == pkgname_str);
+            let installed_hm = installed_hm_attrs.contains(pkgname_str);
             imp.installed_hm.set(installed_hm);
 
             if installed_hm && !installed_nixos {
@@ -640,7 +647,10 @@ impl NscAppDetail {
         let bin_dir = std::path::Path::new(store_path).join("bin");
         let bin_dir_str = bin_dir.to_string_lossy().to_string();
         let share_dir = format!("{store_path}/share");
-        let new_path = format!("{bin_dir_str}:{}", std::env::var("PATH").unwrap_or_default());
+        let new_path = format!(
+            "{bin_dir_str}:{}",
+            std::env::var("PATH").unwrap_or_default()
+        );
         let new_xdg = format!(
             "{share_dir}:{}",
             std::env::var("XDG_DATA_DIRS").unwrap_or_default()

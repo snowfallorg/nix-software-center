@@ -5,7 +5,7 @@ use gtk::glib;
 use libappstream::{Component, Pool};
 use libsnow::metadata::Metadata;
 use std::cell::{Cell, OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::debug;
 
 use crate::config::APP_ID;
@@ -17,6 +17,8 @@ pub struct NscApplication {
     pub metadata: RefCell<Option<Metadata>>,
     pub appstream_pool: RefCell<Option<Pool>>,
     pub pkgname_map: RefCell<HashMap<String, Component>>,
+    pub installed_nixos_attrs: RefCell<HashSet<String>>,
+    pub installed_hm_attrs: RefCell<HashSet<String>>,
     pub views_populated: Cell<bool>,
 }
 

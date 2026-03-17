@@ -26,7 +26,8 @@ impl PendingChanges {
         if self.contains(component, target) {
             return false;
         }
-        self.store().append(&PendingItem::new_install(component, target));
+        self.store()
+            .append(&PendingItem::new_install(component, target));
         true
     }
 
@@ -34,7 +35,8 @@ impl PendingChanges {
         if self.contains(component, target) {
             return false;
         }
-        self.store().append(&PendingItem::new_remove(component, target));
+        self.store()
+            .append(&PendingItem::new_remove(component, target));
         true
     }
 

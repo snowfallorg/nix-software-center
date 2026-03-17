@@ -32,6 +32,14 @@ impl NscApplication {
         &self.imp().metadata
     }
 
+    pub fn installed_nixos_attrs(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().installed_nixos_attrs
+    }
+
+    pub fn installed_hm_attrs(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().installed_hm_attrs
+    }
+
     fn setup_gactions(&self) {
         let action_quit = gio::ActionEntry::builder("quit")
             .activate(move |app: &Self, _, _| {
@@ -166,8 +174,18 @@ impl NscApplication {
             && let Some(window) = imp.window.get()
             && let Some(window) = window.upgrade()
         {
+            let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
+            let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+
+            *imp.installed_nixos_attrs.borrow_mut() =
+                nixos_pkgs.iter().map(|p| p.attr.to_string()).collect();
+            *imp.installed_hm_attrs.borrow_mut() =
+                hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
+
             window.explore_page().populate(md, pool);
-            window.installed_page().populate(md, &pkgname_map);
+            window
+                .installed_page()
+                .populate(&nixos_pkgs, &hm_pkgs, &pkgname_map);
             window.search_page().set_pool(pool);
             imp.views_populated.set(true);
         }

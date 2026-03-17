@@ -405,7 +405,9 @@ impl NscWindow {
                 };
                 detail.imp().target_dropdown.set_selected(target_index);
             } else {
-                let detail = NscAppDetail::new(&component, metadata);
+                let nixos_attrs = app.installed_nixos_attrs().borrow();
+                let hm_attrs = app.installed_hm_attrs().borrow();
+                let detail = NscAppDetail::new(&component, metadata, &nixos_attrs, &hm_attrs);
                 detail.imp().target_dropdown.set_selected(match target {
                     InstallTarget::NixOS => 0,
                     InstallTarget::HomeManager => 1,
