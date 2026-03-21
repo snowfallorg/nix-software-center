@@ -7,6 +7,8 @@ use adw::prelude::*;
 use gtk::glib;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 
+use crate::runtime;
+
 glib::wrapper! {
     pub struct NscScreenshotSlot(ObjectSubclass<imp::NscScreenshotSlot>)
         @extends gtk::Widget,
@@ -99,9 +101,24 @@ async fn load_screenshot_pixels(
                 let data = if let Ok(cached) = tokio::fs::read(&path).await {
                     cached
                 } else {
-                    let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+                    let response = runtime::http_client()
+                        .get(&url)
+                        .send()
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    let status = response.status();
+                    if !status.is_success() {
+                        return Err(format!("HTTP {status} for {url}"));
+                    }
+
                     let bytes = response.bytes().await.map_err(|e| e.to_string())?;
                     let data = bytes.to_vec();
+
+                    // Verify the bytes are actually decodable before caching
+                    if image::guess_format(&data).is_err() {
+                        return Err(format!("Response is not a recognized image for {url}"));
+                    }
 
                     // Write to cache
                     if let Some(parent) = path.parent() {
