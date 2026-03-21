@@ -122,7 +122,7 @@ impl NscAppTile {
             .and_then(|l| l.entries().into_iter().next())
             .or_else(|| component.id());
 
-        desktop_id.is_some_and(|id| gio::DesktopAppInfo::new(&id).is_some())
+        desktop_id.is_some_and(|id| gio_unix::DesktopAppInfo::new(&id).is_some())
     }
 
     fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {

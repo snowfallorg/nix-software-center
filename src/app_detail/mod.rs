@@ -891,7 +891,7 @@ impl NscAppDetail {
             return;
         };
 
-        let Some(app_info) = gio::DesktopAppInfo::new(&id) else {
+        let Some(app_info) = gio_unix::DesktopAppInfo::new(&id) else {
             tracing::warn!("Could not find desktop file for {id}");
             return;
         };
@@ -991,9 +991,7 @@ impl NscAppDetail {
             }
         }
 
-        let app_info = gio::DesktopAppInfo::from_keyfile(&keyfile);
-
-        if let Some(app_info) = app_info {
+        if let Some(app_info) = gio_unix::DesktopAppInfo::from_keyfile(&keyfile) {
             let ctx = gio::AppLaunchContext::new();
             ctx.setenv("PATH", &new_path);
             ctx.setenv("XDG_DATA_DIRS", &new_xdg);
