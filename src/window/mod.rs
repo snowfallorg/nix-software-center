@@ -44,6 +44,10 @@ impl NscWindow {
         self.imp().search_page.clone()
     }
 
+    pub fn show_content(&self) {
+        self.imp().loading_stack.set_visible_child_name("content");
+    }
+
     pub fn pending_changes(&self) -> &PendingChanges {
         &self.imp().pending_changes
     }

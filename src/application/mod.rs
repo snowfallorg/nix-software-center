@@ -211,6 +211,7 @@ impl NscApplication {
                 .installed_page()
                 .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
             window.search_page().set_pool(pool);
+            window.show_content();
             imp.views_populated.set(true);
         }
     }

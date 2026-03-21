@@ -142,36 +142,57 @@ template $NscWindow: Adw.ApplicationWindow {
             };
           }
 
-          content: Adw.ViewStack view_stack {
-            Adw.ViewStackPage {
-              name: "explore";
-              title: _("Explore");
-              icon-name: "nsc-explore-symbolic";
+          content: Gtk.Stack loading_stack {
+            transition-type: crossfade;
+            visible-child-name: "loading";
 
-              child: $NscExplorePage {};
+            Gtk.StackPage {
+              name: "loading";
+
+              child: Adw.StatusPage loading_status {
+                child: Adw.Spinner {
+                  width-request: 48;
+                  height-request: 48;
+                  halign: center;
+                };
+              };
             }
 
-            Adw.ViewStackPage {
-              name: "installed";
-              title: _("Installed");
-              icon-name: "nsc-installed-symbolic";
+            Gtk.StackPage {
+              name: "content";
 
-              child: $NscInstalledPage {};
-            }
+              child: Adw.ViewStack view_stack {
+                Adw.ViewStackPage {
+                  name: "explore";
+                  title: _("Explore");
+                  icon-name: "nsc-explore-symbolic";
 
-            Adw.ViewStackPage {
-              name: "updates";
-              title: _("Updates");
-              icon-name: "software-update-available-symbolic";
+                  child: $NscExplorePage {};
+                }
 
-              child: $NscUpdatesPage {};
-            }
+                Adw.ViewStackPage {
+                  name: "installed";
+                  title: _("Installed");
+                  icon-name: "nsc-installed-symbolic";
 
-            Adw.ViewStackPage {
-              name: "search";
-              visible: false;
+                  child: $NscInstalledPage {};
+                }
 
-              child: $NscSearchPage search_page {};
+                Adw.ViewStackPage {
+                  name: "updates";
+                  title: _("Updates");
+                  icon-name: "software-update-available-symbolic";
+
+                  child: $NscUpdatesPage {};
+                }
+
+                Adw.ViewStackPage {
+                  name: "search";
+                  visible: false;
+
+                  child: $NscSearchPage search_page {};
+                }
+              };
             }
           };
 

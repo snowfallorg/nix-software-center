@@ -27,6 +27,10 @@ pub struct NscWindow {
     #[template_child]
     pub navigation_view: TemplateChild<adw::NavigationView>,
     #[template_child]
+    pub loading_stack: TemplateChild<gtk::Stack>,
+    #[template_child]
+    pub loading_status: TemplateChild<adw::StatusPage>,
+    #[template_child]
     pub view_stack: TemplateChild<adw::ViewStack>,
     #[template_child]
     pub search_button: TemplateChild<gtk::ToggleButton>,
@@ -55,6 +59,8 @@ impl Default for NscWindow {
             split_view: TemplateChild::default(),
             headerbar: TemplateChild::default(),
             navigation_view: TemplateChild::default(),
+            loading_stack: TemplateChild::default(),
+            loading_status: TemplateChild::default(),
             view_stack: TemplateChild::default(),
             search_button: TemplateChild::default(),
             sidebar_button: TemplateChild::default(),
@@ -100,6 +106,8 @@ impl ObjectImpl for NscWindow {
         if *PROFILE == "Devel" {
             obj.add_css_class("devel");
         }
+
+        self.loading_status.set_icon_name(Some(*APP_ID));
 
         // Load latest window state
         obj.load_window_size();
