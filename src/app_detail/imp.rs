@@ -6,7 +6,7 @@ use glib::subclass::InitializingObject;
 use glib::translate::IntoGlib;
 use gtk::{CompositeTemplate, glib, pango};
 
-use crate::height_clamp::NscHeightClamp;
+use crate::{height_clamp::NscHeightClamp, screenshot_slot::NscScreenshotSlot};
 
 /// The collapsed height for the description clamp (in pixels)
 const DESCRIPTION_COLLAPSED_HEIGHT: i32 = 180;
@@ -59,6 +59,7 @@ pub struct NscAppDetail {
     >,
 
     // Screenshots
+    pub screenshot_slots: RefCell<Vec<(Option<String>, bool, NscScreenshotSlot)>>,
     #[template_child]
     pub screenshot_box: TemplateChild<gtk::Box>,
     #[template_child]

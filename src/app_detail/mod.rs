@@ -204,21 +204,35 @@ impl NscAppDetail {
 
         // Screenshots
         self.populate_screenshots(component);
+        self.connect_style_change();
 
         // Links
         self.populate_links(component);
     }
 
+    fn connect_style_change(&self) {
+        let page_weak = self.downgrade();
+        adw::StyleManager::default().connect_dark_notify(move |_| {
+            let Some(page) = page_weak.upgrade() else {
+                return;
+            };
+            page.refresh_screenshot_carousel();
+        });
+    }
+
     fn populate_screenshots(&self, component: &libappstream::Component) {
         let screenshots = component.screenshots_all();
-
         if screenshots.is_empty() {
             return;
         }
 
-        // Collect URLs to load.
-        let mut urls = Vec::new();
+        let imp = self.imp();
+        let mut all_slots = Vec::new();
+
         for screenshot in &screenshots {
+            let env = screenshot.environment().map(|e| e.to_string());
+            let is_default = screenshot.kind() == libappstream::ScreenshotKind::Default;
+
             let image = screenshot
                 .images()
                 .into_iter()
@@ -236,38 +250,124 @@ impl NscAppDetail {
             if let Some(image) = image
                 && let Some(url) = image.url()
             {
-                urls.push(url.to_string());
+                let slot = NscScreenshotSlot::new();
+                slot.load(url.as_ref());
+                all_slots.push((env, is_default, slot));
             }
         }
 
-        if urls.is_empty() {
+        *imp.screenshot_slots.borrow_mut() = all_slots;
+        self.refresh_screenshot_carousel();
+
+        let slots = imp.screenshot_slots.borrow();
+        let carousel = &*imp.screenshot_carousel;
+        let n = carousel.n_pages();
+        if n > 1 {
+            for pos in 0..n {
+                let page = carousel.nth_page(pos);
+                if slots.iter().any(|(_, is_default, slot)| {
+                    *is_default && slot.upcast_ref::<gtk::Widget>() == &page
+                }) {
+                    carousel.scroll_to(&page, false);
+                    break;
+                }
+            }
+        }
+    }
+
+    fn refresh_screenshot_carousel(&self) {
+        let imp = self.imp();
+        let carousel = &*imp.screenshot_carousel;
+
+        let prev_position = carousel.position().round() as u32;
+        let prev_count = carousel.n_pages();
+
+        while let Some(child) = carousel.first_child() {
+            carousel.remove(&child);
+        }
+
+        let all_slots = imp.screenshot_slots.borrow();
+        if all_slots.is_empty() {
+            imp.screenshot_box.set_visible(false);
             return;
         }
 
-        let imp = self.imp();
+        let is_dark = adw::StyleManager::default().is_dark();
+        let desktop = Self::current_desktop_env().unwrap_or_else(|| "gnome".to_string());
+        let has_env = all_slots.iter().any(|(env, _, _)| env.is_some());
 
-        // Show the section immediately with a loading spinner per screenshot.
-        let urls_count = urls.len();
-        imp.screenshot_box.set_visible(true);
-        if urls_count > 1 {
+        // Filter by style and reorder by environment relevance
+        // https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html#tag-screenshots
+        let visible: Vec<usize> = if has_env {
+            let mut v: Vec<usize> = all_slots
+                .iter()
+                .enumerate()
+                .filter(|(_, (env, _, _))| match env.as_deref() {
+                    None => true,
+                    Some(e) => e.ends_with(":dark") == is_dark,
+                })
+                .map(|(i, _)| i)
+                .collect();
+
+            if v.is_empty() {
+                (0..all_slots.len()).collect()
+            } else {
+                v.sort_by_key(|&i| {
+                    let env_base = all_slots[i]
+                        .0
+                        .as_deref()
+                        .map(|e| e.split(':').next().unwrap_or(e));
+                    match env_base {
+                        Some(e) if e == desktop => 0,
+                        None => 1,
+                        Some(_) => 2,
+                    }
+                });
+                v
+            }
+        } else {
+            (0..all_slots.len()).collect()
+        };
+
+        let count = visible.len();
+        for &idx in &visible {
+            carousel.append(&all_slots[idx].2);
+        }
+
+        if count > 0 && count as u32 == prev_count && prev_position < count as u32 {
+            let target = carousel.nth_page(prev_position);
+            carousel.scroll_to(&target, false);
+        }
+
+        let restored = count > 0 && count as u32 == prev_count;
+        let current_pos = if restored { prev_position } else { 0 };
+
+        imp.screenshot_box.set_visible(count > 0);
+        if count > 1 {
             imp.screenshot_dots.set_visible(true);
+            let show_next = (current_pos as usize) < count - 1;
+            let show_prev = current_pos > 0;
+            imp.screenshot_next_revealer.set_reveal_child(show_next);
+            imp.screenshot_next_revealer.set_can_target(show_next);
+            imp.screenshot_prev_revealer.set_reveal_child(show_prev);
+            imp.screenshot_prev_revealer.set_can_target(show_prev);
         } else {
             imp.screenshot_dots.set_visible(false);
             imp.screenshot_carousel
                 .set_margin_bottom(imp.screenshot_carousel.margin_top());
+            imp.screenshot_next_revealer.set_reveal_child(false);
+            imp.screenshot_prev_revealer.set_reveal_child(false);
         }
+    }
 
-        for url in urls {
-            let slot = NscScreenshotSlot::new();
-            imp.screenshot_carousel.append(&slot);
-            slot.load(&url);
-        }
-
-        // Set initial nav button state (position_notify doesn't fire on first load).
-        if urls_count > 1 {
-            imp.screenshot_next_revealer.set_reveal_child(true);
-            imp.screenshot_next_revealer.set_can_target(true);
-        }
+    fn current_desktop_env() -> Option<String> {
+        let xdg = std::env::var("XDG_CURRENT_DESKTOP").ok()?;
+        let desktop = xdg.split(':').next()?.trim();
+        let env_id = match desktop {
+            "KDE" => "plasma",
+            _ => return Some(desktop.to_lowercase()),
+        };
+        Some(env_id.to_string())
     }
 
     fn populate_links(&self, component: &libappstream::Component) {
