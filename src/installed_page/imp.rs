@@ -73,7 +73,14 @@ impl ObjectImpl for InstalledPage {
                 };
                 let nixos_attrs = app.installed_nixos_attrs().borrow();
                 let hm_attrs = app.installed_hm_attrs().borrow();
-                let detail = NscAppDetail::new(&component, metadata, &nixos_attrs, &hm_attrs);
+                let profile_attrs = app.installed_profile_attrs().borrow();
+                let detail = NscAppDetail::new(
+                    &component,
+                    metadata,
+                    &nixos_attrs,
+                    &hm_attrs,
+                    &profile_attrs,
+                );
                 nav_view.push(&detail);
             });
         };

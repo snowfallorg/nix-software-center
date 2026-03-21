@@ -398,20 +398,26 @@ impl NscWindow {
                         == component.pkgname()
                 });
 
+            let target_index = match target {
+                InstallTarget::NixOS => 0,
+                InstallTarget::HomeManager => 1,
+                InstallTarget::Profile => 2,
+            };
+
             if let Some(detail) = existing_detail {
-                let target_index = match target {
-                    InstallTarget::NixOS => 0,
-                    InstallTarget::HomeManager => 1,
-                };
                 detail.imp().target_dropdown.set_selected(target_index);
             } else {
                 let nixos_attrs = app.installed_nixos_attrs().borrow();
                 let hm_attrs = app.installed_hm_attrs().borrow();
-                let detail = NscAppDetail::new(&component, metadata, &nixos_attrs, &hm_attrs);
-                detail.imp().target_dropdown.set_selected(match target {
-                    InstallTarget::NixOS => 0,
-                    InstallTarget::HomeManager => 1,
-                });
+                let profile_attrs = app.installed_profile_attrs().borrow();
+                let detail = NscAppDetail::new(
+                    &component,
+                    metadata,
+                    &nixos_attrs,
+                    &hm_attrs,
+                    &profile_attrs,
+                );
+                detail.imp().target_dropdown.set_selected(target_index);
                 imp.navigation_view.push(&detail);
             }
             imp.split_view.set_show_sidebar(false);

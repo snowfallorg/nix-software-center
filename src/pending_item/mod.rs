@@ -19,6 +19,7 @@ pub enum InstallTarget {
     #[default]
     NixOS,
     HomeManager,
+    Profile,
 }
 
 impl PendingItem {

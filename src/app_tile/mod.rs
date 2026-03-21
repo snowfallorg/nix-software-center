@@ -17,9 +17,10 @@ impl NscAppTile {
         component: &libappstream::Component,
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
+        profile_attrs: &HashSet<String>,
     ) -> Self {
         let tile: Self = glib::Object::new();
-        tile.bind(component, nixos_attrs, hm_attrs);
+        tile.bind(component, nixos_attrs, hm_attrs, profile_attrs);
         tile
     }
 
@@ -28,6 +29,7 @@ impl NscAppTile {
         component: &libappstream::Component,
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
+        profile_attrs: &HashSet<String>,
     ) {
         let imp = self.imp();
 
@@ -42,7 +44,7 @@ impl NscAppTile {
         }
 
         Self::load_icon(imp, component);
-        self.update_install_badge(component, nixos_attrs, hm_attrs);
+        self.update_install_badge(component, nixos_attrs, hm_attrs, profile_attrs);
     }
 
     pub fn unbind(&self) {
@@ -61,6 +63,7 @@ impl NscAppTile {
         component: &libappstream::Component,
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
+        profile_attrs: &HashSet<String>,
     ) {
         let imp = self.imp();
         let badge = &*imp.install_badge;
@@ -68,9 +71,11 @@ impl NscAppTile {
         badge.remove_css_class("install-badge-nix");
         badge.remove_css_class("install-badge-system");
 
-        let nix_installed = component
-            .pkgname()
-            .is_some_and(|p| nixos_attrs.contains(p.as_str()) || hm_attrs.contains(p.as_str()));
+        let nix_installed = component.pkgname().is_some_and(|p| {
+            nixos_attrs.contains(p.as_str())
+                || hm_attrs.contains(p.as_str())
+                || profile_attrs.contains(p.as_str())
+        });
 
         if nix_installed {
             badge.set_icon_name(Some("nsc-installed-symbolic"));
@@ -90,6 +95,25 @@ impl NscAppTile {
         }
 
         badge.set_visible(false);
+    }
+
+    /// Re-read the global installed attr sets and update the badge.
+    pub fn refresh_badge(&self) {
+        let imp = self.imp();
+        let Some(component) = imp.component.borrow().clone() else {
+            return;
+        };
+
+        let Some(app) =
+            gio::Application::default().and_downcast::<crate::application::NscApplication>()
+        else {
+            return;
+        };
+
+        let nixos_attrs = app.installed_nixos_attrs().borrow();
+        let hm_attrs = app.installed_hm_attrs().borrow();
+        let profile_attrs = app.installed_profile_attrs().borrow();
+        self.update_install_badge(&component, &nixos_attrs, &hm_attrs, &profile_attrs);
     }
 
     fn has_system_desktop_file(component: &libappstream::Component) -> bool {

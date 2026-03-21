@@ -8,7 +8,12 @@ use std::collections::HashSet;
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 
+use crate::application::NscApplication;
+use crate::pending_changes::PendingChanges;
 use crate::pending_item::InstallTarget;
+use crate::runtime::runtime;
+use crate::screenshot_slot::NscScreenshotSlot;
+use crate::util;
 use crate::window::NscWindow;
 
 #[derive(Debug)]
@@ -40,6 +45,7 @@ impl NscAppDetail {
         metadata: &libsnow::metadata::Metadata,
         installed_nixos_attrs: &HashSet<String>,
         installed_hm_attrs: &HashSet<String>,
+        installed_profile_attrs: &HashSet<String>,
     ) -> Self {
         let page: Self = glib::Object::new();
         page.populate(
@@ -47,6 +53,7 @@ impl NscAppDetail {
             metadata,
             installed_nixos_attrs,
             installed_hm_attrs,
+            installed_profile_attrs,
         );
         page
     }
@@ -57,6 +64,7 @@ impl NscAppDetail {
         metadata: &libsnow::metadata::Metadata,
         installed_nixos_attrs: &HashSet<String>,
         installed_hm_attrs: &HashSet<String>,
+        installed_profile_attrs: &HashSet<String>,
     ) {
         let imp = self.imp();
 
@@ -93,6 +101,7 @@ impl NscAppDetail {
             child.add_css_class("flat");
         }
 
+        let mut profile_op_active = false;
         if let Some(pkgname) = component.pkgname() {
             let pkgname_str = pkgname.as_str();
             let installed_nixos = installed_nixos_attrs.contains(pkgname_str);
@@ -101,14 +110,41 @@ impl NscAppDetail {
             let installed_hm = installed_hm_attrs.contains(pkgname_str);
             imp.installed_hm.set(installed_hm);
 
-            if installed_hm && !installed_nixos {
-                imp.target_dropdown.set_selected(1);
+            let installed_profile = installed_profile_attrs.contains(pkgname_str);
+            imp.installed_profile.set(installed_profile);
+
+            let default_target = if installed_nixos {
+                0
+            } else if installed_hm {
+                1
+            } else if installed_profile {
+                2
             } else {
-                imp.target_dropdown.set_selected(0);
+                0
+            };
+            imp.target_dropdown.set_selected(default_target);
+
+            if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+                profile_op_active = app.profile_ops_in_flight().borrow().contains(pkgname_str);
             }
         }
 
         Self::setup_action_buttons(self, imp, component);
+
+        if profile_op_active {
+            let label = if imp.installed_profile.get() {
+                "Removing…"
+            } else {
+                "Installing…"
+            };
+            imp.target_dropdown.set_selected(2);
+            imp.profile_op_in_flight.set(true);
+            imp.target_dropdown.set_sensitive(false);
+            imp.install_button.set_label(label);
+            imp.install_button.set_sensitive(false);
+            imp.trash_button.set_visible(false);
+            imp.run_button.set_visible(false);
+        }
 
         // Description
         if let Some(desc) = component.description() {
@@ -222,7 +258,7 @@ impl NscAppDetail {
         }
 
         for url in urls {
-            let slot = crate::screenshot_slot::NscScreenshotSlot::new();
+            let slot = NscScreenshotSlot::new();
             imp.screenshot_carousel.append(&slot);
             slot.load(&url);
         }
@@ -273,7 +309,12 @@ impl NscAppDetail {
     fn selected_target(imp: &imp::NscAppDetail) -> InstallTarget {
         match imp.target_dropdown.selected() {
             0 => InstallTarget::NixOS,
-            _ => InstallTarget::HomeManager,
+            1 => InstallTarget::HomeManager,
+            2 => InstallTarget::Profile,
+            n => {
+                tracing::warn!("Unexpected target dropdown index {n}");
+                InstallTarget::NixOS
+            }
         }
     }
 
@@ -281,6 +322,7 @@ impl NscAppDetail {
         match target {
             InstallTarget::NixOS => imp.installed_nixos.get(),
             InstallTarget::HomeManager => imp.installed_hm.get(),
+            InstallTarget::Profile => imp.installed_profile.get(),
         }
     }
 
@@ -291,7 +333,7 @@ impl NscAppDetail {
     ) {
         let component_install = component.clone();
         let page_weak_install = page.downgrade();
-        imp.install_button.connect_clicked(move |_button| {
+        imp.install_button.connect_clicked(move |button| {
             let Some(page) = page_weak_install.upgrade() else {
                 return;
             };
@@ -301,6 +343,11 @@ impl NscAppDetail {
 
             if installed {
                 Self::launch_app(&component_install);
+                return;
+            }
+
+            if target == InstallTarget::Profile {
+                Self::profile_install(&page, button, &component_install);
                 return;
             }
 
@@ -322,10 +369,18 @@ impl NscAppDetail {
 
         let component_remove = component.clone();
         let page_weak_remove = page.downgrade();
-        imp.trash_button.connect_clicked(move |_button| {
+        imp.trash_button.connect_clicked(move |button| {
             let Some(page) = page_weak_remove.upgrade() else {
                 return;
             };
+
+            let target = Self::selected_target(page.imp());
+
+            if target == InstallTarget::Profile {
+                Self::profile_remove(&page, button, &component_remove);
+                return;
+            }
+
             let Some(window) = page
                 .root()
                 .and_downcast::<adw::ApplicationWindow>()
@@ -334,7 +389,6 @@ impl NscAppDetail {
                 return;
             };
 
-            let target = Self::selected_target(page.imp());
             let pending = window.pending_changes();
             if pending.contains(&component_remove, target) {
                 pending.remove_by_component(&component_remove, target);
@@ -379,7 +433,7 @@ impl NscAppDetail {
             let child_pid: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
             let child_pid_task = child_pid.clone();
 
-            let join_handle = crate::runtime::runtime().spawn(async move {
+            let join_handle = runtime().spawn(async move {
                 let output = match tokio::process::Command::new("nix")
                     .args([
                         "build",
@@ -490,7 +544,7 @@ impl NscAppDetail {
             let was = prev_count.replace(n);
             Self::sync_sidebar_button_style(&page.imp().sidebar_button, pc);
             if n > was {
-                crate::window::NscWindow::shake_widget(&*page.imp().sidebar_button);
+                NscWindow::shake_widget(&*page.imp().sidebar_button);
             }
         });
         imp.pending_changed_handler
@@ -504,6 +558,19 @@ impl NscAppDetail {
     }
 
     fn sync_button_states(page: &Self) {
+        let imp = page.imp();
+        let Some(component) = imp.component.borrow().clone() else {
+            return;
+        };
+
+        let target = Self::selected_target(imp);
+        let installed = Self::is_installed_for_target(imp, target);
+
+        if target == InstallTarget::Profile {
+            Self::sync_profile_button_states(imp, installed);
+            return;
+        }
+
         let Some(window) = page
             .root()
             .and_downcast::<adw::ApplicationWindow>()
@@ -512,13 +579,6 @@ impl NscAppDetail {
             return;
         };
 
-        let imp = page.imp();
-        let Some(component) = imp.component.borrow().clone() else {
-            return;
-        };
-
-        let target = Self::selected_target(imp);
-        let installed = Self::is_installed_for_target(imp, target);
         let pending = window.pending_changes();
         let is_pending = pending.contains(&component, target);
 
@@ -555,10 +615,64 @@ impl NscAppDetail {
         }
     }
 
-    fn sync_sidebar_button_style(
-        button: &gtk::ToggleButton,
-        pending: &crate::pending_changes::PendingChanges,
-    ) {
+    fn sync_profile_button_states(imp: &imp::NscAppDetail, _installed: bool) {
+        let pkgname =
+            imp.component.borrow().as_ref().and_then(|c| {
+                libappstream::prelude::ComponentExt::pkgname(c).map(|p| p.to_string())
+            });
+
+        let in_flight = pkgname.as_ref().is_some_and(|pkgname| {
+            gio::Application::default()
+                .and_downcast::<NscApplication>()
+                .is_some_and(|app| app.profile_ops_in_flight().borrow().contains(pkgname))
+        });
+
+        if in_flight {
+            return;
+        }
+
+        if imp.profile_op_in_flight.get() {
+            imp.profile_op_in_flight.set(false);
+            imp.target_dropdown.set_sensitive(true);
+            imp.install_button.set_sensitive(true);
+
+            if let Some(pkgname) = &pkgname
+                && let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
+            {
+                let now_installed = app
+                    .installed_profile_attrs()
+                    .borrow()
+                    .contains(pkgname.as_str());
+                imp.installed_profile.set(now_installed);
+            }
+        }
+
+        let installed = imp.installed_profile.get();
+
+        if installed {
+            imp.install_button.set_visible(true);
+            imp.install_button.set_label("Open");
+            imp.install_button.remove_css_class("destructive-action");
+            imp.install_button.add_css_class("suggested-action");
+
+            imp.trash_button.set_visible(true);
+            imp.trash_button.remove_css_class("destructive-action");
+            imp.trash_button.set_tooltip_text(Some("Remove"));
+            imp.trash_button.set_icon_name("user-trash-symbolic");
+
+            imp.run_button.set_visible(false);
+        } else {
+            imp.trash_button.set_visible(false);
+            imp.run_button.set_visible(true);
+
+            imp.install_button.set_visible(true);
+            imp.install_button.set_label("Install");
+            imp.install_button.remove_css_class("destructive-action");
+            imp.install_button.add_css_class("suggested-action");
+        }
+    }
+
+    fn sync_sidebar_button_style(button: &gtk::ToggleButton, pending: &PendingChanges) {
         if pending.n_items() > 0 {
             button.add_css_class("suggested-action");
         } else {
@@ -578,6 +692,192 @@ impl NscAppDetail {
             cancel.cancel();
             Self::reset_run_button(&imp.run_button);
         }
+    }
+
+    fn begin_profile_op(imp: &imp::NscAppDetail, label: &str) {
+        imp.profile_op_in_flight.set(true);
+        imp.target_dropdown.set_sensitive(false);
+        imp.install_button.set_label(label);
+        imp.install_button.set_sensitive(false);
+        imp.trash_button.set_visible(false);
+        imp.run_button.set_visible(false);
+
+        if let Some(pkgname) =
+            imp.component.borrow().as_ref().and_then(|c| {
+                libappstream::prelude::ComponentExt::pkgname(c).map(|p| p.to_string())
+            })
+            && let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
+        {
+            app.profile_ops_in_flight().borrow_mut().insert(pkgname);
+        }
+    }
+
+    fn end_profile_op(imp: &imp::NscAppDetail) {
+        imp.profile_op_in_flight.set(false);
+        imp.target_dropdown.set_sensitive(true);
+        imp.install_button.set_sensitive(true);
+    }
+
+    fn finish_profile_op_on_visible_detail(pkgname: &str, succeeded: bool, is_install: bool) {
+        let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
+            return;
+        };
+        let window = app.main_window();
+
+        let Some(detail) = window
+            .imp()
+            .navigation_view
+            .visible_page()
+            .and_downcast::<NscAppDetail>()
+            .filter(|d| {
+                d.imp()
+                    .component
+                    .borrow()
+                    .as_ref()
+                    .and_then(|c| c.pkgname().map(|p| p.to_string()))
+                    .as_deref()
+                    == Some(pkgname)
+            })
+        else {
+            return;
+        };
+
+        if succeeded {
+            detail.imp().installed_profile.set(is_install);
+        }
+        Self::end_profile_op(detail.imp());
+        Self::sync_button_states(&detail);
+    }
+
+    fn clear_profile_in_flight(pkgname: &str) {
+        if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+            app.profile_ops_in_flight().borrow_mut().remove(pkgname);
+        }
+    }
+
+    fn profile_install(page: &Self, _button: &gtk::Button, component: &libappstream::Component) {
+        let imp = page.imp();
+        if imp.profile_op_in_flight.get() {
+            return;
+        }
+
+        let Some(pkgname) = component.pkgname() else {
+            return;
+        };
+
+        Self::begin_profile_op(imp, "Installing…");
+
+        let attr = pkgname.to_string();
+        type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;
+        type ProfileOpResult = (Result<(), String>, RefreshedList);
+        let (sender, receiver) = async_channel::bounded::<ProfileOpResult>(1);
+
+        runtime().spawn(async move {
+            let result = libsnow::profile::install::install(&[&attr])
+                .await
+                .map_err(|e| e.to_string());
+            let refreshed = libsnow::profile::list::list().ok().map(|pkgs| {
+                let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
+                (pkgs, attrs)
+            });
+            let _ = sender.send((result, refreshed)).await;
+        });
+
+        let pkgname_owned = pkgname.to_string();
+        glib::spawn_future_local(async move {
+            let Ok((result, refreshed)) = receiver.recv().await else {
+                return;
+            };
+
+            Self::clear_profile_in_flight(&pkgname_owned);
+
+            let succeeded = result.is_ok();
+            match result {
+                Ok(()) => {
+                    tracing::info!("Profile install succeeded");
+                    if let Some((pkgs, attrs)) = refreshed {
+                        Self::apply_refreshed_profile_attrs(pkgs, attrs);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("Profile install failed: {err}");
+                }
+            }
+
+            Self::finish_profile_op_on_visible_detail(&pkgname_owned, succeeded, true);
+        });
+    }
+
+    fn profile_remove(page: &Self, _button: &gtk::Button, component: &libappstream::Component) {
+        let imp = page.imp();
+        if imp.profile_op_in_flight.get() {
+            return;
+        }
+
+        let Some(pkgname) = component.pkgname() else {
+            return;
+        };
+
+        Self::begin_profile_op(imp, "Removing…");
+
+        let attr = pkgname.to_string();
+        type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;
+        type ProfileOpResult = (Result<(), String>, RefreshedList);
+        let (sender, receiver) = async_channel::bounded::<ProfileOpResult>(1);
+
+        runtime().spawn(async move {
+            let result = libsnow::profile::remove::remove(&[&attr])
+                .await
+                .map_err(|e| e.to_string());
+            let refreshed = libsnow::profile::list::list().ok().map(|pkgs| {
+                let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
+                (pkgs, attrs)
+            });
+            let _ = sender.send((result, refreshed)).await;
+        });
+
+        let pkgname_owned = pkgname.to_string();
+        glib::spawn_future_local(async move {
+            let Ok((result, refreshed)) = receiver.recv().await else {
+                return;
+            };
+
+            Self::clear_profile_in_flight(&pkgname_owned);
+
+            let succeeded = result.is_ok();
+            match result {
+                Ok(()) => {
+                    tracing::info!("Profile remove succeeded");
+                    if let Some((pkgs, attrs)) = refreshed {
+                        Self::apply_refreshed_profile_attrs(pkgs, attrs);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("Profile remove failed: {err}");
+                }
+            }
+
+            Self::finish_profile_op_on_visible_detail(&pkgname_owned, succeeded, false);
+        });
+    }
+
+    fn apply_refreshed_profile_attrs(
+        profile_pkgs: Vec<libsnow::Package>,
+        attrs: std::collections::HashSet<String>,
+    ) {
+        let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
+            return;
+        };
+        *app.installed_profile_attrs().borrow_mut() = attrs;
+
+        let window = app.main_window();
+        let pkgname_map = app.pkgname_map().borrow();
+        window
+            .installed_page()
+            .refresh_profile_section(&profile_pkgs, &pkgname_map);
+
+        window.explore_page().refresh_badges();
+        window.search_page().refresh_badges();
     }
 
     fn launch_app(component: &libappstream::Component) {
@@ -751,7 +1051,7 @@ impl NscAppDetail {
     }
 
     fn load_icon(imp: &imp::NscAppDetail, component: &libappstream::Component) {
-        crate::util::load_component_icon(&imp.icon, component, &[128, 64, 48]);
+        util::load_component_icon(&imp.icon, component, &[128, 64, 48]);
     }
 }
 

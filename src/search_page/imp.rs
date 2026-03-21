@@ -77,7 +77,8 @@ impl ObjectImpl for SearchPage {
                 .expect("NscApplication must exist");
             let nixos_attrs = app.installed_nixos_attrs().borrow();
             let hm_attrs = app.installed_hm_attrs().borrow();
-            tile.bind(&component, &nixos_attrs, &hm_attrs);
+            let profile_attrs = app.installed_profile_attrs().borrow();
+            tile.bind(&component, &nixos_attrs, &hm_attrs, &profile_attrs);
         });
 
         factory.connect_unbind(move |_, list_item| {

@@ -20,6 +20,7 @@ impl InstalledPage {
         &self,
         nixos_pkgs: &[libsnow::Package],
         hm_pkgs: &[libsnow::Package],
+        profile_pkgs: &[libsnow::Package],
         pkgname_map: &HashMap<String, libappstream::Component>,
     ) {
         let imp = self.imp();
@@ -30,8 +31,17 @@ impl InstalledPage {
         let hm_count = Self::fill_list_box(&imp.hm_list_box, hm_pkgs, pkgname_map);
         imp.hm_section.set_visible(hm_count > 0);
 
-        let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
-        let profile_count = Self::fill_list_box(&imp.profile_list_box, &profile_pkgs, pkgname_map);
+        let profile_count = Self::fill_list_box(&imp.profile_list_box, profile_pkgs, pkgname_map);
+        imp.profile_section.set_visible(profile_count > 0);
+    }
+
+    pub fn refresh_profile_section(
+        &self,
+        profile_pkgs: &[libsnow::Package],
+        pkgname_map: &HashMap<String, libappstream::Component>,
+    ) {
+        let imp = self.imp();
+        let profile_count = Self::fill_list_box(&imp.profile_list_box, profile_pkgs, pkgname_map);
         imp.profile_section.set_visible(profile_count > 0);
     }
 

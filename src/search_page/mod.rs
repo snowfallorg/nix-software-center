@@ -2,7 +2,10 @@ mod imp;
 
 use adw::subclass::prelude::*;
 use gtk::glib;
+use gtk::prelude::*;
 use libappstream::prelude::*;
+
+use crate::app_tile::NscAppTile;
 
 glib::wrapper! {
     pub struct SearchPage(ObjectSubclass<imp::SearchPage>)
@@ -13,6 +16,21 @@ glib::wrapper! {
 const POPULATE_BATCH_SIZE: usize = 50;
 
 impl SearchPage {
+    pub fn refresh_badges(&self) {
+        fn walk_and_refresh(widget: &gtk::Widget) {
+            if let Some(tile) = widget.downcast_ref::<NscAppTile>() {
+                tile.refresh_badge();
+                return;
+            }
+            let mut child = widget.first_child();
+            while let Some(w) = child {
+                walk_and_refresh(&w);
+                child = w.next_sibling();
+            }
+        }
+        walk_and_refresh(self.imp().grid_view.upcast_ref());
+    }
+
     pub fn set_pool(&self, pool: &libappstream::Pool) {
         self.imp().pool.replace(Some(pool.clone()));
     }

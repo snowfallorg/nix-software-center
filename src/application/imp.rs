@@ -19,6 +19,8 @@ pub struct NscApplication {
     pub pkgname_map: RefCell<HashMap<String, Component>>,
     pub installed_nixos_attrs: RefCell<HashSet<String>>,
     pub installed_hm_attrs: RefCell<HashSet<String>>,
+    pub installed_profile_attrs: RefCell<HashSet<String>>,
+    pub profile_ops_in_flight: RefCell<HashSet<String>>,
     pub views_populated: Cell<bool>,
 }
 

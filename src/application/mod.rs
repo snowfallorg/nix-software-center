@@ -19,7 +19,7 @@ glib::wrapper! {
 }
 
 impl NscApplication {
-    fn main_window(&self) -> NscWindow {
+    pub fn main_window(&self) -> NscWindow {
         self.imp()
             .window
             .get()
@@ -38,6 +38,22 @@ impl NscApplication {
 
     pub fn installed_hm_attrs(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
         &self.imp().installed_hm_attrs
+    }
+
+    pub fn installed_profile_attrs(
+        &self,
+    ) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().installed_profile_attrs
+    }
+
+    pub fn profile_ops_in_flight(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().profile_ops_in_flight
+    }
+
+    pub fn pkgname_map(
+        &self,
+    ) -> &std::cell::RefCell<std::collections::HashMap<String, libappstream::Component>> {
+        &self.imp().pkgname_map
     }
 
     fn setup_gactions(&self) {
@@ -176,20 +192,24 @@ impl NscApplication {
         {
             let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
             let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+            let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
 
             *imp.installed_nixos_attrs.borrow_mut() =
                 nixos_pkgs.iter().map(|p| p.attr.to_string()).collect();
             *imp.installed_hm_attrs.borrow_mut() =
                 hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
+            *imp.installed_profile_attrs.borrow_mut() =
+                profile_pkgs.iter().map(|p| p.attr.to_string()).collect();
 
             let nixos_attrs = imp.installed_nixos_attrs.borrow();
             let hm_attrs = imp.installed_hm_attrs.borrow();
+            let profile_attrs = imp.installed_profile_attrs.borrow();
             window
                 .explore_page()
-                .populate(md, pool, &nixos_attrs, &hm_attrs);
+                .populate(md, pool, &nixos_attrs, &hm_attrs, &profile_attrs);
             window
                 .installed_page()
-                .populate(&nixos_pkgs, &hm_pkgs, &pkgname_map);
+                .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
             window.search_page().set_pool(pool);
             imp.views_populated.set(true);
         }
