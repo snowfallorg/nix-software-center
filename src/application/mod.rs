@@ -182,7 +182,11 @@ impl NscApplication {
             *imp.installed_hm_attrs.borrow_mut() =
                 hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
 
-            window.explore_page().populate(md, pool);
+            let nixos_attrs = imp.installed_nixos_attrs.borrow();
+            let hm_attrs = imp.installed_hm_attrs.borrow();
+            window
+                .explore_page()
+                .populate(md, pool, &nixos_attrs, &hm_attrs);
             window
                 .installed_page()
                 .populate(&nixos_pkgs, &hm_pkgs, &pkgname_map);

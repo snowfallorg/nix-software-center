@@ -5,50 +5,67 @@ template $NscAppTile: Gtk.Button {
     "card",
   ]
 
-  child: Gtk.Box {
-    orientation: horizontal;
-    spacing: 15;
-    margin-top: 10;
-    margin-bottom: 10;
-    margin-start: 10;
-    margin-end: 10;
-    can-focus: false;
+  child: Gtk.Overlay {
+    child: Gtk.Box {
+      orientation: horizontal;
+      spacing: 15;
+      margin-top: 10;
+      margin-bottom: 10;
+      margin-start: 10;
+      margin-end: 10;
+      can-focus: false;
+      width-request: 280;
 
-    Gtk.Image icon {
-      pixel-size: 64;
+      Gtk.Image icon {
+        pixel-size: 64;
+
+        styles [
+          "icon-dropshadow",
+        ]
+      }
+
+      Gtk.Box {
+        orientation: vertical;
+        spacing: 4;
+        valign: center;
+        hexpand: true;
+
+        Gtk.Label name_label {
+          styles [
+            "heading",
+          ]
+
+          halign: fill;
+          max-width-chars: 23;
+          ellipsize: end;
+          xalign: 0;
+        }
+
+        Gtk.Label summary_label {
+          halign: fill;
+          ellipsize: end;
+          lines: 2;
+          max-width-chars: 20;
+          wrap: true;
+          single-line-mode: true;
+          xalign: 0;
+          yalign: 0;
+        }
+      }
+    };
+
+    [overlay]
+    Gtk.Image install_badge {
+      pixel-size: 16;
+      halign: end;
+      valign: start;
+      margin-top: 10;
+      margin-end: 10;
+      visible: false;
 
       styles [
-        "icon-dropshadow",
+        "install-badge",
       ]
-    }
-
-    Gtk.Box {
-      orientation: vertical;
-      spacing: 4;
-      valign: center;
-      hexpand: true;
-
-      Gtk.Label name_label {
-        styles [
-          "heading",
-        ]
-
-        halign: fill;
-        max-width-chars: 23;
-        ellipsize: end;
-        xalign: 0;
-      }
-
-      Gtk.Label summary_label {
-        halign: fill;
-        ellipsize: end;
-        lines: 2;
-        max-width-chars: 20;
-        wrap: true;
-        single-line-mode: true;
-        xalign: 0;
-        yalign: 0;
-      }
     }
   };
 }

@@ -5,6 +5,7 @@ use gtk::{CompositeTemplate, gio, glib};
 use std::cell::{Cell, RefCell};
 
 use crate::app_tile::NscAppTile;
+use crate::application::NscApplication;
 
 #[derive(Debug, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/search_page.ui")]
@@ -71,7 +72,12 @@ impl ObjectImpl for SearchPage {
                 .child()
                 .and_downcast::<NscAppTile>()
                 .expect("child must be an NscAppTile");
-            tile.bind(&component);
+            let app = gio::Application::default()
+                .and_downcast::<NscApplication>()
+                .expect("NscApplication must exist");
+            let nixos_attrs = app.installed_nixos_attrs().borrow();
+            let hm_attrs = app.installed_hm_attrs().borrow();
+            tile.bind(&component, &nixos_attrs, &hm_attrs);
         });
 
         factory.connect_unbind(move |_, list_item| {

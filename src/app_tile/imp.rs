@@ -1,9 +1,8 @@
-use std::cell::RefCell;
-
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, gio, glib};
+use std::cell::RefCell;
 
 use crate::app_detail::NscAppDetail;
 use crate::application::NscApplication;
@@ -17,6 +16,8 @@ pub struct NscAppTile {
     pub name_label: TemplateChild<gtk::Label>,
     #[template_child]
     pub summary_label: TemplateChild<gtk::Label>,
+    #[template_child]
+    pub install_badge: TemplateChild<gtk::Image>,
     pub component: RefCell<Option<libappstream::Component>>,
 }
 

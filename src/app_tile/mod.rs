@@ -1,8 +1,10 @@
 mod imp;
 
 use adw::subclass::prelude::*;
-use gtk::glib;
+use gtk::prelude::*;
+use gtk::{gio, glib};
 use libappstream::prelude::*;
+use std::collections::HashSet;
 
 glib::wrapper! {
     pub struct NscAppTile(ObjectSubclass<imp::NscAppTile>)
@@ -11,13 +13,22 @@ glib::wrapper! {
 }
 
 impl NscAppTile {
-    pub fn new(component: &libappstream::Component) -> Self {
+    pub fn new(
+        component: &libappstream::Component,
+        nixos_attrs: &HashSet<String>,
+        hm_attrs: &HashSet<String>,
+    ) -> Self {
         let tile: Self = glib::Object::new();
-        tile.bind(component);
+        tile.bind(component, nixos_attrs, hm_attrs);
         tile
     }
 
-    pub fn bind(&self, component: &libappstream::Component) {
+    pub fn bind(
+        &self,
+        component: &libappstream::Component,
+        nixos_attrs: &HashSet<String>,
+        hm_attrs: &HashSet<String>,
+    ) {
         let imp = self.imp();
 
         imp.component.replace(Some(component.clone()));
@@ -31,6 +42,7 @@ impl NscAppTile {
         }
 
         Self::load_icon(imp, component);
+        self.update_install_badge(component, nixos_attrs, hm_attrs);
     }
 
     pub fn unbind(&self) {
@@ -39,6 +51,54 @@ impl NscAppTile {
         imp.name_label.set_label("");
         imp.summary_label.set_label("");
         imp.icon.set_icon_name(Some("application-x-executable"));
+        imp.install_badge.set_visible(false);
+        imp.install_badge.remove_css_class("install-badge-nix");
+        imp.install_badge.remove_css_class("install-badge-system");
+    }
+
+    fn update_install_badge(
+        &self,
+        component: &libappstream::Component,
+        nixos_attrs: &HashSet<String>,
+        hm_attrs: &HashSet<String>,
+    ) {
+        let imp = self.imp();
+        let badge = &*imp.install_badge;
+
+        badge.remove_css_class("install-badge-nix");
+        badge.remove_css_class("install-badge-system");
+
+        let nix_installed = component
+            .pkgname()
+            .is_some_and(|p| nixos_attrs.contains(p.as_str()) || hm_attrs.contains(p.as_str()));
+
+        if nix_installed {
+            badge.set_icon_name(Some("nsc-installed-symbolic"));
+            badge.add_css_class("install-badge-nix");
+            badge.set_tooltip_text(Some("Installed with Nix"));
+            badge.set_visible(true);
+            return;
+        }
+
+        let has_desktop_file = Self::has_system_desktop_file(component);
+        if has_desktop_file {
+            badge.set_icon_name(Some("nsc-installed-symbolic"));
+            badge.add_css_class("install-badge-system");
+            badge.set_tooltip_text(Some("Installed on system"));
+            badge.set_visible(true);
+            return;
+        }
+
+        badge.set_visible(false);
+    }
+
+    fn has_system_desktop_file(component: &libappstream::Component) -> bool {
+        let desktop_id = component
+            .launchable(libappstream::LaunchableKind::DesktopId)
+            .and_then(|l| l.entries().into_iter().next())
+            .or_else(|| component.id());
+
+        desktop_id.is_some_and(|id| gio::DesktopAppInfo::new(&id).is_some())
     }
 
     fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {

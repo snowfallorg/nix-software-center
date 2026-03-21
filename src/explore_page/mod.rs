@@ -5,6 +5,7 @@ use gtk::glib;
 use gtk::prelude::*;
 use libappstream::prelude::*;
 use rand::seq::SliceRandom;
+use std::collections::HashSet;
 
 use crate::app_tile::NscAppTile;
 
@@ -15,7 +16,13 @@ glib::wrapper! {
 }
 
 impl ExplorePage {
-    pub fn populate(&self, _metadata: &libsnow::metadata::Metadata, pool: &libappstream::Pool) {
+    pub fn populate(
+        &self,
+        _metadata: &libsnow::metadata::Metadata,
+        pool: &libappstream::Pool,
+        nixos_attrs: &HashSet<String>,
+        hm_attrs: &HashSet<String>,
+    ) {
         let flow_box = &self.imp().flow_box;
 
         while let Some(child) = flow_box.first_child() {
@@ -43,7 +50,7 @@ impl ExplorePage {
         components.shuffle(&mut rand::rng());
 
         for component in components.iter().take(12) {
-            let tile = NscAppTile::new(component);
+            let tile = NscAppTile::new(component, nixos_attrs, hm_attrs);
             flow_box.append(&tile);
 
             let flow_child = tile
