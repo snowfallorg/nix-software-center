@@ -710,10 +710,10 @@ impl NscAppDetail {
             if is_pending {
                 imp.install_button.set_label("Pending");
                 imp.install_button.remove_css_class("suggested-action");
-                imp.install_button.add_css_class("destructive-action");
+                imp.install_button.add_css_class("accent");
             } else {
                 imp.install_button.set_label("Install");
-                imp.install_button.remove_css_class("destructive-action");
+                imp.install_button.remove_css_class("accent");
                 imp.install_button.add_css_class("suggested-action");
             }
         }
@@ -756,7 +756,7 @@ impl NscAppDetail {
         if installed {
             imp.install_button.set_visible(true);
             imp.install_button.set_label("Open");
-            imp.install_button.remove_css_class("destructive-action");
+            imp.install_button.remove_css_class("accent");
             imp.install_button.add_css_class("suggested-action");
 
             imp.trash_button.set_visible(true);
@@ -771,7 +771,7 @@ impl NscAppDetail {
 
             imp.install_button.set_visible(true);
             imp.install_button.set_label("Install");
-            imp.install_button.remove_css_class("destructive-action");
+            imp.install_button.remove_css_class("accent");
             imp.install_button.add_css_class("suggested-action");
         }
     }
