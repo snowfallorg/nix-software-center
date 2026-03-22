@@ -59,6 +59,10 @@
   background-color: alpha(@error_bg_color, 0.15);
 }
 
+.issue-row {
+  background-color: alpha(@error_bg_color, 0.15);
+}
+
 .install-badge {
   background-color: transparent;
   border-radius: 99px;

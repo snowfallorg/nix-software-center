@@ -6,8 +6,10 @@ use gtk::{gio, glib};
 
 use crate::application::NscApplication;
 use crate::explore_page::ExplorePage;
+use crate::installed_page;
 use crate::pending_changes::PendingChanges;
 use crate::search_page::SearchPage;
+use crate::updates_page::UpdatesPage;
 
 glib::wrapper! {
     pub struct NscWindow(ObjectSubclass<imp::NscWindow>)
@@ -31,13 +33,22 @@ impl NscWindow {
             .expect("explore page must be an ExplorePage")
     }
 
-    pub fn installed_page(&self) -> crate::installed_page::InstalledPage {
+    pub fn installed_page(&self) -> installed_page::InstalledPage {
         self.imp()
             .view_stack
             .child_by_name("installed")
             .expect("installed page must exist in view stack")
-            .downcast::<crate::installed_page::InstalledPage>()
+            .downcast::<installed_page::InstalledPage>()
             .expect("installed page must be an InstalledPage")
+    }
+
+    pub fn updates_page(&self) -> UpdatesPage {
+        self.imp()
+            .view_stack
+            .child_by_name("updates")
+            .expect("updates page must exist in view stack")
+            .downcast::<UpdatesPage>()
+            .expect("updates page must be an UpdatesPage")
     }
 
     pub fn search_page(&self) -> SearchPage {

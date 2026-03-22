@@ -46,6 +46,12 @@ template $NscInstalledAppRow: Gtk.ListBoxRow {
       }
     }
 
+    Gtk.Box action_area {
+      orientation: horizontal;
+      spacing: 8;
+      valign: center;
+    }
+
     Gtk.Image {
       styles [
         "dim-label",

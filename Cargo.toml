@@ -18,6 +18,7 @@ reqwest = { version = "0.13", features = ["json", "brotli"] }
 libsnow = { git = "https://github.com/snowfallorg/libsnow" }
 libappstream = { git = "https://gitlab.gnome.org/vlinkz/libappstream-rs.git", branch = "0.5" }
 gio-unix = "0.22"
+strum = { version = "0.28", features = ["derive"] }
 async-channel = "2"
 rand = "0.10"
 quick-xml = "0.39"

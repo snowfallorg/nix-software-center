@@ -6,7 +6,9 @@ use glib::subclass::InitializingObject;
 use glib::translate::IntoGlib;
 use gtk::{CompositeTemplate, glib, pango};
 
-use crate::{height_clamp::NscHeightClamp, screenshot_slot::NscScreenshotSlot};
+use crate::{
+    app_detail, height_clamp::NscHeightClamp, pending_changes, screenshot_slot::NscScreenshotSlot,
+};
 
 /// The collapsed height for the description clamp (in pixels)
 const DESCRIPTION_COLLAPSED_HEIGHT: i32 = 180;
@@ -49,14 +51,12 @@ pub struct NscAppDetail {
     pub installed_profile: Cell<bool>,
     pub profile_op_in_flight: Cell<bool>,
 
-    pub run_cancel: RefCell<Option<crate::app_detail::RunCancel>>,
+    pub run_cancel: RefCell<Option<app_detail::RunCancel>>,
 
-    pub pending_changed_handler: RefCell<
-        Option<(
-            glib::SignalHandlerId,
-            crate::pending_changes::PendingChanges,
-        )>,
-    >,
+    pub pending_changed_handler:
+        RefCell<Option<(glib::SignalHandlerId, pending_changes::PendingChanges)>>,
+
+    pub style_change_handler: RefCell<Option<glib::SignalHandlerId>>,
 
     // Screenshots
     pub screenshot_slots: RefCell<Vec<(Option<String>, bool, NscScreenshotSlot)>>,
@@ -133,6 +133,9 @@ impl ObjectSubclass for NscAppDetail {
 impl ObjectImpl for NscAppDetail {
     fn dispose(&self) {
         super::NscAppDetail::disconnect_pending_changed(self);
+        if let Some(handler_id) = self.style_change_handler.take() {
+            adw::StyleManager::default().disconnect(handler_id);
+        }
     }
 
     fn constructed(&self) {

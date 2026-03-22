@@ -70,9 +70,12 @@ impl NscAppDetail {
 
         imp.component.replace(Some(component.clone()));
 
-        let pkg_info = component
-            .pkgname()
-            .and_then(|pkgname| metadata.get(pkgname.as_str()).ok());
+        let pkg_info = component.pkgname().and_then(|pkgname| {
+            metadata
+                .get(pkgname.as_str())
+                .or_else(|_| metadata.get(util::strip_nix_output_suffix(pkgname.as_str())))
+                .ok()
+        });
 
         if let Some(name) = component.name() {
             self.set_title(name.as_str());
@@ -212,12 +215,13 @@ impl NscAppDetail {
 
     fn connect_style_change(&self) {
         let page_weak = self.downgrade();
-        adw::StyleManager::default().connect_dark_notify(move |_| {
+        let handler_id = adw::StyleManager::default().connect_dark_notify(move |_| {
             let Some(page) = page_weak.upgrade() else {
                 return;
             };
             page.refresh_screenshot_carousel();
         });
+        self.imp().style_change_handler.replace(Some(handler_id));
     }
 
     fn populate_screenshots(&self, component: &libappstream::Component) {
@@ -794,22 +798,24 @@ impl NscAppDetail {
         }
     }
 
-    fn begin_profile_op(imp: &imp::NscAppDetail, label: &str) {
+    fn begin_profile_op(imp: &imp::NscAppDetail, label: &str) -> bool {
+        if let Some(pkgname) =
+            imp.component.borrow().as_ref().and_then(|c| {
+                libappstream::prelude::ComponentExt::pkgname(c).map(|p| p.to_string())
+            })
+            && let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
+            && !app.profile_ops_in_flight().borrow_mut().insert(pkgname)
+        {
+            return false;
+        }
+
         imp.profile_op_in_flight.set(true);
         imp.target_dropdown.set_sensitive(false);
         imp.install_button.set_label(label);
         imp.install_button.set_sensitive(false);
         imp.trash_button.set_visible(false);
         imp.run_button.set_visible(false);
-
-        if let Some(pkgname) =
-            imp.component.borrow().as_ref().and_then(|c| {
-                libappstream::prelude::ComponentExt::pkgname(c).map(|p| p.to_string())
-            })
-            && let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
-        {
-            app.profile_ops_in_flight().borrow_mut().insert(pkgname);
-        }
+        true
     }
 
     fn end_profile_op(imp: &imp::NscAppDetail) {
@@ -856,16 +862,13 @@ impl NscAppDetail {
     }
 
     fn profile_install(page: &Self, _button: &gtk::Button, component: &libappstream::Component) {
-        let imp = page.imp();
-        if imp.profile_op_in_flight.get() {
-            return;
-        }
-
         let Some(pkgname) = component.pkgname() else {
             return;
         };
 
-        Self::begin_profile_op(imp, "Installing…");
+        if !Self::begin_profile_op(page.imp(), "Installing…") {
+            return;
+        }
 
         let attr = pkgname.to_string();
         type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;
@@ -909,16 +912,13 @@ impl NscAppDetail {
     }
 
     fn profile_remove(page: &Self, _button: &gtk::Button, component: &libappstream::Component) {
-        let imp = page.imp();
-        if imp.profile_op_in_flight.get() {
-            return;
-        }
-
         let Some(pkgname) = component.pkgname() else {
             return;
         };
 
-        Self::begin_profile_op(imp, "Removing…");
+        if !Self::begin_profile_op(page.imp(), "Removing…") {
+            return;
+        }
 
         let attr = pkgname.to_string();
         type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;

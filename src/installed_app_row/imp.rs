@@ -12,6 +12,8 @@ pub struct NscInstalledAppRow {
     pub name_label: TemplateChild<gtk::Label>,
     #[template_child]
     pub version_label: TemplateChild<gtk::Label>,
+    #[template_child]
+    pub action_area: TemplateChild<gtk::Box>,
     pub component: RefCell<Option<libappstream::Component>>,
 }
 

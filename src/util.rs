@@ -47,3 +47,16 @@ pub fn load_component_icon(image: &gtk::Image, component: &libappstream::Compone
     }
     image.set_icon_name(Some("application-x-executable"));
 }
+
+/// Strip a nix output suffix from a package attribute if present
+pub fn strip_nix_output_suffix(attr: &str) -> &str {
+    if let Some((base, suffix)) = attr.rsplit_once('.') {
+        match suffix {
+            "out" | "dev" | "devdoc" | "lib" | "man" | "doc" | "info" | "bin" | "debug"
+            | "static" | "all" => base,
+            _ => attr,
+        }
+    } else {
+        attr
+    }
+}

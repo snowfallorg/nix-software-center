@@ -1864,7 +1864,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "libsnow"
 version = "0.0.2-alpha.1"
-source = "git+https://github.com/snowfallorg/libsnow#4536de7b46397661b4dda0cb71ca4018e321c141"
+source = "git+https://github.com/snowfallorg/libsnow#bcb28adb38e677e724470797d27d9a76890b3cf2"
 dependencies = [
  "anyhow",
  "brotli",
@@ -1876,6 +1876,7 @@ dependencies = [
  "pretty_env_logger",
  "quick-xml",
  "rayon",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2091,6 +2092,7 @@ dependencies = [
  "rand 0.10.0",
  "reqwest",
  "spdx",
+ "strum",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3081,6 +3083,27 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "subtle"

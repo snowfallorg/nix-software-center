@@ -211,6 +211,19 @@ impl NscApplication {
                 .installed_page()
                 .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
             window.search_page().set_pool(pool);
+
+            // start update check
+            let nixos_attr_vec: Vec<String> = nixos_attrs.iter().cloned().collect();
+            let hm_attr_vec: Vec<String> = hm_attrs.iter().cloned().collect();
+            let profile_attr_vec: Vec<String> = profile_attrs.iter().cloned().collect();
+            window.updates_page().check_for_updates(
+                md,
+                &nixos_attr_vec,
+                &hm_attr_vec,
+                &profile_attr_vec,
+                &pkgname_map,
+            );
+
             window.show_content();
             imp.views_populated.set(true);
         }

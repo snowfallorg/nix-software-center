@@ -2,9 +2,385 @@ using Gtk 4.0;
 using Adw 1;
 
 template $NscUpdatesPage: Adw.Bin {
-  child: Adw.StatusPage {
-    icon-name: "software-update-available-symbolic";
-    title: _("Updates");
-    description: _("Available package updates");
+  child: Gtk.Stack loading_stack {
+    transition-type: crossfade;
+    visible-child-name: "loading";
+
+    Gtk.StackPage {
+      name: "loading";
+
+      child: Adw.StatusPage {
+        icon-name: "software-update-available-symbolic";
+        title: _("Checking for Updates");
+
+        child: Adw.Spinner {
+          width-request: 32;
+          height-request: 32;
+          halign: center;
+        };
+      };
+    }
+
+    Gtk.StackPage {
+      name: "up-to-date";
+
+      child: Adw.StatusPage {
+        icon-name: "nsc-installed-symbolic";
+        title: _("Up to Date");
+        description: _("All packages are up to date");
+      };
+    }
+
+    Gtk.StackPage {
+      name: "error";
+
+      child: Adw.StatusPage error_status {
+        icon-name: "dialog-error-symbolic";
+        title: _("Unable to Check for Updates");
+      };
+    }
+
+    Gtk.StackPage {
+      name: "content";
+
+      child: Gtk.ScrolledWindow {
+        child: Adw.Clamp {
+          maximum-size: 800;
+          tightening-threshold: 600;
+
+          child: Gtk.Box {
+            orientation: vertical;
+            margin-start: 12;
+            margin-end: 12;
+            margin-top: 12;
+            margin-bottom: 12;
+            spacing: 18;
+
+            Adw.Banner warnings_banner {
+              visible: false;
+            }
+
+            Gtk.Box update_everything_section {
+              visible: false;
+              orientation: vertical;
+              spacing: 12;
+
+              Gtk.ListBox {
+                styles [
+                  "boxed-list",
+                ]
+
+                selection-mode: none;
+
+                Gtk.ListBoxRow {
+                  activatable: false;
+
+                  child: Gtk.Box {
+                    orientation: horizontal;
+                    spacing: 12;
+                    margin-top: 8;
+                    margin-bottom: 8;
+                    margin-start: 12;
+                    margin-end: 12;
+
+                    Gtk.Image {
+                      pixel-size: 64;
+                      icon-name: "software-update-available-symbolic";
+
+                      styles [
+                        "icon-dropshadow",
+                      ]
+                    }
+
+                    Gtk.Box {
+                      orientation: vertical;
+                      spacing: 2;
+                      valign: center;
+                      hexpand: true;
+
+                      Gtk.Label {
+                        styles [
+                          "heading",
+                        ]
+
+                        label: _("Updates Available");
+                        halign: start;
+                        ellipsize: end;
+                        xalign: 0;
+                      }
+
+                      Gtk.Label update_everything_subtitle {
+                        styles [
+                          "caption",
+                        ]
+
+                        halign: start;
+                        wrap: true;
+                        xalign: 0;
+                      }
+                    }
+
+                    Gtk.Button update_everything_button {
+                      label: _("Update All");
+                      valign: center;
+
+                      styles [
+                        "suggested-action",
+                        "pill",
+                      ]
+                    }
+                  };
+                }
+              }
+
+              Gtk.Separator {}
+            }
+
+            Gtk.Box system_header_section {
+              orientation: vertical;
+              spacing: 18;
+              visible: false;
+
+              Gtk.ListBox {
+                styles [
+                  "boxed-list",
+                ]
+
+                selection-mode: none;
+
+                Gtk.ListBoxRow {
+                  activatable: false;
+
+                  child: Gtk.Box {
+                    orientation: horizontal;
+                    spacing: 12;
+                    margin-top: 8;
+                    margin-bottom: 8;
+                    margin-start: 12;
+                    margin-end: 12;
+
+                    Gtk.Image {
+                      pixel-size: 64;
+                      icon-name: "software-update-available-symbolic";
+
+                      styles [
+                        "icon-dropshadow",
+                      ]
+                    }
+
+                    Gtk.Box {
+                      orientation: vertical;
+                      spacing: 2;
+                      valign: center;
+                      hexpand: true;
+
+                      Gtk.Label {
+                        styles [
+                          "heading",
+                        ]
+
+                        label: _("System Updates");
+                        halign: start;
+                        ellipsize: end;
+                        xalign: 0;
+                      }
+
+                      Gtk.Label system_header_subtitle {
+                        styles [
+                          "caption",
+                        ]
+
+                        halign: start;
+                        wrap: true;
+                        xalign: 0;
+                      }
+                    }
+
+                    Gtk.Button system_update_button {
+                      label: _("Update");
+                      valign: center;
+
+                      styles [
+                        "suggested-action",
+                        "pill",
+                      ]
+                    }
+                  };
+                }
+              }
+
+              Gtk.Box nixos_updates_section {
+                orientation: vertical;
+                spacing: 6;
+                visible: false;
+
+                Gtk.Label {
+                  styles [
+                    "title-4",
+                  ]
+
+                  label: _("NixOS");
+                  xalign: 0;
+                }
+
+                Gtk.ListBox nixos_updates_list {
+                  styles [
+                    "boxed-list",
+                  ]
+
+                  selection-mode: none;
+                }
+              }
+
+              Gtk.Box hm_updates_section {
+                orientation: vertical;
+                spacing: 6;
+                visible: false;
+
+                Gtk.Label {
+                  styles [
+                    "title-4",
+                  ]
+
+                  label: _("Home Manager");
+                  xalign: 0;
+                }
+
+                Gtk.ListBox hm_updates_list {
+                  styles [
+                    "boxed-list",
+                  ]
+
+                  selection-mode: none;
+                }
+              }
+            }
+
+            Gtk.Separator profile_separator {
+              visible: false;
+            }
+
+            Gtk.Box profile_updates_section {
+              orientation: vertical;
+              spacing: 18;
+              visible: false;
+
+              Gtk.ListBox {
+                styles [
+                  "boxed-list",
+                ]
+
+                selection-mode: none;
+
+                Gtk.ListBoxRow {
+                  activatable: false;
+
+                  child: Gtk.Box {
+                    orientation: horizontal;
+                    spacing: 12;
+                    margin-top: 8;
+                    margin-bottom: 8;
+                    margin-start: 12;
+                    margin-end: 12;
+
+                    Gtk.Image {
+                      pixel-size: 64;
+                      icon-name: "software-update-available-symbolic";
+
+                      styles [
+                        "icon-dropshadow",
+                      ]
+                    }
+
+                    Gtk.Box {
+                      orientation: vertical;
+                      spacing: 2;
+                      valign: center;
+                      hexpand: true;
+
+                      Gtk.Label {
+                        styles [
+                          "heading",
+                        ]
+
+                        label: _("Profile Updates");
+                        halign: start;
+                        ellipsize: end;
+                        xalign: 0;
+                      }
+
+                      Gtk.Label profile_header_subtitle {
+                        styles [
+                          "caption",
+                        ]
+
+                        halign: start;
+                        xalign: 0;
+                      }
+                    }
+
+                    Gtk.Button profile_update_all_button {
+                      label: _("Update");
+                      valign: center;
+
+                      styles [
+                        "suggested-action",
+                        "pill",
+                      ]
+                    }
+                  };
+                }
+              }
+
+              Gtk.Box profile_now_section {
+                orientation: vertical;
+                spacing: 6;
+                visible: false;
+
+                Gtk.Label {
+                  styles [
+                    "title-4",
+                  ]
+
+                  label: _("Available Now");
+                  xalign: 0;
+                }
+
+                Gtk.ListBox profile_now_list {
+                  styles [
+                    "boxed-list",
+                  ]
+
+                  selection-mode: none;
+                }
+              }
+
+              Gtk.Box profile_after_system_section {
+                orientation: vertical;
+                spacing: 6;
+                visible: false;
+
+                Gtk.Label {
+                  styles [
+                    "title-4",
+                  ]
+
+                  label: _("Available After System Update");
+                  xalign: 0;
+                }
+
+                Gtk.ListBox profile_after_system_list {
+                  styles [
+                    "boxed-list",
+                  ]
+
+                  selection-mode: none;
+                }
+              }
+            }
+          };
+        };
+      };
+    }
   };
 }
