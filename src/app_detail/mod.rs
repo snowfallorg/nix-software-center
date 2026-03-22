@@ -824,7 +824,7 @@ impl NscAppDetail {
         imp.install_button.set_sensitive(true);
     }
 
-    fn finish_profile_op_on_visible_detail(pkgname: &str, succeeded: bool, is_install: bool) {
+    pub fn finish_profile_op_on_visible_detail(pkgname: &str, succeeded: bool, is_install: bool) {
         let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
             return;
         };

@@ -391,7 +391,6 @@ impl UpdatesPage {
                 row.add_action(
                     &gtk::Button::builder()
                         .icon_name("software-update-available-symbolic")
-                        .css_classes(["flat"])
                         .valign(gtk::Align::Center)
                         .tooltip_text("Update")
                         .build(),
@@ -430,7 +429,6 @@ impl UpdatesPage {
                 row.add_action(
                     &gtk::Button::builder()
                         .icon_name("user-trash-symbolic")
-                        .css_classes(["flat"])
                         .valign(gtk::Align::Center)
                         .tooltip_text("Remove")
                         .build(),
