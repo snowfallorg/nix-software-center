@@ -210,6 +210,8 @@ impl InstalledPage {
                     window.explore_page().refresh_badges();
                     window.search_page().refresh_badges();
 
+                    app.refresh_updates();
+
                     app_detail::NscAppDetail::finish_profile_op_on_visible_detail(
                         &attr_owned,
                         true,

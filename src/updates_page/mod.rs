@@ -10,7 +10,7 @@ use crate::{runtime, util};
 
 glib::wrapper! {
     pub struct UpdatesPage(ObjectSubclass<imp::UpdatesPage>)
-        @extends adw::Bin, gtk::Widget,
+        @extends adw::BreakpointBin, gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 

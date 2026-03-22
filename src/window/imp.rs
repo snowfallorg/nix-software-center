@@ -35,6 +35,8 @@ pub struct NscWindow {
     #[template_child]
     pub search_button: TemplateChild<gtk::ToggleButton>,
     #[template_child]
+    pub refresh_updates_button: TemplateChild<gtk::Button>,
+    #[template_child]
     pub sidebar_button: TemplateChild<gtk::ToggleButton>,
     #[template_child]
     pub search_bar: TemplateChild<gtk::SearchBar>,
@@ -62,6 +64,7 @@ impl Default for NscWindow {
             loading_stack: TemplateChild::default(),
             loading_status: TemplateChild::default(),
             view_stack: TemplateChild::default(),
+            refresh_updates_button: TemplateChild::default(),
             search_button: TemplateChild::default(),
             sidebar_button: TemplateChild::default(),
             search_bar: TemplateChild::default(),
@@ -246,17 +249,28 @@ impl ObjectImpl for NscWindow {
 
         // Clicking a visible ViewStack tab dismisses search.
         let search_button = self.search_button.clone();
+        let refresh_button = self.refresh_updates_button.clone();
         self.view_stack.connect_visible_child_notify(glib::clone!(
             #[weak]
             search_button,
+            #[weak]
+            refresh_button,
             move |stack| {
-                if let Some(name) = stack.visible_child_name()
-                    && name != "search"
-                {
-                    search_button.set_active(false);
+                if let Some(name) = stack.visible_child_name() {
+                    if name != "search" {
+                        search_button.set_active(false);
+                    }
+                    refresh_button.set_visible(name == "updates");
                 }
             }
         ));
+
+        self.refresh_updates_button.connect_clicked(|_| {
+            let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
+                return;
+            };
+            app.refresh_updates();
+        });
     }
 }
 

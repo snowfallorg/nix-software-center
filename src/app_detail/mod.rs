@@ -978,6 +978,8 @@ impl NscAppDetail {
 
         window.explore_page().refresh_badges();
         window.search_page().refresh_badges();
+
+        app.refresh_updates();
     }
 
     fn launch_app(component: &libappstream::Component) {

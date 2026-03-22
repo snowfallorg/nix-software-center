@@ -47,7 +47,7 @@ pub struct UpdatesPage {
     #[template_child]
     pub profile_header_subtitle: TemplateChild<gtk::Label>,
     #[template_child]
-    pub profile_update_all_button: TemplateChild<gtk::Button>,
+    pub profile_update_button: TemplateChild<gtk::Button>,
     #[template_child]
     pub profile_now_section: TemplateChild<gtk::Box>,
     #[template_child]
@@ -62,7 +62,7 @@ pub struct UpdatesPage {
 impl ObjectSubclass for UpdatesPage {
     const NAME: &'static str = "NscUpdatesPage";
     type Type = super::UpdatesPage;
-    type ParentType = adw::Bin;
+    type ParentType = adw::BreakpointBin;
 
     fn class_init(klass: &mut Self::Class) {
         NscInstalledAppRow::ensure_type();
@@ -148,4 +148,4 @@ impl ObjectImpl for UpdatesPage {
 
 impl WidgetImpl for UpdatesPage {}
 
-impl BinImpl for UpdatesPage {}
+impl BreakpointBinImpl for UpdatesPage {}

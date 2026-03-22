@@ -1,7 +1,26 @@
 using Gtk 4.0;
 using Adw 1;
 
-template $NscUpdatesPage: Adw.Bin {
+template $NscUpdatesPage: Adw.BreakpointBin {
+  width-request: 300;
+  height-request: 200;
+
+  Adw.Breakpoint {
+    condition ("max-width: 500sp")
+
+    setters {
+      update_everything_content.orientation: vertical;
+      update_everything_button.halign: fill;
+      update_everything_button.hexpand: true;
+      system_header_content.orientation: vertical;
+      system_update_button.halign: fill;
+      system_update_button.hexpand: true;
+      profile_header_content.orientation: vertical;
+      profile_update_button.halign: fill;
+      profile_update_button.hexpand: true;
+    }
+  }
+
   child: Gtk.Stack loading_stack {
     transition-type: crossfade;
     visible-child-name: "loading";
@@ -43,22 +62,27 @@ template $NscUpdatesPage: Adw.Bin {
     Gtk.StackPage {
       name: "content";
 
-      child: Gtk.ScrolledWindow {
-        child: Adw.Clamp {
-          maximum-size: 800;
-          tightening-threshold: 600;
+      child: Gtk.Box {
+        orientation: vertical;
 
-          child: Gtk.Box {
-            orientation: vertical;
-            margin-start: 12;
-            margin-end: 12;
-            margin-top: 12;
-            margin-bottom: 12;
-            spacing: 18;
+        Adw.Banner warnings_banner {
+          revealed: false;
+        }
 
-            Adw.Banner warnings_banner {
-              visible: false;
-            }
+        Gtk.ScrolledWindow {
+          vexpand: true;
+
+          child: Adw.Clamp {
+            maximum-size: 800;
+            tightening-threshold: 600;
+
+            child: Gtk.Box {
+              orientation: vertical;
+              margin-start: 12;
+              margin-end: 12;
+              margin-top: 12;
+              margin-bottom: 12;
+              spacing: 18;
 
             Gtk.Box update_everything_section {
               visible: false;
@@ -75,7 +99,7 @@ template $NscUpdatesPage: Adw.Bin {
                 Gtk.ListBoxRow {
                   activatable: false;
 
-                  child: Gtk.Box {
+                  child: Gtk.Box update_everything_row {
                     orientation: horizontal;
                     spacing: 12;
                     margin-top: 8;
@@ -92,42 +116,48 @@ template $NscUpdatesPage: Adw.Bin {
                       ]
                     }
 
-                    Gtk.Box {
-                      orientation: vertical;
-                      spacing: 2;
-                      valign: center;
+                    Gtk.Box update_everything_content {
+                      orientation: horizontal;
+                      spacing: 12;
                       hexpand: true;
 
-                      Gtk.Label {
-                        styles [
-                          "heading",
-                        ]
+                      Gtk.Box {
+                        orientation: vertical;
+                        spacing: 2;
+                        valign: center;
+                        hexpand: true;
 
-                        label: _("Updates Available");
-                        halign: start;
-                        ellipsize: end;
-                        xalign: 0;
+                        Gtk.Label {
+                          styles [
+                            "heading",
+                          ]
+
+                          label: _("Updates Available");
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
+
+                        Gtk.Label update_everything_subtitle {
+                          styles [
+                            "caption",
+                          ]
+
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
                       }
 
-                      Gtk.Label update_everything_subtitle {
+                      Gtk.Button update_everything_button {
+                        label: _("Update All");
+                        valign: center;
+
                         styles [
-                          "caption",
+                          "suggested-action",
+                          "pill",
                         ]
-
-                        halign: start;
-                        wrap: true;
-                        xalign: 0;
                       }
-                    }
-
-                    Gtk.Button update_everything_button {
-                      label: _("Update All");
-                      valign: center;
-
-                      styles [
-                        "suggested-action",
-                        "pill",
-                      ]
                     }
                   };
                 }
@@ -151,7 +181,7 @@ template $NscUpdatesPage: Adw.Bin {
                 Gtk.ListBoxRow {
                   activatable: false;
 
-                  child: Gtk.Box {
+                  child: Gtk.Box system_header_row {
                     orientation: horizontal;
                     spacing: 12;
                     margin-top: 8;
@@ -168,42 +198,48 @@ template $NscUpdatesPage: Adw.Bin {
                       ]
                     }
 
-                    Gtk.Box {
-                      orientation: vertical;
-                      spacing: 2;
-                      valign: center;
+                    Gtk.Box system_header_content {
+                      orientation: horizontal;
+                      spacing: 12;
                       hexpand: true;
 
-                      Gtk.Label {
-                        styles [
-                          "heading",
-                        ]
+                      Gtk.Box {
+                        orientation: vertical;
+                        spacing: 2;
+                        valign: center;
+                        hexpand: true;
 
-                        label: _("System Updates");
-                        halign: start;
-                        ellipsize: end;
-                        xalign: 0;
+                        Gtk.Label {
+                          styles [
+                            "heading",
+                          ]
+
+                          label: _("System Updates");
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
+
+                        Gtk.Label system_header_subtitle {
+                          styles [
+                            "caption",
+                          ]
+
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
                       }
 
-                      Gtk.Label system_header_subtitle {
+                      Gtk.Button system_update_button {
+                        label: _("Update");
+                        valign: center;
+
                         styles [
-                          "caption",
+                          "suggested-action",
+                          "pill",
                         ]
-
-                        halign: start;
-                        wrap: true;
-                        xalign: 0;
                       }
-                    }
-
-                    Gtk.Button system_update_button {
-                      label: _("Update");
-                      valign: center;
-
-                      styles [
-                        "suggested-action",
-                        "pill",
-                      ]
                     }
                   };
                 }
@@ -275,7 +311,7 @@ template $NscUpdatesPage: Adw.Bin {
                 Gtk.ListBoxRow {
                   activatable: false;
 
-                  child: Gtk.Box {
+                  child: Gtk.Box profile_header_row {
                     orientation: horizontal;
                     spacing: 12;
                     margin-top: 8;
@@ -292,41 +328,48 @@ template $NscUpdatesPage: Adw.Bin {
                       ]
                     }
 
-                    Gtk.Box {
-                      orientation: vertical;
-                      spacing: 2;
-                      valign: center;
+                    Gtk.Box profile_header_content {
+                      orientation: horizontal;
+                      spacing: 12;
                       hexpand: true;
 
-                      Gtk.Label {
-                        styles [
-                          "heading",
-                        ]
+                      Gtk.Box {
+                        orientation: vertical;
+                        spacing: 2;
+                        valign: center;
+                        hexpand: true;
 
-                        label: _("Profile Updates");
-                        halign: start;
-                        ellipsize: end;
-                        xalign: 0;
+                        Gtk.Label {
+                          styles [
+                            "heading",
+                          ]
+
+                          label: _("Profile Updates");
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
+
+                        Gtk.Label profile_header_subtitle {
+                          styles [
+                            "caption",
+                          ]
+
+                          halign: start;
+                          ellipsize: end;
+                          xalign: 0;
+                        }
                       }
 
-                      Gtk.Label profile_header_subtitle {
+                      Gtk.Button profile_update_button {
+                        label: _("Update");
+                        valign: center;
+
                         styles [
-                          "caption",
+                          "suggested-action",
+                          "pill",
                         ]
-
-                        halign: start;
-                        xalign: 0;
                       }
-                    }
-
-                    Gtk.Button profile_update_all_button {
-                      label: _("Update");
-                      valign: center;
-
-                      styles [
-                        "suggested-action",
-                        "pill",
-                      ]
                     }
                   };
                 }
@@ -380,6 +423,7 @@ template $NscUpdatesPage: Adw.Bin {
             }
           };
         };
+        }
       };
     }
   };

@@ -106,6 +106,13 @@ template $NscWindow: Adw.ApplicationWindow {
               tooltip-text: _("Search");
             }
 
+            [start]
+            Gtk.Button refresh_updates_button {
+              icon-name: "view-refresh-symbolic";
+              tooltip-text: _("Refresh Updates");
+              visible: false;
+            }
+
             [title]
             Adw.ViewSwitcher header_switcher {
               stack: view_stack;

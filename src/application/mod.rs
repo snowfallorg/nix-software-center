@@ -50,6 +50,33 @@ impl NscApplication {
         &self.imp().profile_ops_in_flight
     }
 
+    pub fn refresh_updates(&self) {
+        let imp = self.imp();
+        let metadata_ref = imp.metadata.borrow();
+        let Some(md) = metadata_ref.as_ref() else {
+            return;
+        };
+
+        let window = self.main_window();
+        let nixos_attrs: Vec<String> = imp.installed_nixos_attrs.borrow().iter().cloned().collect();
+        let hm_attrs: Vec<String> = imp.installed_hm_attrs.borrow().iter().cloned().collect();
+        let profile_attrs: Vec<String> = imp
+            .installed_profile_attrs
+            .borrow()
+            .iter()
+            .cloned()
+            .collect();
+        let pkgname_map = imp.pkgname_map.borrow();
+
+        window.updates_page().check_for_updates(
+            md,
+            &nixos_attrs,
+            &hm_attrs,
+            &profile_attrs,
+            &pkgname_map,
+        );
+    }
+
     pub fn pkgname_map(
         &self,
     ) -> &std::cell::RefCell<std::collections::HashMap<String, libappstream::Component>> {
