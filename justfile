@@ -4,14 +4,18 @@ profile := "development"
 
 # Configure meson build directory
 setup:
-    meson setup {{builddir}} -Dprofile={{profile}} -Dprefix={{prefix}}
+    @if [ ! -f {{builddir}}/build.ninja ]; then \
+        meson setup {{builddir}} -Dprofile={{profile}} -Dprefix={{prefix}}; \
+    elif ! meson configure {{builddir}} | grep -q "profile.*{{profile}}"; then \
+        meson setup {{builddir}} --reconfigure -Dprofile={{profile}} -Dprefix={{prefix}}; \
+    fi
 
 # Reconfigure existing build directory
 reconfigure:
     meson setup {{builddir}} --reconfigure -Dprofile={{profile}} -Dprefix={{prefix}}
 
 # Build the project
-build:
+build: setup
     meson compile -C {{builddir}}
 
 # Install to local prefix
@@ -28,6 +32,23 @@ run: install
 # Clean build directory
 clean:
     rm -rf {{builddir}}
+
+# Watch for changes and rebuild
+watch:
+    bacon
+
+# Run clippy lints
+lint:
+    cargo clippy --manifest-path Cargo.toml
+
+# Format code
+fmt:
+    cargo fmt --manifest-path Cargo.toml
+
+# Fix lints and format code
+fix:
+    cargo clippy --manifest-path Cargo.toml --fix --allow-dirty --allow-staged
+    cargo fmt --manifest-path Cargo.toml
 
 # Clean and reconfigure from scratch
 rebuild: clean setup build

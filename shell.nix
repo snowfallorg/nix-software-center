@@ -13,7 +13,7 @@ pkgs.mkShell {
     rustfmt
     clippy
     rust-analyzer
-    cargo-watch
+    bacon
 
     openssl
     sqlite
