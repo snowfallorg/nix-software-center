@@ -1,11 +1,12 @@
 mod imp;
 
 use adw::subclass::prelude::*;
-use gtk::glib;
 use gtk::prelude::*;
+use gtk::{gio, glib};
 use libappstream::prelude::*;
 
 use crate::app_tile::NscAppTile;
+use crate::application::NscApplication;
 
 glib::wrapper! {
     pub struct SearchPage(ObjectSubclass<imp::SearchPage>)
@@ -62,11 +63,19 @@ impl SearchPage {
         };
 
         let array = cbox.as_array();
+        let unavailable = gio::Application::default()
+            .and_downcast::<NscApplication>()
+            .map(|app| app.unavailable_pkgnames().borrow().clone())
+            .unwrap_or_default();
+
         let components: Vec<libappstream::Component> = array
             .iter()
             .filter(|c| {
-                c.kind() == libappstream::ComponentKind::DesktopApp
-                    || c.kind() == libappstream::ComponentKind::ConsoleApp
+                (c.kind() == libappstream::ComponentKind::DesktopApp
+                    || c.kind() == libappstream::ComponentKind::ConsoleApp)
+                    && !c
+                        .pkgname()
+                        .is_some_and(|p| unavailable.contains(p.as_str()))
             })
             .cloned()
             .collect();

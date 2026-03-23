@@ -77,6 +77,10 @@ impl NscApplication {
         );
     }
 
+    pub fn unavailable_pkgnames(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().unavailable_pkgnames
+    }
+
     pub fn pkgname_map(
         &self,
     ) -> &std::cell::RefCell<std::collections::HashMap<String, libappstream::Component>> {
@@ -181,15 +185,30 @@ impl NscApplication {
                     let count = pool.components().map(|cbox| cbox.size()).unwrap_or(0);
                     info!("AppStream pool loaded: {} components", count);
 
+                    let md_ref = app.imp().metadata.borrow();
+                    let md = md_ref.as_ref().expect("metadata must be loaded");
                     let mut pkgname_map = std::collections::HashMap::new();
+                    let mut unavailable_pkgnames = std::collections::HashSet::new();
                     if let Some(cbox) = pool.components() {
                         for component in cbox.as_array() {
                             if let Some(pkgname) = component.pkgname() {
+                                let attr = pkgname.as_str();
                                 pkgname_map.insert(pkgname.to_string(), component);
+                                if md.get(attr).is_err()
+                                    && md.get(crate::util::strip_nix_output_suffix(attr)).is_err()
+                                {
+                                    unavailable_pkgnames.insert(pkgname.to_string());
+                                }
                             }
                         }
                     }
-                    info!("Built pkgname map: {} entries", pkgname_map.len());
+                    drop(md_ref);
+                    info!(
+                        "Built pkgname map: {} entries ({} unavailable)",
+                        pkgname_map.len(),
+                        unavailable_pkgnames.len()
+                    );
+                    app.imp().unavailable_pkgnames.replace(unavailable_pkgnames);
                     app.imp().pkgname_map.replace(pkgname_map);
 
                     app.imp().appstream_pool.replace(Some(pool));
@@ -231,9 +250,15 @@ impl NscApplication {
             let nixos_attrs = imp.installed_nixos_attrs.borrow();
             let hm_attrs = imp.installed_hm_attrs.borrow();
             let profile_attrs = imp.installed_profile_attrs.borrow();
-            window
-                .explore_page()
-                .populate(md, pool, &nixos_attrs, &hm_attrs, &profile_attrs);
+            let unavailable = imp.unavailable_pkgnames.borrow();
+            window.explore_page().populate(
+                md,
+                pool,
+                &nixos_attrs,
+                &hm_attrs,
+                &profile_attrs,
+                &unavailable,
+            );
             window
                 .installed_page()
                 .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);

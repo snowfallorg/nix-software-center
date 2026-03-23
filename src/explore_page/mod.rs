@@ -36,6 +36,7 @@ impl ExplorePage {
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
         profile_attrs: &HashSet<String>,
+        unavailable: &HashSet<String>,
     ) {
         let flow_box = &self.imp().flow_box;
 
@@ -54,6 +55,9 @@ impl ExplorePage {
                 !c.icons().is_empty()
                     && !c.screenshots_all().is_empty()
                     && c.kind() == libappstream::ComponentKind::DesktopApp
+                    && !c
+                        .pkgname()
+                        .is_some_and(|p| unavailable.contains(p.as_str()))
             })
             .collect();
         tracing::debug!(

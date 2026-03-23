@@ -132,6 +132,12 @@ impl NscAppDetail {
             }
         }
 
+        imp.is_unavailable.set(component.pkgname().is_some_and(|p| {
+            gio::Application::default()
+                .and_downcast::<NscApplication>()
+                .is_some_and(|app| app.unavailable_pkgnames().borrow().contains(p.as_str()))
+        }));
+
         Self::setup_action_buttons(self, imp, component);
 
         if profile_op_active {
@@ -142,10 +148,12 @@ impl NscAppDetail {
             };
             imp.target_dropdown.set_selected(2);
             imp.profile_op_in_flight.set(true);
-            imp.target_dropdown.set_sensitive(false);
             imp.install_button.set_label(label);
             imp.install_button.set_sensitive(false);
-            imp.trash_button.set_visible(false);
+            imp.trash_button.set_visible(true);
+            imp.trash_button
+                .set_icon_name("media-playback-stop-symbolic");
+            imp.trash_button.set_tooltip_text(Some("Cancel"));
             imp.run_button.set_visible(false);
         }
 
@@ -478,6 +486,13 @@ impl NscAppDetail {
                 return;
             };
 
+            if page.imp().profile_op_in_flight.get() {
+                if let Some(cancel) = page.imp().profile_cancel.take() {
+                    let _ = cancel.send(());
+                }
+                return;
+            }
+
             let target = Self::selected_target(page.imp());
 
             if target == InstallTarget::Profile {
@@ -686,6 +701,10 @@ impl NscAppDetail {
         let pending = window.pending_changes();
         let is_pending = pending.contains(&component, target);
 
+        imp.install_button.set_sensitive(true);
+        imp.trash_button.set_sensitive(true);
+        imp.trash_button.set_icon_name("user-trash-symbolic");
+
         if installed {
             imp.install_button.set_visible(true);
             imp.install_button.set_label("Open");
@@ -716,6 +735,22 @@ impl NscAppDetail {
                 imp.install_button.remove_css_class("accent");
                 imp.install_button.add_css_class("suggested-action");
             }
+
+            Self::apply_unavailable_state(imp);
+        }
+    }
+
+    fn apply_unavailable_state(imp: &imp::NscAppDetail) {
+        if imp.is_unavailable.get()
+            && !imp.installed_nixos.get()
+            && !imp.installed_hm.get()
+            && !imp.installed_profile.get()
+        {
+            imp.install_button.set_label("Unavailable");
+            imp.install_button.set_sensitive(false);
+            imp.install_button.remove_css_class("suggested-action");
+            imp.install_button.remove_css_class("accent");
+            imp.run_button.set_visible(false);
         }
     }
 
@@ -732,6 +767,19 @@ impl NscAppDetail {
         });
 
         if in_flight {
+            // Re-apply the in-flight UI state (user may have switched away and back).
+            let label = if imp.installed_profile.get() {
+                "Removing…"
+            } else {
+                "Installing…"
+            };
+            imp.install_button.set_label(label);
+            imp.install_button.set_sensitive(false);
+            imp.trash_button.set_visible(true);
+            imp.trash_button
+                .set_icon_name("media-playback-stop-symbolic");
+            imp.trash_button.set_tooltip_text(Some("Cancel"));
+            imp.run_button.set_visible(false);
             return;
         }
 
@@ -755,11 +803,13 @@ impl NscAppDetail {
 
         if installed {
             imp.install_button.set_visible(true);
+            imp.install_button.set_sensitive(true);
             imp.install_button.set_label("Open");
             imp.install_button.remove_css_class("accent");
             imp.install_button.add_css_class("suggested-action");
 
             imp.trash_button.set_visible(true);
+            imp.trash_button.set_sensitive(true);
             imp.trash_button.remove_css_class("destructive-action");
             imp.trash_button.set_tooltip_text(Some("Remove"));
             imp.trash_button.set_icon_name("user-trash-symbolic");
@@ -768,11 +818,15 @@ impl NscAppDetail {
         } else {
             imp.trash_button.set_visible(false);
             imp.run_button.set_visible(true);
+            imp.run_button.set_sensitive(true);
 
             imp.install_button.set_visible(true);
+            imp.install_button.set_sensitive(true);
             imp.install_button.set_label("Install");
             imp.install_button.remove_css_class("accent");
             imp.install_button.add_css_class("suggested-action");
+
+            Self::apply_unavailable_state(imp);
         }
     }
 
@@ -810,18 +864,21 @@ impl NscAppDetail {
         }
 
         imp.profile_op_in_flight.set(true);
-        imp.target_dropdown.set_sensitive(false);
         imp.install_button.set_label(label);
         imp.install_button.set_sensitive(false);
-        imp.trash_button.set_visible(false);
+        imp.trash_button.set_visible(true);
+        imp.trash_button
+            .set_icon_name("media-playback-stop-symbolic");
+        imp.trash_button.set_tooltip_text(Some("Cancel"));
         imp.run_button.set_visible(false);
         true
     }
 
     fn end_profile_op(imp: &imp::NscAppDetail) {
         imp.profile_op_in_flight.set(false);
-        imp.target_dropdown.set_sensitive(true);
         imp.install_button.set_sensitive(true);
+        imp.trash_button.set_icon_name("user-trash-symbolic");
+        imp.trash_button.set_tooltip_text(Some("Remove"));
     }
 
     pub fn finish_profile_op_on_visible_detail(pkgname: &str, succeeded: bool, is_install: bool) {
@@ -855,6 +912,14 @@ impl NscAppDetail {
         Self::sync_button_states(&detail);
     }
 
+    fn show_profile_error(message: &str) {
+        if let Some(app) =
+            gio::Application::default().and_downcast::<crate::application::NscApplication>()
+        {
+            app.main_window().show_toast(message);
+        }
+    }
+
     fn clear_profile_in_flight(pkgname: &str) {
         if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
             app.profile_ops_in_flight().borrow_mut().remove(pkgname);
@@ -871,18 +936,25 @@ impl NscAppDetail {
         }
 
         let attr = pkgname.to_string();
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        page.imp().profile_cancel.replace(Some(cancel_tx));
+
         type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;
         type ProfileOpResult = (Result<(), String>, RefreshedList);
         let (sender, receiver) = async_channel::bounded::<ProfileOpResult>(1);
 
         runtime().spawn(async move {
-            let result = libsnow::profile::install::install(&[&attr])
-                .await
-                .map_err(|e| e.to_string());
-            let refreshed = libsnow::profile::list::list().ok().map(|pkgs| {
-                let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
-                (pkgs, attrs)
-            });
+            let child =
+                libsnow::profile::install::install_spawn(&[&attr]).map_err(|e| e.to_string());
+            let result = Self::run_cancellable_child(child, cancel_rx).await;
+            let refreshed = if result.is_ok() {
+                libsnow::profile::list::list().ok().map(|pkgs| {
+                    let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
+                    (pkgs, attrs)
+                })
+            } else {
+                None
+            };
             let _ = sender.send((result, refreshed)).await;
         });
 
@@ -902,8 +974,12 @@ impl NscAppDetail {
                         Self::apply_refreshed_profile_attrs(pkgs, attrs);
                     }
                 }
+                Err(ref err) if err == "Cancelled" => {
+                    tracing::info!("Profile install cancelled");
+                }
                 Err(err) => {
                     tracing::warn!("Profile install failed: {err}");
+                    Self::show_profile_error(&format!("Install failed: {err}"));
                 }
             }
 
@@ -921,18 +997,24 @@ impl NscAppDetail {
         }
 
         let attr = pkgname.to_string();
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        page.imp().profile_cancel.replace(Some(cancel_tx));
+
         type RefreshedList = Option<(Vec<libsnow::Package>, std::collections::HashSet<String>)>;
         type ProfileOpResult = (Result<(), String>, RefreshedList);
         let (sender, receiver) = async_channel::bounded::<ProfileOpResult>(1);
 
         runtime().spawn(async move {
-            let result = libsnow::profile::remove::remove(&[&attr])
-                .await
-                .map_err(|e| e.to_string());
-            let refreshed = libsnow::profile::list::list().ok().map(|pkgs| {
-                let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
-                (pkgs, attrs)
-            });
+            let child = libsnow::profile::remove::remove_spawn(&[&attr]).map_err(|e| e.to_string());
+            let result = Self::run_cancellable_child(child, cancel_rx).await;
+            let refreshed = if result.is_ok() {
+                libsnow::profile::list::list().ok().map(|pkgs| {
+                    let attrs = pkgs.iter().map(|p| p.attr.to_string()).collect();
+                    (pkgs, attrs)
+                })
+            } else {
+                None
+            };
             let _ = sender.send((result, refreshed)).await;
         });
 
@@ -952,13 +1034,38 @@ impl NscAppDetail {
                         Self::apply_refreshed_profile_attrs(pkgs, attrs);
                     }
                 }
+                Err(ref err) if err == "Cancelled" => {
+                    tracing::info!("Profile remove cancelled");
+                }
                 Err(err) => {
                     tracing::warn!("Profile remove failed: {err}");
+                    Self::show_profile_error(&format!("Remove failed: {err}"));
                 }
             }
 
             Self::finish_profile_op_on_visible_detail(&pkgname_owned, succeeded, false);
         });
+    }
+
+    async fn run_cancellable_child(
+        child: Result<tokio::process::Child, String>,
+        cancel_rx: tokio::sync::oneshot::Receiver<()>,
+    ) -> Result<(), String> {
+        let mut child = child?;
+        tokio::select! {
+            status = child.wait() => {
+                let status = status.map_err(|e| e.to_string())?;
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err(format!("Process exited with {status}"))
+                }
+            }
+            _ = cancel_rx => {
+                let _ = child.kill().await;
+                Err("Cancelled".to_string())
+            }
+        }
     }
 
     fn apply_refreshed_profile_attrs(

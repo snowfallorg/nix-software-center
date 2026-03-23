@@ -17,6 +17,7 @@ pub struct NscApplication {
     pub metadata: RefCell<Option<Metadata>>,
     pub appstream_pool: RefCell<Option<Pool>>,
     pub pkgname_map: RefCell<HashMap<String, Component>>,
+    pub unavailable_pkgnames: RefCell<HashSet<String>>,
     pub installed_nixos_attrs: RefCell<HashSet<String>>,
     pub installed_hm_attrs: RefCell<HashSet<String>>,
     pub installed_profile_attrs: RefCell<HashSet<String>>,

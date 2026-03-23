@@ -220,6 +220,11 @@ impl InstalledPage {
                 }
                 Err(err) => {
                     tracing::warn!("Profile remove from installed page failed: {err}");
+                    if let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
+                    {
+                        app.main_window()
+                            .show_toast(&format!("Remove failed: {err}"));
+                    }
                 }
             }
         });

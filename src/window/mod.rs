@@ -24,6 +24,11 @@ impl NscWindow {
         glib::Object::builder().property("application", app).build()
     }
 
+    pub fn show_toast(&self, message: &str) {
+        let toast = adw::Toast::new(message);
+        self.imp().toast_overlay.add_toast(toast);
+    }
+
     pub fn explore_page(&self) -> ExplorePage {
         self.imp()
             .view_stack

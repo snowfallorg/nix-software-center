@@ -92,7 +92,8 @@ template $NscWindow: Adw.ApplicationWindow {
       };
     };
 
-    content: Adw.NavigationView navigation_view {
+    content: Adw.ToastOverlay toast_overlay {
+    child: Adw.NavigationView navigation_view {
       Adw.NavigationPage {
         title: _("Nix Software Center");
         tag: "main";
@@ -209,6 +210,7 @@ template $NscWindow: Adw.ApplicationWindow {
           }
         };
       }
+    };
     };
   };
 }

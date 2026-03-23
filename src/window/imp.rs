@@ -27,6 +27,8 @@ pub struct NscWindow {
     #[template_child]
     pub navigation_view: TemplateChild<adw::NavigationView>,
     #[template_child]
+    pub toast_overlay: TemplateChild<adw::ToastOverlay>,
+    #[template_child]
     pub loading_stack: TemplateChild<gtk::Stack>,
     #[template_child]
     pub loading_status: TemplateChild<adw::StatusPage>,
@@ -61,6 +63,7 @@ impl Default for NscWindow {
             split_view: TemplateChild::default(),
             headerbar: TemplateChild::default(),
             navigation_view: TemplateChild::default(),
+            toast_overlay: TemplateChild::default(),
             loading_stack: TemplateChild::default(),
             loading_status: TemplateChild::default(),
             view_stack: TemplateChild::default(),

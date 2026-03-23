@@ -49,7 +49,9 @@ pub struct NscAppDetail {
     pub installed_nixos: Cell<bool>,
     pub installed_hm: Cell<bool>,
     pub installed_profile: Cell<bool>,
+    pub is_unavailable: Cell<bool>,
     pub profile_op_in_flight: Cell<bool>,
+    pub profile_cancel: RefCell<Option<tokio::sync::oneshot::Sender<()>>>,
 
     pub run_cancel: RefCell<Option<app_detail::RunCancel>>,
 
