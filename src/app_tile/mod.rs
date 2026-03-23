@@ -6,6 +6,8 @@ use gtk::{gio, glib};
 use libappstream::prelude::*;
 use std::collections::HashSet;
 
+use crate::util;
+
 glib::wrapper! {
     pub struct NscAppTile(ObjectSubclass<imp::NscAppTile>)
         @extends gtk::Button, gtk::Widget,
@@ -85,7 +87,7 @@ impl NscAppTile {
             return;
         }
 
-        let has_desktop_file = Self::has_system_desktop_file(component);
+        let has_desktop_file = util::has_system_desktop_file(component);
         if has_desktop_file {
             badge.set_icon_name(Some("nsc-installed-symbolic"));
             badge.add_css_class("install-badge-system");
@@ -114,15 +116,6 @@ impl NscAppTile {
         let hm_attrs = app.installed_hm_attrs().borrow();
         let profile_attrs = app.installed_profile_attrs().borrow();
         self.update_install_badge(&component, &nixos_attrs, &hm_attrs, &profile_attrs);
-    }
-
-    fn has_system_desktop_file(component: &libappstream::Component) -> bool {
-        let desktop_id = component
-            .launchable(libappstream::LaunchableKind::DesktopId)
-            .and_then(|l| l.entries().into_iter().next())
-            .or_else(|| component.id());
-
-        desktop_id.is_some_and(|id| gio_unix::DesktopAppInfo::new(&id).is_some())
     }
 
     fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {

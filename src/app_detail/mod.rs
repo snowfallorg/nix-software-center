@@ -39,6 +39,8 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
+const OTHER_TARGET_INDEX: u32 = 3;
+
 impl NscAppDetail {
     pub fn new(
         component: &libappstream::Component,
@@ -116,7 +118,19 @@ impl NscAppDetail {
             let installed_profile = installed_profile_attrs.contains(pkgname_str);
             imp.installed_profile.set(installed_profile);
 
-            let default_target = if installed_nixos {
+            let nix_installed = installed_nixos || installed_hm || installed_profile;
+            let desktop_only = !nix_installed && util::has_system_desktop_file(component);
+
+            let default_target = if desktop_only {
+                if let Some(model) = imp
+                    .target_dropdown
+                    .model()
+                    .and_downcast::<gtk::StringList>()
+                {
+                    model.append("Other");
+                }
+                OTHER_TARGET_INDEX
+            } else if installed_nixos {
                 0
             } else if installed_hm {
                 1
@@ -450,6 +464,12 @@ impl NscAppDetail {
                 return;
             };
             let imp = page.imp();
+
+            if imp.target_dropdown.selected() == OTHER_TARGET_INDEX {
+                Self::launch_app(&component_install);
+                return;
+            }
+
             let target = Self::selected_target(imp);
             let installed = Self::is_installed_for_target(imp, target);
 
@@ -682,6 +702,11 @@ impl NscAppDetail {
             return;
         };
 
+        if imp.target_dropdown.selected() == OTHER_TARGET_INDEX {
+            Self::sync_other_button_states(imp);
+            return;
+        }
+
         let target = Self::selected_target(imp);
         let installed = Self::is_installed_for_target(imp, target);
 
@@ -828,6 +853,17 @@ impl NscAppDetail {
 
             Self::apply_unavailable_state(imp);
         }
+    }
+
+    fn sync_other_button_states(imp: &imp::NscAppDetail) {
+        imp.install_button.set_visible(true);
+        imp.install_button.set_sensitive(true);
+        imp.install_button.set_label("Open");
+        imp.install_button.remove_css_class("accent");
+        imp.install_button.add_css_class("suggested-action");
+
+        imp.trash_button.set_visible(false);
+        imp.run_button.set_visible(false);
     }
 
     fn sync_sidebar_button_style(button: &gtk::ToggleButton, pending: &PendingChanges) {

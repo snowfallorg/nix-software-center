@@ -1,5 +1,5 @@
 use adw::prelude::*;
-use libappstream::prelude::{ComponentExt, IconExt};
+use libappstream::prelude::{ComponentExt, IconExt, LaunchableExt};
 
 /// Walk up the widget tree from `widget` to find the nearest `NavigationView`.
 pub fn find_navigation_view(widget: &impl IsA<gtk::Widget>) -> Option<adw::NavigationView> {
@@ -46,6 +46,16 @@ pub fn load_component_icon(image: &gtk::Image, component: &libappstream::Compone
         return;
     }
     image.set_icon_name(Some("application-x-executable"));
+}
+
+/// Check if a component has a `.desktop` file installed on the system
+pub fn has_system_desktop_file(component: &libappstream::Component) -> bool {
+    let desktop_id = component
+        .launchable(libappstream::LaunchableKind::DesktopId)
+        .and_then(|l| l.entries().into_iter().next())
+        .or_else(|| component.id());
+
+    desktop_id.is_some_and(|id| gio_unix::DesktopAppInfo::new(&id).is_some())
 }
 
 /// Strip a nix output suffix from a package attribute if present
