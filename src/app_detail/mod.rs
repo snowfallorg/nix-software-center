@@ -696,6 +696,10 @@ impl NscAppDetail {
         }
     }
 
+    pub fn sync_button_states_public(page: &Self) {
+        Self::sync_button_states(page);
+    }
+
     fn sync_button_states(page: &Self) {
         let imp = page.imp();
         let Some(component) = imp.component.borrow().clone() else {

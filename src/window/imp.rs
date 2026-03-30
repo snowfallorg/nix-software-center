@@ -52,6 +52,10 @@ pub struct NscWindow {
     pub pending_content_box: TemplateChild<gtk::Box>,
     #[template_child]
     pub sidebar_back_button: TemplateChild<gtk::Button>,
+    #[template_child]
+    pub apply_bar: TemplateChild<gtk::Box>,
+    #[template_child]
+    pub apply_button: TemplateChild<gtk::Button>,
     pub pending_changes: PendingChanges,
     pub settings: gio::Settings,
     pub last_tab: RefCell<String>,
@@ -76,6 +80,8 @@ impl Default for NscWindow {
             pending_stack: TemplateChild::default(),
             pending_content_box: TemplateChild::default(),
             sidebar_back_button: TemplateChild::default(),
+            apply_bar: TemplateChild::default(),
+            apply_button: TemplateChild::default(),
             pending_changes: PendingChanges::default(),
             settings: gio::Settings::new(*APP_ID),
             last_tab: RefCell::new("explore".to_string()),
@@ -304,12 +310,15 @@ impl NscWindow {
         let stack = pending_stack.clone();
         let content_box = pending_content_box.clone();
         let btn = sidebar_button.clone();
+        let bar = self.apply_bar.clone();
         let prev_count = std::cell::Cell::new(0u32);
         pending_changes.connect_items_changed(move |_, _, _, _| {
             Self::rebuild_pending_list(&pc, &stack, &content_box);
 
             let n = pc.n_items();
             let was = prev_count.replace(n);
+
+            bar.set_visible(n > 0);
 
             if n > 0 {
                 btn.set_tooltip_text(Some(&format!("Pending Changes ({})", n)));
@@ -327,6 +336,13 @@ impl NscWindow {
         let split_view = self.split_view.clone();
         self.sidebar_back_button.connect_clicked(move |_| {
             split_view.set_show_sidebar(false);
+        });
+
+        self.apply_button.connect_clicked(|button| {
+            let Some(window) = button.root().and_downcast::<super::NscWindow>() else {
+                return;
+            };
+            window.apply_pending_changes();
         });
 
         Self::rebuild_pending_list(pending_changes, &pending_stack, &pending_content_box);

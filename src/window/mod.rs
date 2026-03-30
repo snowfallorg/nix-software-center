@@ -5,9 +5,12 @@ use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
 use crate::application::NscApplication;
+use crate::apply_dialog::NscApplyDialog;
 use crate::explore_page::ExplorePage;
 use crate::installed_page;
 use crate::pending_changes::PendingChanges;
+use crate::pending_item::{ChangeKind, InstallTarget};
+use crate::runtime::runtime;
 use crate::search_page::SearchPage;
 use crate::updates_page::UpdatesPage;
 
@@ -72,6 +75,101 @@ impl NscWindow {
         imp::NscWindow::shake_widget(widget);
     }
 
+    pub fn apply_pending_changes(&self) {
+        let pending = self.pending_changes();
+        if pending.n_items() == 0 {
+            return;
+        }
+
+        let mut nixos_installs = Vec::new();
+        let mut nixos_removes = Vec::new();
+        let mut hm_installs = Vec::new();
+        let mut hm_removes = Vec::new();
+
+        for i in 0..pending.n_items() {
+            let Some(item) = pending
+                .item(i)
+                .and_downcast::<crate::pending_item::PendingItem>()
+            else {
+                continue;
+            };
+            let Some(pkgname) = item.pkgname() else {
+                continue;
+            };
+            let attr = pkgname.to_string();
+            match (item.target(), item.kind()) {
+                (InstallTarget::NixOS, ChangeKind::Install) => nixos_installs.push(attr),
+                (InstallTarget::NixOS, ChangeKind::Remove) => nixos_removes.push(attr),
+                (InstallTarget::HomeManager, ChangeKind::Install) => hm_installs.push(attr),
+                (InstallTarget::HomeManager, ChangeKind::Remove) => hm_removes.push(attr),
+                (InstallTarget::Profile, _) => {}
+            }
+        }
+
+        if nixos_installs.is_empty()
+            && nixos_removes.is_empty()
+            && hm_installs.is_empty()
+            && hm_removes.is_empty()
+        {
+            return;
+        }
+
+        self.imp().split_view.set_show_sidebar(false);
+
+        let dialog = NscApplyDialog::new();
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        dialog.imp().cancel_sender.replace(Some(cancel_tx));
+        dialog.present_apply(self);
+
+        let (sender, receiver) = async_channel::bounded::<Result<(), String>>(1);
+
+        runtime().spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(apply_changes(
+                    nixos_installs,
+                    nixos_removes,
+                    hm_installs,
+                    hm_removes,
+                    cancel_rx,
+                ))
+            })
+            .await
+            .map_err(|e| e.to_string())
+            .and_then(|r| r);
+            let _ = sender.send(result).await;
+        });
+
+        let window_weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            let result = receiver
+                .recv()
+                .await
+                .unwrap_or(Err("Channel closed".into()));
+
+            if let Some(window) = window_weak.upgrade() {
+                window.pending_changes().clear();
+            }
+
+            match result {
+                Ok(()) => {
+                    dialog.set_success();
+                }
+                Err(ref err) if err == "Cancelled" => {
+                    tracing::info!("Apply cancelled by user");
+                }
+                Err(err) => {
+                    tracing::warn!("Apply failed: {err}");
+                    dialog.set_failed(&err);
+                }
+            }
+
+            if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+                app.refresh_after_system_apply();
+            }
+        });
+    }
+
     fn save_window_size(&self) -> Result<(), glib::BoolError> {
         let imp = self.imp();
 
@@ -99,4 +197,69 @@ impl NscWindow {
             self.maximize();
         }
     }
+}
+
+async fn apply_changes(
+    nixos_installs: Vec<String>,
+    nixos_removes: Vec<String>,
+    hm_installs: Vec<String>,
+    hm_removes: Vec<String>,
+    mut cancel_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<(), String> {
+    let md = libsnow::metadata::Metadata::connect()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let has_nixos = !nixos_installs.is_empty() || !nixos_removes.is_empty();
+    let has_hm = !hm_installs.is_empty() || !hm_removes.is_empty();
+
+    let hm_system_managed = libsnow::config::configfile::get_config()
+        .map(|c| c.system_for_home_manager)
+        .unwrap_or(false);
+
+    if has_nixos {
+        let install_refs: Vec<&str> = nixos_installs.iter().map(|s| s.as_str()).collect();
+        let remove_refs: Vec<&str> = nixos_removes.iter().map(|s| s.as_str()).collect();
+        let content = libsnow::nixos::batch::prepare(&install_refs, &remove_refs, &md)
+            .map_err(|e| e.to_string())?;
+        tokio::select! {
+            result = libsnow::dbus::config(&content, "switch") => {
+                result.map_err(|e| e.to_string())?;
+            }
+            _ = &mut cancel_rx => {
+                let _ = libsnow::dbus::cancel().await;
+                return Err("Cancelled".to_string());
+            }
+        }
+    }
+
+    if has_hm {
+        let install_refs: Vec<&str> = hm_installs.iter().map(|s| s.as_str()).collect();
+        let remove_refs: Vec<&str> = hm_removes.iter().map(|s| s.as_str()).collect();
+        let content = libsnow::homemanager::batch::prepare(&install_refs, &remove_refs, &md)
+            .map_err(|e| e.to_string())?;
+        if hm_system_managed {
+            tokio::select! {
+                result = libsnow::dbus::config(&content, "switch") => {
+                    result.map_err(|e| e.to_string())?;
+                }
+                _ = &mut cancel_rx => {
+                    let _ = libsnow::dbus::cancel().await;
+                    return Err("Cancelled".to_string());
+                }
+            }
+        } else {
+            tokio::select! {
+                result = libsnow::dbus::config_home(&content, "switch") => {
+                    result.map_err(|e| e.to_string())?;
+                }
+                _ = &mut cancel_rx => {
+                    let _ = libsnow::dbus::cancel_home().await;
+                    return Err("Cancelled".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

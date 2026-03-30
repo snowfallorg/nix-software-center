@@ -2,17 +2,19 @@ builddir := "builddir"
 prefix := justfile_directory() / builddir / "install"
 profile := "development"
 
+meson_flags := "-Dprofile=" + profile + " -Dprefix=" + prefix
+
 # Configure meson build directory
 setup:
     @if [ ! -f {{builddir}}/build.ninja ]; then \
-        meson setup {{builddir}} -Dprofile={{profile}} -Dprefix={{prefix}}; \
+        meson setup {{builddir}} {{meson_flags}}; \
     elif ! meson configure {{builddir}} | grep -q "profile.*{{profile}}"; then \
-        meson setup {{builddir}} --reconfigure -Dprofile={{profile}} -Dprefix={{prefix}}; \
+        meson setup {{builddir}} --reconfigure {{meson_flags}}; \
     fi
 
 # Reconfigure existing build directory
 reconfigure:
-    meson setup {{builddir}} --reconfigure -Dprofile={{profile}} -Dprefix={{prefix}}
+    meson setup {{builddir}} --reconfigure {{meson_flags}}
 
 # Build the project
 build: setup

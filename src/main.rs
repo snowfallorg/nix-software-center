@@ -1,6 +1,7 @@
 mod app_detail;
 mod app_tile;
 mod application;
+mod apply_dialog;
 mod config;
 mod explore_page;
 mod height_clamp;

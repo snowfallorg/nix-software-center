@@ -71,6 +71,10 @@ impl PendingChanges {
         false
     }
 
+    pub fn clear(&self) {
+        self.store().remove_all();
+    }
+
     pub fn items_for_target(&self, target: InstallTarget) -> Vec<PendingItem> {
         let mut items = Vec::new();
         for i in 0..self.n_items() {

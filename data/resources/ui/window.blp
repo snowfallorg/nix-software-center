@@ -60,6 +60,30 @@ template $NscWindow: Adw.ApplicationWindow {
         }
       }
 
+      [bottom]
+      Gtk.Box apply_bar {
+        orientation: vertical;
+        visible: false;
+
+        Gtk.Box {
+          orientation: vertical;
+          margin-start: 12;
+          margin-end: 12;
+          margin-top: 12;
+          margin-bottom: 12;
+
+          Gtk.Button apply_button {
+            styles [
+              "suggested-action",
+              "pill",
+            ]
+
+            halign: center;
+            label: _("Apply Changes");
+          }
+        }
+      }
+
       content: Gtk.Stack pending_stack {
         transition-type: crossfade;
 
@@ -67,7 +91,7 @@ template $NscWindow: Adw.ApplicationWindow {
           name: "empty";
 
           child: Adw.StatusPage {
-            icon-name: "list-add-symbolic";
+            icon-name: "nsc-bag-symbolic";
             title: _("No Changes");
             description: _("Packages you add or remove will appear here");
           };
@@ -93,124 +117,124 @@ template $NscWindow: Adw.ApplicationWindow {
     };
 
     content: Adw.ToastOverlay toast_overlay {
-    child: Adw.NavigationView navigation_view {
-      Adw.NavigationPage {
-        title: _("Nix Software Center");
-        tag: "main";
+      child: Adw.NavigationView navigation_view {
+        Adw.NavigationPage {
+          title: _("Nix Software Center");
+          tag: "main";
 
-        child: Adw.ToolbarView {
-          [top]
-          Adw.HeaderBar headerbar {
-            [start]
-            ToggleButton search_button {
-              icon-name: "system-search-symbolic";
-              tooltip-text: _("Search");
+          child: Adw.ToolbarView {
+            [top]
+            Adw.HeaderBar headerbar {
+              [start]
+              ToggleButton search_button {
+                icon-name: "system-search-symbolic";
+                tooltip-text: _("Search");
+              }
+
+              [start]
+              Gtk.Button refresh_updates_button {
+                icon-name: "view-refresh-symbolic";
+                tooltip-text: _("Refresh Updates");
+                visible: false;
+              }
+
+              [title]
+              Adw.ViewSwitcher header_switcher {
+                stack: view_stack;
+                policy: wide;
+              }
+
+              [end]
+              MenuButton appmenu_button {
+                icon-name: "open-menu-symbolic";
+                menu-model: primary_menu;
+                primary: true;
+                tooltip-text: _("Main Menu");
+              }
+
+              [end]
+              ToggleButton sidebar_button {
+                icon-name: "nsc-bag-symbolic";
+                tooltip-text: _("Pending Changes Sidebar");
+                active: bind split_view.show-sidebar bidirectional;
+              }
             }
 
-            [start]
-            Gtk.Button refresh_updates_button {
-              icon-name: "view-refresh-symbolic";
-              tooltip-text: _("Refresh Updates");
-              visible: false;
-            }
+            [top]
+            Gtk.SearchBar search_bar {
+              search-mode-enabled: bind search_button.active bidirectional;
 
-            [title]
-            Adw.ViewSwitcher header_switcher {
-              stack: view_stack;
-              policy: wide;
-            }
+              child: Adw.Clamp {
+                maximum-size: 500;
 
-            [end]
-            MenuButton appmenu_button {
-              icon-name: "open-menu-symbolic";
-              menu-model: primary_menu;
-              primary: true;
-              tooltip-text: _("Main Menu");
-            }
-
-            [end]
-            ToggleButton sidebar_button {
-              icon-name: "nsc-bag-symbolic";
-              tooltip-text: _("Pending Changes Sidebar");
-              active: bind split_view.show-sidebar bidirectional;
-            }
-          }
-
-          [top]
-          Gtk.SearchBar search_bar {
-            search-mode-enabled: bind search_button.active bidirectional;
-
-            child: Adw.Clamp {
-              maximum-size: 500;
-
-              child: Gtk.SearchEntry search_entry {
-                hexpand: true;
-                placeholder-text: _("Search apps");
-              };
-            };
-          }
-
-          content: Gtk.Stack loading_stack {
-            transition-type: crossfade;
-            visible-child-name: "loading";
-
-            Gtk.StackPage {
-              name: "loading";
-
-              child: Adw.StatusPage loading_status {
-                child: Adw.Spinner {
-                  width-request: 48;
-                  height-request: 48;
-                  halign: center;
+                child: Gtk.SearchEntry search_entry {
+                  hexpand: true;
+                  placeholder-text: _("Search apps");
                 };
               };
             }
 
-            Gtk.StackPage {
-              name: "content";
+            content: Gtk.Stack loading_stack {
+              transition-type: crossfade;
+              visible-child-name: "loading";
 
-              child: Adw.ViewStack view_stack {
-                Adw.ViewStackPage {
-                  name: "explore";
-                  title: _("Explore");
-                  icon-name: "nsc-explore-symbolic";
+              Gtk.StackPage {
+                name: "loading";
 
-                  child: $NscExplorePage {};
-                }
+                child: Adw.StatusPage loading_status {
+                  child: Adw.Spinner {
+                    width-request: 48;
+                    height-request: 48;
+                    halign: center;
+                  };
+                };
+              }
 
-                Adw.ViewStackPage {
-                  name: "installed";
-                  title: _("Installed");
-                  icon-name: "nsc-installed-symbolic";
+              Gtk.StackPage {
+                name: "content";
 
-                  child: $NscInstalledPage {};
-                }
+                child: Adw.ViewStack view_stack {
+                  Adw.ViewStackPage {
+                    name: "explore";
+                    title: _("Explore");
+                    icon-name: "nsc-explore-symbolic";
 
-                Adw.ViewStackPage {
-                  name: "updates";
-                  title: _("Updates");
-                  icon-name: "software-update-available-symbolic";
+                    child: $NscExplorePage {};
+                  }
 
-                  child: $NscUpdatesPage {};
-                }
+                  Adw.ViewStackPage {
+                    name: "installed";
+                    title: _("Installed");
+                    icon-name: "nsc-installed-symbolic";
 
-                Adw.ViewStackPage {
-                  name: "search";
-                  visible: false;
+                    child: $NscInstalledPage {};
+                  }
 
-                  child: $NscSearchPage search_page {};
-                }
-              };
+                  Adw.ViewStackPage {
+                    name: "updates";
+                    title: _("Updates");
+                    icon-name: "software-update-available-symbolic";
+
+                    child: $NscUpdatesPage {};
+                  }
+
+                  Adw.ViewStackPage {
+                    name: "search";
+                    visible: false;
+
+                    child: $NscSearchPage search_page {};
+                  }
+                };
+              }
+            };
+
+            [bottom]
+            Adw.ViewSwitcherBar switcher_bar {
+              stack: view_stack;
             }
           };
-
-          [bottom]
-          Adw.ViewSwitcherBar switcher_bar {
-            stack: view_stack;
-          }
-        };
-      }
-    };
+        }
+      };
     };
   };
 }

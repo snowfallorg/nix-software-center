@@ -4,6 +4,7 @@
     <file compressed="true" preprocess="xml-stripblanks" alias="shortcuts-dialog.ui">ui/shortcuts.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/window.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/app_detail.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/apply_dialog.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/app_tile.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/explore_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/installed_app_row.ui</file>
@@ -19,5 +20,7 @@
     <file compressed="true" preprocess="xml-stripblanks">nsc-explore-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">nsc-heart-symbolic.svg</file>
     <file compressed="true" preprocess="xml-stripblanks">nsc-installed-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">nsc-success-symbolic.svg</file>
+    <file compressed="true" preprocess="xml-stripblanks">nsc-failed-symbolic.svg</file>
   </gresource>
 </gresources>

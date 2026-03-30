@@ -1,0 +1,38 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $NscApplyDialog: Adw.Dialog {
+  content-width: 450;
+  content-height: 450;
+  can-close: false;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: Adw.StatusPage status_page {
+      title: _("Applying Changes…");
+      description: _("This may take a while");
+
+      child: Gtk.Box {
+        orientation: vertical;
+        spacing: 24;
+
+        Gtk.ProgressBar progress_bar {
+          margin-start: 48;
+          margin-end: 48;
+        }
+
+        Gtk.Button close_button {
+          styles [
+            "pill",
+          ]
+
+          label: _("Close");
+          halign: center;
+          visible: false;
+        }
+      };
+    };
+  };
+}

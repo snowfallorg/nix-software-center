@@ -388,18 +388,85 @@ impl UpdatesPage {
                     profile_name: None,
                 };
                 let row = NscInstalledAppRow::new(component, &pkg);
-                row.add_action(
-                    &gtk::Button::builder()
-                        .icon_name("software-update-available-symbolic")
-                        .valign(gtk::Align::Center)
-                        .tooltip_text("Update")
-                        .build(),
-                );
+
+                let update_button = gtk::Button::builder()
+                    .icon_name("software-update-available-symbolic")
+                    .valign(gtk::Align::Center)
+                    .tooltip_text("Update")
+                    .build();
+
+                let attr_clone = attr.clone();
+                update_button.connect_clicked(move |button| {
+                    Self::update_single_profile_package(button, &attr_clone);
+                });
+
+                row.add_action(&update_button);
                 list_box.append(&row);
                 count += 1;
             }
         }
         count
+    }
+
+    fn update_single_profile_package(button: &gtk::Button, attr: &str) {
+        use crate::apply_dialog::NscApplyDialog;
+
+        let dialog = NscApplyDialog::new();
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        dialog.imp().cancel_sender.replace(Some(cancel_tx));
+        dialog.present_apply(button);
+
+        let attr = attr.to_string();
+        let (sender, receiver) = async_channel::bounded::<Result<(), String>>(1);
+
+        runtime::runtime().spawn(async move {
+            let result = async {
+                let mut cancel_rx = cancel_rx;
+                let pkgs = [attr.as_str()];
+                let mut child =
+                    libsnow::profile::update::update_spawn(&pkgs).map_err(|e| e.to_string())?;
+                tokio::select! {
+                    status = child.wait() => {
+                        let status = status.map_err(|e| e.to_string())?;
+                        if status.success() {
+                            Ok(())
+                        } else {
+                            Err(format!("Update failed with {status}"))
+                        }
+                    }
+                    _ = &mut cancel_rx => {
+                        let _ = child.kill().await;
+                        Err("Cancelled".to_string())
+                    }
+                }
+            }
+            .await;
+            let _ = sender.send(result).await;
+        });
+
+        glib::spawn_future_local(async move {
+            let result = receiver
+                .recv()
+                .await
+                .unwrap_or(Err("Channel closed".into()));
+
+            match result {
+                Ok(()) => dialog.set_success(),
+                Err(ref err) if err == "Cancelled" => {
+                    tracing::info!("Profile update cancelled by user");
+                }
+                Err(err) => {
+                    tracing::warn!("Profile update failed: {err}");
+                    dialog.set_failed(&err);
+                }
+            }
+
+            if let Some(app) = gtk::gio::Application::default()
+                .and_downcast::<crate::application::NscApplication>()
+            {
+                app.refresh_after_system_apply();
+            }
+        });
     }
 
     fn append_issues_to_list(

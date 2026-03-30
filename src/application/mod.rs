@@ -50,6 +50,81 @@ impl NscApplication {
         &self.imp().profile_ops_in_flight
     }
 
+    pub fn refresh_installed_attrs(&self) {
+        let imp = self.imp();
+        let metadata_ref = imp.metadata.borrow();
+        let Some(md) = metadata_ref.as_ref() else {
+            return;
+        };
+
+        let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
+        let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+        let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
+
+        *imp.installed_nixos_attrs.borrow_mut() =
+            nixos_pkgs.iter().map(|p| p.attr.to_string()).collect();
+        *imp.installed_hm_attrs.borrow_mut() = hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
+        *imp.installed_profile_attrs.borrow_mut() =
+            profile_pkgs.iter().map(|p| p.attr.to_string()).collect();
+    }
+
+    pub fn refresh_after_system_apply(&self) {
+        self.refresh_installed_attrs();
+
+        let imp = self.imp();
+        let metadata_ref = imp.metadata.borrow();
+        let Some(md) = metadata_ref.as_ref() else {
+            return;
+        };
+
+        let window = self.main_window();
+        let pkgname_map = imp.pkgname_map.borrow();
+
+        let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
+        let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+        let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
+        window
+            .installed_page()
+            .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
+
+        window.explore_page().refresh_badges();
+        window.search_page().refresh_badges();
+
+        let nixos_attrs = imp.installed_nixos_attrs.borrow();
+        let hm_attrs = imp.installed_hm_attrs.borrow();
+        let profile_attrs = imp.installed_profile_attrs.borrow();
+
+        if let Some(detail) = window
+            .imp()
+            .navigation_view
+            .visible_page()
+            .and_downcast::<crate::app_detail::NscAppDetail>()
+            && let Some(pkgname) = detail
+                .imp()
+                .component
+                .borrow()
+                .as_ref()
+                .and_then(libappstream::prelude::ComponentExt::pkgname)
+        {
+            let attr = pkgname.as_str();
+            detail.imp().installed_nixos.set(nixos_attrs.contains(attr));
+            detail.imp().installed_hm.set(hm_attrs.contains(attr));
+            detail
+                .imp()
+                .installed_profile
+                .set(profile_attrs.contains(attr));
+            crate::app_detail::NscAppDetail::sync_button_states_public(&detail);
+        }
+
+        drop(nixos_attrs);
+        drop(hm_attrs);
+        drop(profile_attrs);
+        drop(pkgname_map);
+        drop(metadata_ref);
+
+        self.refresh_updates();
+    }
+
     pub fn refresh_updates(&self) {
         let imp = self.imp();
         let metadata_ref = imp.metadata.borrow();
@@ -184,33 +259,6 @@ impl NscApplication {
                 Ok(()) => {
                     let count = pool.components().map(|cbox| cbox.size()).unwrap_or(0);
                     info!("AppStream pool loaded: {} components", count);
-
-                    let md_ref = app.imp().metadata.borrow();
-                    let md = md_ref.as_ref().expect("metadata must be loaded");
-                    let mut pkgname_map = std::collections::HashMap::new();
-                    let mut unavailable_pkgnames = std::collections::HashSet::new();
-                    if let Some(cbox) = pool.components() {
-                        for component in cbox.as_array() {
-                            if let Some(pkgname) = component.pkgname() {
-                                let attr = pkgname.as_str();
-                                pkgname_map.insert(pkgname.to_string(), component);
-                                if md.get(attr).is_err()
-                                    && md.get(crate::util::strip_nix_output_suffix(attr)).is_err()
-                                {
-                                    unavailable_pkgnames.insert(pkgname.to_string());
-                                }
-                            }
-                        }
-                    }
-                    drop(md_ref);
-                    info!(
-                        "Built pkgname map: {} entries ({} unavailable)",
-                        pkgname_map.len(),
-                        unavailable_pkgnames.len()
-                    );
-                    app.imp().unavailable_pkgnames.replace(unavailable_pkgnames);
-                    app.imp().pkgname_map.replace(pkgname_map);
-
                     app.imp().appstream_pool.replace(Some(pool));
                     app.try_populate_views();
                 }
@@ -230,12 +278,35 @@ impl NscApplication {
 
         let metadata = imp.metadata.borrow();
         let pool = imp.appstream_pool.borrow();
-        let pkgname_map = imp.pkgname_map.borrow();
 
         if let (Some(md), Some(pool)) = (metadata.as_ref(), pool.as_ref())
             && let Some(window) = imp.window.get()
             && let Some(window) = window.upgrade()
         {
+            let mut pkgname_map_new = std::collections::HashMap::new();
+            let mut unavailable_pkgnames = std::collections::HashSet::new();
+            if let Some(cbox) = pool.components() {
+                for component in cbox.as_array() {
+                    if let Some(pkgname) = component.pkgname() {
+                        let attr = pkgname.as_str();
+                        pkgname_map_new.insert(pkgname.to_string(), component);
+                        if md.get(attr).is_err()
+                            && md.get(crate::util::strip_nix_output_suffix(attr)).is_err()
+                        {
+                            unavailable_pkgnames.insert(pkgname.to_string());
+                        }
+                    }
+                }
+            }
+            info!(
+                "Built pkgname map: {} entries ({} unavailable)",
+                pkgname_map_new.len(),
+                unavailable_pkgnames.len()
+            );
+            imp.unavailable_pkgnames.replace(unavailable_pkgnames);
+            imp.pkgname_map.replace(pkgname_map_new);
+
+            let pkgname_map = imp.pkgname_map.borrow();
             let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
             let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
             let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();

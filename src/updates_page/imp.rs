@@ -5,7 +5,9 @@ use gtk::{CompositeTemplate, gio, glib};
 
 use crate::app_detail::NscAppDetail;
 use crate::application::NscApplication;
+use crate::apply_dialog::NscApplyDialog;
 use crate::installed_app_row::NscInstalledAppRow;
+use crate::runtime::runtime;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/updates_page.ui")]
@@ -143,7 +145,119 @@ impl ObjectImpl for UpdatesPage {
         self.hm_updates_list.set_sort_func(sort_by_name);
         self.profile_now_list.set_sort_func(sort_by_name);
         self.profile_after_system_list.set_sort_func(sort_by_name);
+        self.system_update_button
+            .connect_clicked(|button| run_update(button, UpdateKind::System));
+        self.profile_update_button
+            .connect_clicked(|button| run_update(button, UpdateKind::Profile));
+        self.update_everything_button
+            .connect_clicked(|button| run_update(button, UpdateKind::Everything));
     }
+}
+
+enum UpdateKind {
+    System,
+    Profile,
+    Everything,
+}
+
+fn run_update(button: &gtk::Button, kind: UpdateKind) {
+    let dialog = NscApplyDialog::new();
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    dialog.imp().cancel_sender.replace(Some(cancel_tx));
+    dialog.present_apply(button);
+
+    let has_system = matches!(kind, UpdateKind::System | UpdateKind::Everything);
+    let has_profile = matches!(kind, UpdateKind::Profile | UpdateKind::Everything);
+
+    let (sender, receiver) = async_channel::bounded::<Result<(), String>>(1);
+
+    runtime().spawn(async move {
+        let result = tokio::task::spawn_blocking(move || {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(run_update_async(has_system, has_profile, cancel_rx))
+        })
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|r| r);
+        let _ = sender.send(result).await;
+    });
+
+    glib::spawn_future_local(async move {
+        let result = receiver
+            .recv()
+            .await
+            .unwrap_or(Err("Channel closed".into()));
+
+        match result {
+            Ok(()) => {
+                dialog.set_success();
+            }
+            Err(ref err) if err == "Cancelled" => {
+                tracing::info!("Update cancelled by user");
+            }
+            Err(err) => {
+                tracing::warn!("Update failed: {err}");
+                dialog.set_failed(&err);
+            }
+        }
+
+        if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+            app.refresh_after_system_apply();
+        }
+    });
+}
+
+async fn run_update_async(
+    has_system: bool,
+    has_profile: bool,
+    mut cancel_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<(), String> {
+    use libsnow::nixos::AuthMethod;
+
+    if has_system {
+        tokio::select! {
+            result = libsnow::nixos::update::update(AuthMethod::Dbus) => {
+                result.map_err(|e| e.to_string())?;
+            }
+            _ = &mut cancel_rx => {
+                let _ = libsnow::dbus::cancel().await;
+                return Err("Cancelled".to_string());
+            }
+        }
+
+        let hm_system_managed = libsnow::config::configfile::get_config()
+            .map(|c| c.system_for_home_manager)
+            .unwrap_or(false);
+        if !hm_system_managed {
+            tokio::select! {
+                result = libsnow::homemanager::update::update(AuthMethod::Dbus) => {
+                    result.map_err(|e| e.to_string())?;
+                }
+                _ = &mut cancel_rx => {
+                    let _ = libsnow::dbus::cancel_home().await;
+                    return Err("Cancelled".to_string());
+                }
+            }
+        }
+    }
+
+    if has_profile {
+        let mut child = libsnow::profile::update::update_all_spawn().map_err(|e| e.to_string())?;
+        tokio::select! {
+            status = child.wait() => {
+                let status = status.map_err(|e| e.to_string())?;
+                if !status.success() {
+                    return Err(format!("Profile update failed with {status}"));
+                }
+            }
+            _ = &mut cancel_rx => {
+                let _ = child.kill().await;
+                return Err("Cancelled".to_string());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 impl WidgetImpl for UpdatesPage {}
