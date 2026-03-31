@@ -23,18 +23,24 @@ pub struct PackageIssue {
     pub message: Option<String>,
 }
 
-#[derive(strum::Display)]
 pub enum IssueKind {
-    #[strum(serialize = "Marked as broken")]
     Broken,
-    #[strum(serialize = "Marked as insecure")]
     Insecure,
-    #[strum(serialize = "No longer available")]
     Unavailable,
-    #[strum(serialize = "Renamed")]
     Renamed,
-    #[strum(serialize = "Removed")]
     Removed,
+}
+
+impl std::fmt::Display for IssueKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Broken => write!(f, "Marked as broken"),
+            Self::Insecure => write!(f, "Marked as insecure"),
+            Self::Unavailable => write!(f, "No longer available"),
+            Self::Renamed => write!(f, "Renamed"),
+            Self::Removed => write!(f, "Removed"),
+        }
+    }
 }
 
 struct UpdateCheckResult {

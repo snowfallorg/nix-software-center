@@ -6,7 +6,6 @@ use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
 use libappstream::prelude::*;
-use rand::seq::SliceRandom;
 
 use crate::app_tile::NscAppTile;
 
@@ -66,7 +65,7 @@ impl ExplorePage {
             components.len(),
             array.len()
         );
-        components.shuffle(&mut rand::rng());
+        fastrand::shuffle(&mut components);
 
         for component in components.iter().take(12) {
             let tile = NscAppTile::new(component, nixos_attrs, hm_attrs, profile_attrs);
