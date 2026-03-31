@@ -8,6 +8,7 @@ use crate::application::NscApplication;
 use crate::apply_dialog::NscApplyDialog;
 use crate::installed_app_row::NscInstalledAppRow;
 use crate::runtime::runtime;
+use crate::util;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/updates_page.ui")]
@@ -98,7 +99,7 @@ impl ObjectImpl for UpdatesPage {
                     return;
                 };
 
-                let Some(nav_view) = crate::util::find_navigation_view(row) else {
+                let Some(nav_view) = util::find_navigation_view(row) else {
                     return;
                 };
 

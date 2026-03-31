@@ -91,7 +91,7 @@ fn decode_image_bytes(data: &[u8]) -> Result<DecodedImage, String> {
 async fn load_screenshot_pixels(
     url: &str,
 ) -> Result<(Vec<u8>, i32, i32), Box<dyn std::error::Error>> {
-    let decoded = crate::runtime::runtime()
+    let decoded = runtime::runtime()
         .spawn({
             let url = url.to_string();
             let path = cache_path(&url);

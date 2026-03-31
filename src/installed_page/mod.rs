@@ -1,10 +1,11 @@
 mod imp;
 
+use std::collections::HashMap;
+
 use adw::subclass::prelude::*;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use libappstream::prelude::ComponentExt;
-use std::collections::HashMap;
 
 use crate::application::NscApplication;
 use crate::installed_app_row::NscInstalledAppRow;

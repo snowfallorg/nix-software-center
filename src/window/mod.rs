@@ -9,7 +9,7 @@ use crate::apply_dialog::NscApplyDialog;
 use crate::explore_page::ExplorePage;
 use crate::installed_page;
 use crate::pending_changes::PendingChanges;
-use crate::pending_item::{ChangeKind, InstallTarget};
+use crate::pending_item::{ChangeKind, InstallTarget, PendingItem};
 use crate::runtime::runtime;
 use crate::search_page::SearchPage;
 use crate::updates_page::UpdatesPage;
@@ -87,10 +87,7 @@ impl NscWindow {
         let mut hm_removes = Vec::new();
 
         for i in 0..pending.n_items() {
-            let Some(item) = pending
-                .item(i)
-                .and_downcast::<crate::pending_item::PendingItem>()
-            else {
+            let Some(item) = pending.item(i).and_downcast::<PendingItem>() else {
                 continue;
             };
             let Some(pkgname) = item.pkgname() else {
@@ -218,8 +215,14 @@ async fn apply_changes(
         .unwrap_or(false);
 
     if has_nixos {
-        let install_refs: Vec<&str> = nixos_installs.iter().map(|s| s.as_str()).collect();
-        let remove_refs: Vec<&str> = nixos_removes.iter().map(|s| s.as_str()).collect();
+        let install_refs: Vec<&str> = nixos_installs
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
+        let remove_refs: Vec<&str> = nixos_removes
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
         let content = libsnow::nixos::batch::prepare(&install_refs, &remove_refs, &md)
             .map_err(|e| e.to_string())?;
         tokio::select! {
@@ -234,8 +237,11 @@ async fn apply_changes(
     }
 
     if has_hm {
-        let install_refs: Vec<&str> = hm_installs.iter().map(|s| s.as_str()).collect();
-        let remove_refs: Vec<&str> = hm_removes.iter().map(|s| s.as_str()).collect();
+        let install_refs: Vec<&str> = hm_installs
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
+        let remove_refs: Vec<&str> = hm_removes.iter().map(std::string::String::as_str).collect();
         let content = libsnow::homemanager::batch::prepare(&install_refs, &remove_refs, &md)
             .map_err(|e| e.to_string())?;
         if hm_system_managed {

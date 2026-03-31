@@ -435,7 +435,7 @@ impl NscWindow {
                         .component
                         .borrow()
                         .as_ref()
-                        .and_then(|c| c.pkgname())
+                        .and_then(libappstream::prelude::ComponentExt::pkgname)
                         == component.pkgname()
                 });
 

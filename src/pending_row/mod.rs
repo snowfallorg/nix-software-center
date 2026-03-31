@@ -6,6 +6,7 @@ use gtk::glib;
 use libappstream::prelude::ComponentExt;
 
 use crate::pending_item::{ChangeKind, InstallTarget, PendingItem};
+use crate::util;
 
 glib::wrapper! {
     pub struct NscPendingRow(ObjectSubclass<imp::NscPendingRow>)
@@ -23,7 +24,7 @@ impl NscPendingRow {
                 imp.name_label.set_label(name.as_str());
             }
 
-            crate::util::load_component_icon(&imp.icon, &component, &[48]);
+            util::load_component_icon(&imp.icon, &component, &[48]);
             imp.component.replace(Some(component));
         }
 

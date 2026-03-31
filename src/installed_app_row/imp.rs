@@ -1,7 +1,8 @@
+use std::cell::RefCell;
+
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, glib};
-use std::cell::RefCell;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/installed_app_row.ui")]

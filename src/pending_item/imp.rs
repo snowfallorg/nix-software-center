@@ -1,6 +1,7 @@
+use std::cell::{Cell, RefCell};
+
 use glib::subclass::prelude::*;
 use gtk::glib;
-use std::cell::{Cell, RefCell};
 
 use super::{ChangeKind, InstallTarget};
 

@@ -1,10 +1,13 @@
 mod imp;
 
+use std::collections::HashMap;
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
-use std::collections::HashMap;
 
+use crate::application::NscApplication;
+use crate::apply_dialog::NscApplyDialog;
 use crate::installed_app_row::NscInstalledAppRow;
 use crate::{runtime, util};
 
@@ -63,8 +66,12 @@ impl UpdatesPage {
         let hm_attrs = hm_attrs.to_vec();
         let profile_attrs = profile_attrs.to_vec();
         let db_path = metadata.db_path().to_path_buf();
-        let current_rev = metadata.nixpkgs_revision().map(|s| s.to_string());
-        let current_release = metadata.nixos_release().map(|s| s.to_string());
+        let current_rev = metadata
+            .nixpkgs_revision()
+            .map(std::string::ToString::to_string);
+        let current_release = metadata
+            .nixos_release()
+            .map(std::string::ToString::to_string);
         let (sender, receiver) = async_channel::bounded(1);
 
         runtime::runtime().spawn(async move {
@@ -409,8 +416,6 @@ impl UpdatesPage {
     }
 
     fn update_single_profile_package(button: &gtk::Button, attr: &str) {
-        use crate::apply_dialog::NscApplyDialog;
-
         let dialog = NscApplyDialog::new();
         let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
         dialog.imp().cancel_sender.replace(Some(cancel_tx));
@@ -461,9 +466,7 @@ impl UpdatesPage {
                 }
             }
 
-            if let Some(app) = gtk::gio::Application::default()
-                .and_downcast::<crate::application::NscApplication>()
-            {
+            if let Some(app) = gtk::gio::Application::default().and_downcast::<NscApplication>() {
                 app.refresh_after_system_apply();
             }
         });
@@ -571,8 +574,12 @@ async fn check_updates_async(
             Ok(latest_md) => {
                 let ni = detect_issues(&latest_md, &nixos_attrs);
                 let hi = detect_issues(&latest_md, &hm_attrs);
-                let rev = latest_md.nixpkgs_revision().map(|s| s.to_string());
-                let release = latest_md.nixos_release().map(|s| s.to_string());
+                let rev = latest_md
+                    .nixpkgs_revision()
+                    .map(std::string::ToString::to_string);
+                let release = latest_md
+                    .nixos_release()
+                    .map(std::string::ToString::to_string);
                 (ni, hi, rev, release)
             }
             Err(err) => {

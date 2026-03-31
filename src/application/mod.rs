@@ -8,8 +8,10 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use libappstream::prelude::*;
 
+use crate::app_detail::NscAppDetail;
 use crate::config::{APP_ID, PKGDATADIR, PROFILE, VERSION};
 use crate::runtime::runtime;
+use crate::util;
 use crate::window::NscWindow;
 
 glib::wrapper! {
@@ -98,7 +100,7 @@ impl NscApplication {
             .imp()
             .navigation_view
             .visible_page()
-            .and_downcast::<crate::app_detail::NscAppDetail>()
+            .and_downcast::<NscAppDetail>()
             && let Some(pkgname) = detail
                 .imp()
                 .component
@@ -113,7 +115,7 @@ impl NscApplication {
                 .imp()
                 .installed_profile
                 .set(profile_attrs.contains(attr));
-            crate::app_detail::NscAppDetail::sync_button_states_public(&detail);
+            NscAppDetail::sync_button_states_public(&detail);
         }
 
         drop(nixos_attrs);
@@ -197,7 +199,7 @@ impl NscApplication {
 
     fn authors() -> Vec<&'static str> {
         // Authors are defined in Cargo.toml
-        env!("CARGO_PKG_AUTHORS").split(":").collect()
+        env!("CARGO_PKG_AUTHORS").split(':').collect()
     }
 
     fn show_about_dialog(&self) {
@@ -291,7 +293,7 @@ impl NscApplication {
                         let attr = pkgname.as_str();
                         pkgname_map_new.insert(pkgname.to_string(), component);
                         if md.get(attr).is_err()
-                            && md.get(crate::util::strip_nix_output_suffix(attr)).is_err()
+                            && md.get(util::strip_nix_output_suffix(attr)).is_err()
                         {
                             unavailable_pkgnames.insert(pkgname.to_string());
                         }

@@ -1,8 +1,9 @@
+use std::cell::{Cell, RefCell};
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, gio, glib};
-use std::cell::{Cell, RefCell};
 
 use crate::app_tile::NscAppTile;
 use crate::application::NscApplication;

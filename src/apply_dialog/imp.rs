@@ -1,8 +1,9 @@
+use std::cell::RefCell;
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, glib};
-use std::cell::RefCell;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/apply_dialog.ui")]

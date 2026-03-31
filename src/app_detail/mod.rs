@@ -1,12 +1,13 @@
 mod imp;
 
+use std::collections::HashSet;
+use std::os::unix::process::CommandExt;
+use std::sync::{Arc, Mutex};
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 use libappstream::prelude::*;
-use std::collections::HashSet;
-use std::os::unix::process::CommandExt;
-use std::sync::{Arc, Mutex};
 
 use crate::application::NscApplication;
 use crate::pending_changes::PendingChanges;
@@ -953,9 +954,7 @@ impl NscAppDetail {
     }
 
     fn show_profile_error(message: &str) {
-        if let Some(app) =
-            gio::Application::default().and_downcast::<crate::application::NscApplication>()
-        {
+        if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
             app.main_window().show_toast(message);
         }
     }
@@ -1160,7 +1159,7 @@ impl NscAppDetail {
         };
 
         let desktop_files: Vec<std::path::PathBuf> = entries
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .map(|e| e.path())
             .filter(|p| p.extension().is_some_and(|ext| ext == "desktop"))
             .collect();
@@ -1359,8 +1358,7 @@ fn extract_developer_name(component: &libappstream::Component) -> Option<String>
                     _ => {}
                 }
             }
-            Ok(Event::Eof) => break,
-            Err(_) => break,
+            Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
     }

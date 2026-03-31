@@ -1,11 +1,12 @@
 mod imp;
 
+use std::collections::HashSet;
+
 use adw::subclass::prelude::*;
 use gtk::glib;
 use gtk::prelude::*;
 use libappstream::prelude::*;
 use rand::seq::SliceRandom;
-use std::collections::HashSet;
 
 use crate::app_tile::NscAppTile;
 

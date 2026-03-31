@@ -1,7 +1,8 @@
+use std::cell::{Cell, RefCell};
+
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, glib};
-use std::cell::{Cell, RefCell};
 
 use crate::pending_item::InstallTarget;
 

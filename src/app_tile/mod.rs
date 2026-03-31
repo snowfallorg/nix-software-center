@@ -1,11 +1,13 @@
 mod imp;
 
+use std::collections::HashSet;
+
 use adw::subclass::prelude::*;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use libappstream::prelude::*;
-use std::collections::HashSet;
 
+use crate::application::NscApplication;
 use crate::util;
 
 glib::wrapper! {
@@ -106,9 +108,7 @@ impl NscAppTile {
             return;
         };
 
-        let Some(app) =
-            gio::Application::default().and_downcast::<crate::application::NscApplication>()
-        else {
+        let Some(app) = gio::Application::default().and_downcast::<NscApplication>() else {
             return;
         };
 
@@ -120,6 +120,6 @@ impl NscAppTile {
 
     fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {
         let size = imp.icon.pixel_size() as u32;
-        crate::util::load_component_icon(&imp.icon, component, &[size]);
+        util::load_component_icon(&imp.icon, component, &[size]);
     }
 }

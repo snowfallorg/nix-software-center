@@ -6,6 +6,7 @@ use gtk::{CompositeTemplate, gio, glib};
 use crate::app_detail::NscAppDetail;
 use crate::application::NscApplication;
 use crate::installed_app_row::NscInstalledAppRow;
+use crate::util;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/installed_page.ui")]
@@ -65,7 +66,7 @@ impl ObjectImpl for InstalledPage {
                     return;
                 };
 
-                let Some(nav_view) = crate::util::find_navigation_view(row) else {
+                let Some(nav_view) = util::find_navigation_view(row) else {
                     tracing::warn!(
                         "InstalledAppRow activated but no NavigationView ancestor found"
                     );

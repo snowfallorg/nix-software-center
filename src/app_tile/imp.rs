@@ -1,11 +1,13 @@
+use std::cell::RefCell;
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
 use gtk::{CompositeTemplate, gio, glib};
-use std::cell::RefCell;
 
 use crate::app_detail::NscAppDetail;
 use crate::application::NscApplication;
+use crate::util;
 
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/app_tile.ui")]
@@ -57,7 +59,7 @@ impl ObjectImpl for NscAppTile {
                 return;
             };
 
-            let Some(nav_view) = crate::util::find_navigation_view(button) else {
+            let Some(nav_view) = util::find_navigation_view(button) else {
                 tracing::warn!("NscAppTile clicked but no NavigationView ancestor found");
                 return;
             };
