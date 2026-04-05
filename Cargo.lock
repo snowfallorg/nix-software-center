@@ -2013,7 +2013,7 @@ dependencies = [
 [[package]]
 name = "libsnow"
 version = "0.0.2-alpha.1"
-source = "git+https://github.com/snowfallorg/libsnow#503fad98eb45c59909697fdca6d5edb1d2f6b58d"
+source = "git+https://github.com/snowfallorg/libsnow#4cc27ed8a80bd5e8b0c3141c397eee76367f2afb"
 dependencies = [
  "dirs",
  "nix-editor",

@@ -196,6 +196,10 @@ impl NscWindow {
     }
 }
 
+fn as_refs(v: &[String]) -> Vec<&str> {
+    v.iter().map(String::as_str).collect()
+}
+
 async fn apply_changes(
     nixos_installs: Vec<String>,
     nixos_removes: Vec<String>,
@@ -214,19 +218,22 @@ async fn apply_changes(
         .map(|c| c.system_for_home_manager)
         .unwrap_or(false);
 
-    if has_nixos {
-        let install_refs: Vec<&str> = nixos_installs
-            .iter()
-            .map(std::string::String::as_str)
-            .collect();
-        let remove_refs: Vec<&str> = nixos_removes
-            .iter()
-            .map(std::string::String::as_str)
-            .collect();
-        let content = libsnow::nixos::batch::prepare(&install_refs, &remove_refs, &md)
-            .map_err(|e| e.to_string())?;
+    if has_nixos && has_hm && hm_system_managed {
+        let system_content = libsnow::nixos::batch::prepare(
+            &as_refs(&nixos_installs),
+            &as_refs(&nixos_removes),
+            &md,
+        )
+        .map_err(|e| e.to_string())?;
+        let home_content = libsnow::homemanager::batch::prepare(
+            &as_refs(&hm_installs),
+            &as_refs(&hm_removes),
+            &md,
+        )
+        .map_err(|e| e.to_string())?;
+
         tokio::select! {
-            result = libsnow::dbus::config(&content, "switch") => {
+            result = libsnow::dbus::config_both(&system_content, &home_content, "switch") => {
                 result.map_err(|e| e.to_string())?;
             }
             _ = &mut cancel_rx => {
@@ -234,17 +241,14 @@ async fn apply_changes(
                 return Err("Cancelled".to_string());
             }
         }
-    }
-
-    if has_hm {
-        let install_refs: Vec<&str> = hm_installs
-            .iter()
-            .map(std::string::String::as_str)
-            .collect();
-        let remove_refs: Vec<&str> = hm_removes.iter().map(std::string::String::as_str).collect();
-        let content = libsnow::homemanager::batch::prepare(&install_refs, &remove_refs, &md)
+    } else {
+        if has_nixos {
+            let content = libsnow::nixos::batch::prepare(
+                &as_refs(&nixos_installs),
+                &as_refs(&nixos_removes),
+                &md,
+            )
             .map_err(|e| e.to_string())?;
-        if hm_system_managed {
             tokio::select! {
                 result = libsnow::dbus::config(&content, "switch") => {
                     result.map_err(|e| e.to_string())?;
@@ -254,14 +258,34 @@ async fn apply_changes(
                     return Err("Cancelled".to_string());
                 }
             }
-        } else {
-            tokio::select! {
-                result = libsnow::dbus::config_home(&content, "switch") => {
-                    result.map_err(|e| e.to_string())?;
+        }
+
+        if has_hm {
+            let content = libsnow::homemanager::batch::prepare(
+                &as_refs(&hm_installs),
+                &as_refs(&hm_removes),
+                &md,
+            )
+            .map_err(|e| e.to_string())?;
+            if hm_system_managed {
+                tokio::select! {
+                    result = libsnow::dbus::config_system_home(&content, "switch") => {
+                        result.map_err(|e| e.to_string())?;
+                    }
+                    _ = &mut cancel_rx => {
+                        let _ = libsnow::dbus::cancel().await;
+                        return Err("Cancelled".to_string());
+                    }
                 }
-                _ = &mut cancel_rx => {
-                    let _ = libsnow::dbus::cancel_home().await;
-                    return Err("Cancelled".to_string());
+            } else {
+                tokio::select! {
+                    result = libsnow::dbus::config_home(&content, "switch") => {
+                        result.map_err(|e| e.to_string())?;
+                    }
+                    _ = &mut cancel_rx => {
+                        let _ = libsnow::dbus::cancel_home().await;
+                        return Err("Cancelled".to_string());
+                    }
                 }
             }
         }
