@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::application::NscApplication;
 use crate::apply_dialog::NscApplyDialog;
@@ -54,6 +54,18 @@ struct UpdateCheckResult {
     warnings: Vec<String>,
     current_rev: Option<String>,
     latest_rev: Option<String>,
+    has_system_targets: bool,
+}
+
+struct UpdateCheckParams {
+    db_path: std::path::PathBuf,
+    nixos_attrs: Vec<String>,
+    hm_attrs: Vec<String>,
+    profile_attrs: Vec<String>,
+    current_rev: Option<String>,
+    current_release: Option<String>,
+    nixos_configured: bool,
+    hm_configured: bool,
 }
 
 impl UpdatesPage {
@@ -68,29 +80,33 @@ impl UpdatesPage {
         let imp = self.imp();
         imp.loading_stack.set_visible_child_name("loading");
 
-        let nixos_attrs = nixos_attrs.to_vec();
-        let hm_attrs = hm_attrs.to_vec();
-        let profile_attrs = profile_attrs.to_vec();
-        let db_path = metadata.db_path().to_path_buf();
-        let current_rev = metadata
-            .nixpkgs_revision()
-            .map(std::string::ToString::to_string);
-        let current_release = metadata
-            .nixos_release()
-            .map(std::string::ToString::to_string);
+        let (nixos_configured, hm_configured) =
+            if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+                (app.nixos_configured(), app.hm_configured())
+            } else {
+                (false, false)
+            };
+
+        let params = UpdateCheckParams {
+            db_path: metadata.db_path().to_path_buf(),
+            nixos_attrs: nixos_attrs.to_vec(),
+            hm_attrs: hm_attrs.to_vec(),
+            profile_attrs: profile_attrs.to_vec(),
+            current_rev: metadata
+                .nixpkgs_revision()
+                .map(std::string::ToString::to_string),
+            current_release: metadata
+                .nixos_release()
+                .map(std::string::ToString::to_string),
+            nixos_configured,
+            hm_configured,
+        };
         let (sender, receiver) = async_channel::bounded(1);
 
         runtime::runtime().spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 let rt = tokio::runtime::Handle::current();
-                rt.block_on(check_updates_async(
-                    db_path,
-                    nixos_attrs,
-                    hm_attrs,
-                    profile_attrs,
-                    current_rev,
-                    current_release,
-                ))
+                rt.block_on(check_updates_async(params))
             })
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
@@ -125,7 +141,8 @@ impl UpdatesPage {
     ) {
         let imp = self.imp();
 
-        let revs_differ = result.current_rev.is_some()
+        let revs_differ = result.has_system_targets
+            && result.current_rev.is_some()
             && result.latest_rev.is_some()
             && result.current_rev != result.latest_rev;
 
@@ -517,32 +534,43 @@ impl UpdatesPage {
     }
 }
 
-async fn check_updates_async(
-    db_path: std::path::PathBuf,
-    nixos_attrs: Vec<String>,
-    hm_attrs: Vec<String>,
-    profile_attrs: Vec<String>,
-    current_rev: Option<String>,
-    current_release: Option<String>,
-) -> Result<UpdateCheckResult, String> {
+async fn check_updates_async(params: UpdateCheckParams) -> Result<UpdateCheckResult, String> {
+    let UpdateCheckParams {
+        db_path,
+        nixos_attrs,
+        hm_attrs,
+        profile_attrs,
+        current_rev,
+        current_release,
+        nixos_configured,
+        hm_configured,
+    } = params;
     let md = libsnow::metadata::Metadata::open(&db_path).map_err(|e| e.to_string())?;
     let mut warnings = Vec::new();
 
-    let nixos_updates = match libsnow::nixos::update::updatable(&md).await {
-        Ok(u) => u,
-        Err(err) => {
-            tracing::warn!("Failed to check NixOS updates: {err}");
-            warnings.push(format!("Could not check NixOS updates: {err}"));
-            Vec::new()
+    let nixos_updates = if nixos_configured {
+        match libsnow::nixos::update::updatable(&md).await {
+            Ok(u) => u,
+            Err(err) => {
+                tracing::warn!("Failed to check NixOS updates: {err}");
+                warnings.push(format!("Could not check NixOS updates: {err}"));
+                Vec::new()
+            }
         }
+    } else {
+        Vec::new()
     };
-    let hm_updates = match libsnow::homemanager::update::updatable(&md).await {
-        Ok(u) => u,
-        Err(err) => {
-            tracing::warn!("Failed to check Home Manager updates: {err}");
-            warnings.push(format!("Could not check Home Manager updates: {err}"));
-            Vec::new()
+    let hm_updates = if hm_configured {
+        match libsnow::homemanager::update::updatable(&md).await {
+            Ok(u) => u,
+            Err(err) => {
+                tracing::warn!("Failed to check Home Manager updates: {err}");
+                warnings.push(format!("Could not check Home Manager updates: {err}"));
+                Vec::new()
+            }
         }
+    } else {
+        Vec::new()
     };
     let profile_now_updates = match libsnow::profile::update::updatable_user().await {
         Ok(u) => u,
@@ -560,22 +588,28 @@ async fn check_updates_async(
         }
     };
 
-    let now_attrs: std::collections::HashMap<String, &str> = profile_now_updates
-        .iter()
-        .map(|u| (u.attr.to_string(), u.new_version.as_str()))
-        .collect();
-    let profile_after_system_updates: Vec<libsnow::PackageUpdate> = profile_latest_updates
-        .into_iter()
-        .filter(|u| {
-            let attr = u.attr.to_string();
-            match now_attrs.get(&attr) {
-                Some(now_ver) => *now_ver != u.new_version,
-                None => true,
-            }
-        })
-        .collect();
+    let has_system_targets = nixos_configured || hm_configured;
 
-    let (nixos_issues, hm_issues, latest_rev, latest_release) =
+    let profile_after_system_updates = if has_system_targets {
+        let now_attrs: std::collections::HashMap<String, &str> = profile_now_updates
+            .iter()
+            .map(|u| (u.attr.to_string(), u.new_version.as_str()))
+            .collect();
+        profile_latest_updates
+            .into_iter()
+            .filter(|u| {
+                let attr = u.attr.to_string();
+                match now_attrs.get(&attr) {
+                    Some(now_ver) => *now_ver != u.new_version,
+                    None => true,
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let (nixos_issues, hm_issues, latest_rev, latest_release) = if has_system_targets {
         match libsnow::metadata::Metadata::connect_latest().await {
             Ok(latest_md) => {
                 let ni = detect_issues(&latest_md, &nixos_attrs);
@@ -593,7 +627,10 @@ async fn check_updates_async(
                 warnings.push(format!("Could not check for package issues: {err}"));
                 (Vec::new(), Vec::new(), None, None)
             }
-        };
+        }
+    } else {
+        (Vec::new(), Vec::new(), None, None)
+    };
 
     let profile_issues = match libsnow::metadata::Metadata::connect_registry().await {
         Ok(registry_md) => detect_issues(&registry_md, &profile_attrs),
@@ -623,6 +660,7 @@ async fn check_updates_async(
         warnings,
         current_rev: format_rev(&current_rev, &current_release),
         latest_rev: format_rev(&latest_rev, &latest_release),
+        has_system_targets: nixos_configured || hm_configured,
     })
 }
 

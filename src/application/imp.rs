@@ -22,6 +22,8 @@ pub struct NscApplication {
     pub installed_hm_attrs: RefCell<HashSet<String>>,
     pub installed_profile_attrs: RefCell<HashSet<String>>,
     pub profile_ops_in_flight: RefCell<HashSet<String>>,
+    pub nixos_configured: Cell<bool>,
+    pub hm_configured: Cell<bool>,
     pub views_populated: Cell<bool>,
 }
 
@@ -67,6 +69,7 @@ impl ApplicationImpl for NscApplication {
         app.setup_css();
         app.setup_gactions();
         app.setup_accels();
+        app.detect_available_targets();
         app.load_metadata();
         app.load_appstream();
     }

@@ -50,6 +50,7 @@ pub struct NscAppDetail {
     pub installed_hm: Cell<bool>,
     pub installed_profile: Cell<bool>,
     pub is_unavailable: Cell<bool>,
+    pub target_indices: RefCell<Vec<super::TargetEntry>>,
     pub profile_op_in_flight: Cell<bool>,
     pub profile_cancel: RefCell<Option<tokio::sync::oneshot::Sender<()>>>,
 

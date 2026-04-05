@@ -167,7 +167,15 @@ fn run_update(button: &gtk::Button, kind: UpdateKind) {
     dialog.imp().cancel_sender.replace(Some(cancel_tx));
     dialog.present_apply(button);
 
-    let has_system = matches!(kind, UpdateKind::System | UpdateKind::Everything);
+    let (nixos_configured, hm_configured) =
+        if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+            (app.nixos_configured(), app.hm_configured())
+        } else {
+            (false, false)
+        };
+
+    let has_nixos = matches!(kind, UpdateKind::System | UpdateKind::Everything) && nixos_configured;
+    let has_hm = matches!(kind, UpdateKind::System | UpdateKind::Everything) && hm_configured;
     let has_profile = matches!(kind, UpdateKind::Profile | UpdateKind::Everything);
 
     let (sender, receiver) = async_channel::bounded::<Result<(), String>>(1);
@@ -175,7 +183,7 @@ fn run_update(button: &gtk::Button, kind: UpdateKind) {
     runtime().spawn(async move {
         let result = tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Handle::current();
-            rt.block_on(run_update_async(has_system, has_profile, cancel_rx))
+            rt.block_on(run_update_async(has_nixos, has_hm, has_profile, cancel_rx))
         })
         .await
         .map_err(|e| e.to_string())
@@ -209,13 +217,14 @@ fn run_update(button: &gtk::Button, kind: UpdateKind) {
 }
 
 async fn run_update_async(
-    has_system: bool,
+    has_nixos: bool,
+    has_hm: bool,
     has_profile: bool,
     mut cancel_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<(), String> {
     use libsnow::nixos::AuthMethod;
 
-    if has_system {
+    if has_nixos {
         tokio::select! {
             result = libsnow::nixos::update::update(AuthMethod::Dbus) => {
                 result.map_err(|e| e.to_string())?;
@@ -225,7 +234,9 @@ async fn run_update_async(
                 return Err("Cancelled".to_string());
             }
         }
+    }
 
+    if has_hm {
         let hm_system_managed = libsnow::config::configfile::get_config()
             .map(|c| c.system_for_home_manager)
             .unwrap_or(false);

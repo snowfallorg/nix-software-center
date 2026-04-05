@@ -439,13 +439,11 @@ impl NscWindow {
                         == component.pkgname()
                 });
 
-            let target_index = match target {
-                InstallTarget::NixOS => 0,
-                InstallTarget::HomeManager => 1,
-                InstallTarget::Profile => 2,
-            };
-
             if let Some(detail) = existing_detail {
+                let target_index = NscAppDetail::index_of_target(
+                    &detail.imp().target_indices.borrow(),
+                    target.into(),
+                );
                 detail.imp().target_dropdown.set_selected(target_index);
             } else {
                 let nixos_attrs = app.installed_nixos_attrs().borrow();
@@ -457,6 +455,10 @@ impl NscWindow {
                     &nixos_attrs,
                     &hm_attrs,
                     &profile_attrs,
+                );
+                let target_index = NscAppDetail::index_of_target(
+                    &detail.imp().target_indices.borrow(),
+                    target.into(),
                 );
                 detail.imp().target_dropdown.set_selected(target_index);
                 imp.navigation_view.push(&detail);

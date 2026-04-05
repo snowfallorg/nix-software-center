@@ -17,6 +17,24 @@ use crate::screenshot_slot::NscScreenshotSlot;
 use crate::util;
 use crate::window::NscWindow;
 
+#[derive(Debug, Clone, Copy)]
+pub enum TargetEntry {
+    NixOS,
+    HomeManager,
+    Profile,
+    Other,
+}
+
+impl From<InstallTarget> for TargetEntry {
+    fn from(target: InstallTarget) -> Self {
+        match target {
+            InstallTarget::NixOS => Self::NixOS,
+            InstallTarget::HomeManager => Self::HomeManager,
+            InstallTarget::Profile => Self::Profile,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RunCancel {
     abort_handle: tokio::task::AbortHandle,
@@ -39,8 +57,6 @@ glib::wrapper! {
         @extends adw::NavigationPage, gtk::Widget,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
-
-const OTHER_TARGET_INDEX: u32 = 3;
 
 impl NscAppDetail {
     pub fn new(
@@ -107,6 +123,28 @@ impl NscAppDetail {
             child.add_css_class("flat");
         }
 
+        // Build the target dropdown based on which targets are configured
+        let (nixos_configured, hm_configured) =
+            if let Some(app) = gio::Application::default().and_downcast::<NscApplication>() {
+                (app.nixos_configured(), app.hm_configured())
+            } else {
+                (false, false)
+            };
+
+        let mut target_entries = Vec::new();
+        let model = gtk::StringList::new(&[]);
+        if nixos_configured {
+            model.append("NixOS");
+            target_entries.push(TargetEntry::NixOS);
+        }
+        if hm_configured {
+            model.append("Home Manager");
+            target_entries.push(TargetEntry::HomeManager);
+        }
+        model.append("Profile");
+        target_entries.push(TargetEntry::Profile);
+        imp.target_dropdown.set_model(Some(&model));
+
         let mut profile_op_active = false;
         if let Some(pkgname) = component.pkgname() {
             let pkgname_str = pkgname.as_str();
@@ -123,21 +161,17 @@ impl NscAppDetail {
             let desktop_only = !nix_installed && util::has_system_desktop_file(component);
 
             let default_target = if desktop_only {
-                if let Some(model) = imp
-                    .target_dropdown
-                    .model()
-                    .and_downcast::<gtk::StringList>()
-                {
-                    model.append("Other");
-                }
-                OTHER_TARGET_INDEX
+                model.append("Other");
+                target_entries.push(TargetEntry::Other);
+                target_entries.len() as u32 - 1
             } else if installed_nixos {
-                0
+                Self::index_of_target(&target_entries, TargetEntry::NixOS)
             } else if installed_hm {
-                1
+                Self::index_of_target(&target_entries, TargetEntry::HomeManager)
             } else if installed_profile {
-                2
+                Self::index_of_target(&target_entries, TargetEntry::Profile)
             } else {
+                // Default to first available target
                 0
             };
             imp.target_dropdown.set_selected(default_target);
@@ -146,6 +180,8 @@ impl NscAppDetail {
                 profile_op_active = app.profile_ops_in_flight().borrow().contains(pkgname_str);
             }
         }
+
+        *imp.target_indices.borrow_mut() = target_entries;
 
         imp.is_unavailable.set(component.pkgname().is_some_and(|p| {
             gio::Application::default()
@@ -161,7 +197,9 @@ impl NscAppDetail {
             } else {
                 "Installing…"
             };
-            imp.target_dropdown.set_selected(2);
+            let profile_idx =
+                Self::index_of_target(&imp.target_indices.borrow(), TargetEntry::Profile);
+            imp.target_dropdown.set_selected(profile_idx);
             imp.profile_op_in_flight.set(true);
             imp.install_button.set_label(label);
             imp.install_button.set_sensitive(false);
@@ -433,15 +471,24 @@ impl NscAppDetail {
         imp.links_group.set_visible(has_links);
     }
 
+    pub fn index_of_target(entries: &[TargetEntry], target: TargetEntry) -> u32 {
+        entries
+            .iter()
+            .position(|e| std::mem::discriminant(e) == std::mem::discriminant(&target))
+            .unwrap_or(0) as u32
+    }
+
+    fn selected_target_entry(imp: &imp::NscAppDetail) -> TargetEntry {
+        let idx = imp.target_dropdown.selected() as usize;
+        let entries = imp.target_indices.borrow();
+        entries.get(idx).copied().unwrap_or(TargetEntry::Profile)
+    }
+
     fn selected_target(imp: &imp::NscAppDetail) -> InstallTarget {
-        match imp.target_dropdown.selected() {
-            0 => InstallTarget::NixOS,
-            1 => InstallTarget::HomeManager,
-            2 => InstallTarget::Profile,
-            n => {
-                tracing::warn!("Unexpected target dropdown index {n}");
-                InstallTarget::NixOS
-            }
+        match Self::selected_target_entry(imp) {
+            TargetEntry::NixOS => InstallTarget::NixOS,
+            TargetEntry::HomeManager => InstallTarget::HomeManager,
+            TargetEntry::Profile | TargetEntry::Other => InstallTarget::Profile,
         }
     }
 
@@ -466,7 +513,7 @@ impl NscAppDetail {
             };
             let imp = page.imp();
 
-            if imp.target_dropdown.selected() == OTHER_TARGET_INDEX {
+            if matches!(Self::selected_target_entry(imp), TargetEntry::Other) {
                 Self::launch_app(&component_install);
                 return;
             }
@@ -707,7 +754,7 @@ impl NscAppDetail {
             return;
         };
 
-        if imp.target_dropdown.selected() == OTHER_TARGET_INDEX {
+        if matches!(Self::selected_target_entry(imp), TargetEntry::Other) {
             Self::sync_other_button_states(imp);
             return;
         }

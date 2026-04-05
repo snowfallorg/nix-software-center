@@ -52,6 +52,14 @@ impl NscApplication {
         &self.imp().profile_ops_in_flight
     }
 
+    pub fn nixos_configured(&self) -> bool {
+        self.imp().nixos_configured.get()
+    }
+
+    pub fn hm_configured(&self) -> bool {
+        self.imp().hm_configured.get()
+    }
+
     pub fn refresh_installed_attrs(&self) {
         let imp = self.imp();
         let metadata_ref = imp.metadata.borrow();
@@ -59,8 +67,16 @@ impl NscApplication {
             return;
         };
 
-        let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
-        let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+        let nixos_pkgs = if imp.nixos_configured.get() {
+            libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let hm_pkgs = if imp.hm_configured.get() {
+            libsnow::homemanager::list::list(md).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
 
         *imp.installed_nixos_attrs.borrow_mut() =
@@ -82,8 +98,16 @@ impl NscApplication {
         let window = self.main_window();
         let pkgname_map = imp.pkgname_map.borrow();
 
-        let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
-        let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+        let nixos_pkgs = if imp.nixos_configured.get() {
+            libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let hm_pkgs = if imp.hm_configured.get() {
+            libsnow::homemanager::list::list(md).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
         window
             .installed_page()
@@ -214,6 +238,25 @@ impl NscApplication {
         dialog.present(Some(&self.main_window()));
     }
 
+    fn detect_available_targets(&self) {
+        let imp = self.imp();
+        match libsnow::config::configfile::get_config() {
+            Ok(config) => {
+                let nixos = config.nixos_configured();
+                let hm = config.home_manager_configured();
+                imp.nixos_configured.set(nixos);
+                imp.hm_configured.set(hm);
+                info!(
+                    "Available targets: NixOS={}, Home Manager={}, Profile=always",
+                    nixos, hm
+                );
+            }
+            Err(err) => {
+                info!("No libsnow config found ({err}), only profile target available");
+            }
+        }
+    }
+
     fn load_metadata(&self) {
         let (sender, receiver) = async_channel::bounded(1);
 
@@ -309,8 +352,16 @@ impl NscApplication {
             imp.pkgname_map.replace(pkgname_map_new);
 
             let pkgname_map = imp.pkgname_map.borrow();
-            let nixos_pkgs = libsnow::nixos::list::list_systempackages(md).unwrap_or_default();
-            let hm_pkgs = libsnow::homemanager::list::list(md).unwrap_or_default();
+            let nixos_pkgs = if imp.nixos_configured.get() {
+                libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            let hm_pkgs = if imp.hm_configured.get() {
+                libsnow::homemanager::list::list(md).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
             let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
 
             *imp.installed_nixos_attrs.borrow_mut() =
