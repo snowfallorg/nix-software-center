@@ -1,3 +1,5 @@
+use std::cell::{Cell, RefCell};
+
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::InitializingObject;
@@ -13,6 +15,9 @@ use crate::util;
 #[derive(Debug, Default, CompositeTemplate)]
 #[template(resource = "/org/snowflakeos/NixSoftwareCenter/ui/updates_page.ui")]
 pub struct UpdatesPage {
+    pub check_generation: Cell<u64>,
+    pub check_handle: RefCell<Option<tokio::task::JoinHandle<()>>>,
+
     #[template_child]
     pub loading_stack: TemplateChild<gtk::Stack>,
     #[template_child]
