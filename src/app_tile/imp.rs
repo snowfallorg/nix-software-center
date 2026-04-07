@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -21,6 +21,7 @@ pub struct NscAppTile {
     #[template_child]
     pub install_badge: TemplateChild<gtk::Image>,
     pub component: RefCell<Option<libappstream::Component>>,
+    pub icon_generation: Cell<u64>,
 }
 
 #[glib::object_subclass]

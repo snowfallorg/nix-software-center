@@ -22,9 +22,10 @@ impl NscAppTile {
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
         profile_attrs: &HashSet<String>,
+        desktop_ids: &HashSet<String>,
     ) -> Self {
         let tile: Self = glib::Object::new();
-        tile.bind(component, nixos_attrs, hm_attrs, profile_attrs);
+        tile.bind(component, nixos_attrs, hm_attrs, profile_attrs, desktop_ids);
         tile
     }
 
@@ -34,6 +35,7 @@ impl NscAppTile {
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
         profile_attrs: &HashSet<String>,
+        desktop_ids: &HashSet<String>,
     ) {
         let imp = self.imp();
 
@@ -47,13 +49,15 @@ impl NscAppTile {
             imp.summary_label.set_label(summary.as_str());
         }
 
-        Self::load_icon(imp, component);
-        self.update_install_badge(component, nixos_attrs, hm_attrs, profile_attrs);
+        self.load_icon(component);
+        self.update_install_badge(component, nixos_attrs, hm_attrs, profile_attrs, desktop_ids);
     }
 
     pub fn unbind(&self) {
         let imp = self.imp();
         imp.component.replace(None);
+        imp.icon_generation
+            .set(imp.icon_generation.get().wrapping_add(1));
         imp.name_label.set_label("");
         imp.summary_label.set_label("");
         imp.icon.set_icon_name(Some("application-x-executable"));
@@ -68,6 +72,7 @@ impl NscAppTile {
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
         profile_attrs: &HashSet<String>,
+        desktop_ids: &HashSet<String>,
     ) {
         let imp = self.imp();
         let badge = &*imp.install_badge;
@@ -89,8 +94,7 @@ impl NscAppTile {
             return;
         }
 
-        let has_desktop_file = util::has_system_desktop_file(component);
-        if has_desktop_file {
+        if util::has_system_desktop_file(component, desktop_ids) {
             badge.set_icon_name(Some("nsc-installed-symbolic"));
             badge.add_css_class("install-badge-system");
             badge.set_tooltip_text(Some("Installed on system"));
@@ -115,11 +119,27 @@ impl NscAppTile {
         let nixos_attrs = app.installed_nixos_attrs().borrow();
         let hm_attrs = app.installed_hm_attrs().borrow();
         let profile_attrs = app.installed_profile_attrs().borrow();
-        self.update_install_badge(&component, &nixos_attrs, &hm_attrs, &profile_attrs);
+        let desktop_ids = app.system_desktop_ids().borrow();
+        self.update_install_badge(
+            &component,
+            &nixos_attrs,
+            &hm_attrs,
+            &profile_attrs,
+            &desktop_ids,
+        );
     }
 
-    fn load_icon(imp: &imp::NscAppTile, component: &libappstream::Component) {
+    fn load_icon(&self, component: &libappstream::Component) {
+        let imp = self.imp();
         let size = imp.icon.pixel_size() as u32;
-        util::load_component_icon(&imp.icon, component, &[size]);
+        let source = util::resolve_component_icon(component, &[size]);
+        let generation = imp.icon_generation.get().wrapping_add(1);
+        imp.icon_generation.set(generation);
+        let weak = self.downgrade();
+        util::load_icon_async(&imp.icon, source, generation, move || {
+            weak.upgrade()
+                .map(|t| t.imp().icon_generation.get())
+                .unwrap_or(u64::MAX)
+        });
     }
 }

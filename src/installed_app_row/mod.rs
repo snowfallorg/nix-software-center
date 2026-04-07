@@ -47,6 +47,7 @@ impl NscInstalledAppRow {
 
     fn load_icon(imp: &imp::NscInstalledAppRow, component: &libappstream::Component) {
         let size = imp.icon.pixel_size() as u32;
-        util::load_component_icon(&imp.icon, component, &[size]);
+        let source = util::resolve_component_icon(component, &[size]);
+        util::load_icon_async(&imp.icon, source, 0, || 0);
     }
 }

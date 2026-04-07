@@ -14,6 +14,32 @@ use crate::runtime::runtime;
 use crate::util;
 use crate::window::NscWindow;
 
+struct InstalledPackages {
+    nixos: Vec<libsnow::Package>,
+    hm: Vec<libsnow::Package>,
+    profile: Vec<libsnow::Package>,
+}
+
+fn query_installed_packages(
+    db_path: std::path::PathBuf,
+    nixos_configured: bool,
+    hm_configured: bool,
+) -> Result<InstalledPackages, String> {
+    let md = libsnow::metadata::Metadata::open(&db_path).map_err(|e| e.to_string())?;
+    let nixos = if nixos_configured {
+        libsnow::nixos::list::list_systempackages(&md).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let hm = if hm_configured {
+        libsnow::homemanager::list::list(&md).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let profile = libsnow::profile::list::list().unwrap_or_default();
+    Ok(InstalledPackages { nixos, hm, profile })
+}
+
 glib::wrapper! {
     pub struct NscApplication(ObjectSubclass<imp::NscApplication>)
         @extends gio::Application, gtk::Application, adw::Application,
@@ -52,6 +78,18 @@ impl NscApplication {
         &self.imp().profile_ops_in_flight
     }
 
+    pub fn system_desktop_ids(&self) -> &std::cell::RefCell<std::collections::HashSet<String>> {
+        &self.imp().system_desktop_ids
+    }
+
+    pub fn refresh_system_desktop_ids(&self) {
+        let desktop_ids: std::collections::HashSet<String> = gio::AppInfo::all()
+            .into_iter()
+            .filter_map(|info| info.id().map(|id| id.to_string()))
+            .collect();
+        self.imp().system_desktop_ids.replace(desktop_ids);
+    }
+
     pub fn nixos_configured(&self) -> bool {
         self.imp().nixos_configured.get()
     }
@@ -60,95 +98,89 @@ impl NscApplication {
         self.imp().hm_configured.get()
     }
 
-    pub fn refresh_installed_attrs(&self) {
-        let imp = self.imp();
-        let metadata_ref = imp.metadata.borrow();
-        let Some(md) = metadata_ref.as_ref() else {
-            return;
-        };
-
-        let nixos_pkgs = if imp.nixos_configured.get() {
-            libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        let hm_pkgs = if imp.hm_configured.get() {
-            libsnow::homemanager::list::list(md).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
-
-        *imp.installed_nixos_attrs.borrow_mut() =
-            nixos_pkgs.iter().map(|p| p.attr.to_string()).collect();
-        *imp.installed_hm_attrs.borrow_mut() = hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
-        *imp.installed_profile_attrs.borrow_mut() =
-            profile_pkgs.iter().map(|p| p.attr.to_string()).collect();
-    }
-
     pub fn refresh_after_system_apply(&self) {
-        self.refresh_installed_attrs();
-
         let imp = self.imp();
         let metadata_ref = imp.metadata.borrow();
         let Some(md) = metadata_ref.as_ref() else {
             return;
         };
 
-        let window = self.main_window();
-        let pkgname_map = imp.pkgname_map.borrow();
-
-        let nixos_pkgs = if imp.nixos_configured.get() {
-            libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        let hm_pkgs = if imp.hm_configured.get() {
-            libsnow::homemanager::list::list(md).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
-        window
-            .installed_page()
-            .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
-
-        window.explore_page().refresh_badges();
-        window.search_page().refresh_badges();
-
-        let nixos_attrs = imp.installed_nixos_attrs.borrow();
-        let hm_attrs = imp.installed_hm_attrs.borrow();
-        let profile_attrs = imp.installed_profile_attrs.borrow();
-
-        if let Some(detail) = window
-            .imp()
-            .navigation_view
-            .visible_page()
-            .and_downcast::<NscAppDetail>()
-            && let Some(pkgname) = detail
-                .imp()
-                .component
-                .borrow()
-                .as_ref()
-                .and_then(libappstream::prelude::ComponentExt::pkgname)
-        {
-            let attr = pkgname.as_str();
-            detail.imp().installed_nixos.set(nixos_attrs.contains(attr));
-            detail.imp().installed_hm.set(hm_attrs.contains(attr));
-            detail
-                .imp()
-                .installed_profile
-                .set(profile_attrs.contains(attr));
-            NscAppDetail::sync_button_states_public(&detail);
-        }
-
-        drop(nixos_attrs);
-        drop(hm_attrs);
-        drop(profile_attrs);
-        drop(pkgname_map);
+        let db_path = md.db_path().to_path_buf();
+        let nixos_configured = imp.nixos_configured.get();
+        let hm_configured = imp.hm_configured.get();
         drop(metadata_ref);
 
-        self.refresh_updates();
+        let (sender, receiver) = async_channel::bounded(1);
+        runtime().spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                query_installed_packages(db_path, nixos_configured, hm_configured)
+            })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+            let _ = sender.send(result).await;
+        });
+
+        let app_weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            let Ok(Ok(pkgs)) = receiver.recv().await else {
+                return;
+            };
+            let Some(app) = app_weak.upgrade() else {
+                return;
+            };
+            let imp = app.imp();
+
+            *imp.installed_nixos_attrs.borrow_mut() =
+                pkgs.nixos.iter().map(|p| p.attr.to_string()).collect();
+            *imp.installed_hm_attrs.borrow_mut() =
+                pkgs.hm.iter().map(|p| p.attr.to_string()).collect();
+            *imp.installed_profile_attrs.borrow_mut() =
+                pkgs.profile.iter().map(|p| p.attr.to_string()).collect();
+
+            app.refresh_system_desktop_ids();
+
+            let window = app.main_window();
+            let pkgname_map = imp.pkgname_map.borrow();
+            window
+                .installed_page()
+                .populate(&pkgs.nixos, &pkgs.hm, &pkgs.profile, &pkgname_map);
+
+            window.explore_page().refresh_badges();
+            window.search_page().refresh_badges();
+
+            let nixos_attrs = imp.installed_nixos_attrs.borrow();
+            let hm_attrs = imp.installed_hm_attrs.borrow();
+            let profile_attrs = imp.installed_profile_attrs.borrow();
+
+            if let Some(detail) = window
+                .imp()
+                .navigation_view
+                .visible_page()
+                .and_downcast::<NscAppDetail>()
+                && let Some(pkgname) = detail
+                    .imp()
+                    .component
+                    .borrow()
+                    .as_ref()
+                    .and_then(libappstream::prelude::ComponentExt::pkgname)
+            {
+                let attr = pkgname.as_str();
+                detail.imp().installed_nixos.set(nixos_attrs.contains(attr));
+                detail.imp().installed_hm.set(hm_attrs.contains(attr));
+                detail
+                    .imp()
+                    .installed_profile
+                    .set(profile_attrs.contains(attr));
+                NscAppDetail::sync_button_states_public(&detail);
+            }
+
+            drop(nixos_attrs);
+            drop(hm_attrs);
+            drop(profile_attrs);
+            drop(pkgname_map);
+
+            app.refresh_updates();
+        });
     }
 
     pub fn refresh_updates(&self) {
@@ -302,8 +334,7 @@ impl NscApplication {
         glib::spawn_future_local(async move {
             match pool.load_future().await {
                 Ok(()) => {
-                    let count = pool.components().map(|cbox| cbox.size()).unwrap_or(0);
-                    info!("AppStream pool loaded: {} components", count);
+                    info!("AppStream pool loaded");
                     app.imp().appstream_pool.replace(Some(pool));
                     app.try_populate_views();
                 }
@@ -326,20 +357,24 @@ impl NscApplication {
 
         if let (Some(md), Some(pool)) = (metadata.as_ref(), pool.as_ref())
             && let Some(window) = imp.window.get()
-            && let Some(window) = window.upgrade()
+            && let Some(_window) = window.upgrade()
         {
+            // pool.components() is expensive, cache it
+            let all_components: Vec<libappstream::Component> = pool
+                .components()
+                .map(|cbox| cbox.as_array())
+                .unwrap_or_default();
+            info!("AppStream pool loaded: {} components", all_components.len());
+
             let mut pkgname_map_new = std::collections::HashMap::new();
             let mut unavailable_pkgnames = std::collections::HashSet::new();
-            if let Some(cbox) = pool.components() {
-                for component in cbox.as_array() {
-                    if let Some(pkgname) = component.pkgname() {
-                        let attr = pkgname.as_str();
-                        pkgname_map_new.insert(pkgname.to_string(), component);
-                        if md.get(attr).is_err()
-                            && md.get(util::strip_nix_output_suffix(attr)).is_err()
-                        {
-                            unavailable_pkgnames.insert(pkgname.to_string());
-                        }
+            for component in &all_components {
+                if let Some(pkgname) = component.pkgname() {
+                    let attr = pkgname.as_str();
+                    pkgname_map_new.insert(pkgname.to_string(), component.clone());
+                    if md.get(attr).is_err() && md.get(util::strip_nix_output_suffix(attr)).is_err()
+                    {
+                        unavailable_pkgnames.insert(pkgname.to_string());
                     }
                 }
             }
@@ -351,57 +386,108 @@ impl NscApplication {
             imp.unavailable_pkgnames.replace(unavailable_pkgnames);
             imp.pkgname_map.replace(pkgname_map_new);
 
-            let pkgname_map = imp.pkgname_map.borrow();
-            let nixos_pkgs = if imp.nixos_configured.get() {
-                libsnow::nixos::list::list_systempackages(md).unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            let hm_pkgs = if imp.hm_configured.get() {
-                libsnow::homemanager::list::list(md).unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
+            let db_path = md.db_path().to_path_buf();
+            let nixos_configured = imp.nixos_configured.get();
+            let hm_configured = imp.hm_configured.get();
+            let (sender, receiver) = async_channel::bounded(1);
+            runtime().spawn(async move {
+                let result = tokio::task::spawn_blocking(move || {
+                    query_installed_packages(db_path, nixos_configured, hm_configured)
+                })
+                .await
+                .unwrap_or_else(|e| Err(e.to_string()));
+                let _ = sender.send(result).await;
+            });
 
-            *imp.installed_nixos_attrs.borrow_mut() =
-                nixos_pkgs.iter().map(|p| p.attr.to_string()).collect();
-            *imp.installed_hm_attrs.borrow_mut() =
-                hm_pkgs.iter().map(|p| p.attr.to_string()).collect();
-            *imp.installed_profile_attrs.borrow_mut() =
-                profile_pkgs.iter().map(|p| p.attr.to_string()).collect();
+            let (desktop_sender, desktop_receiver) = async_channel::bounded(1);
+            gio::spawn_blocking(move || {
+                let ids: std::collections::HashSet<String> = gio::AppInfo::all()
+                    .into_iter()
+                    .filter_map(|info| info.id().map(|id| id.to_string()))
+                    .collect();
+                let _ = desktop_sender.send_blocking(ids);
+            });
 
-            let nixos_attrs = imp.installed_nixos_attrs.borrow();
-            let hm_attrs = imp.installed_hm_attrs.borrow();
-            let profile_attrs = imp.installed_profile_attrs.borrow();
-            let unavailable = imp.unavailable_pkgnames.borrow();
-            window.explore_page().populate(
-                md,
-                pool,
-                &nixos_attrs,
-                &hm_attrs,
-                &profile_attrs,
-                &unavailable,
-            );
-            window
-                .installed_page()
-                .populate(&nixos_pkgs, &hm_pkgs, &profile_pkgs, &pkgname_map);
-            window.search_page().set_pool(pool);
+            let app_weak = self.downgrade();
+            glib::spawn_future_local(async move {
+                let pkgs = match receiver.recv().await {
+                    Ok(Ok(pkgs)) => pkgs,
+                    Ok(Err(err)) => {
+                        warn!("Failed to query installed packages: {err}");
+                        InstalledPackages {
+                            nixos: Vec::new(),
+                            hm: Vec::new(),
+                            profile: Vec::new(),
+                        }
+                    }
+                    Err(_) => return,
+                };
+                let desktop_ids = match desktop_receiver.recv().await {
+                    Ok(ids) => ids,
+                    Err(_) => {
+                        warn!("Failed to load system desktop IDs, badges may be incomplete");
+                        std::collections::HashSet::new()
+                    }
+                };
 
-            // start update check
-            let nixos_attr_vec: Vec<String> = nixos_attrs.iter().cloned().collect();
-            let hm_attr_vec: Vec<String> = hm_attrs.iter().cloned().collect();
-            let profile_attr_vec: Vec<String> = profile_attrs.iter().cloned().collect();
-            window.updates_page().check_for_updates(
-                md,
-                &nixos_attr_vec,
-                &hm_attr_vec,
-                &profile_attr_vec,
-                &pkgname_map,
-            );
+                let Some(app) = app_weak.upgrade() else {
+                    return;
+                };
+                let imp = app.imp();
+                let metadata_ref = imp.metadata.borrow();
+                let Some(md) = metadata_ref.as_ref() else {
+                    return;
+                };
+                let pool_ref = imp.appstream_pool.borrow();
+                let Some(pool) = pool_ref.as_ref() else {
+                    return;
+                };
 
-            window.show_content();
-            imp.views_populated.set(true);
+                *imp.installed_nixos_attrs.borrow_mut() =
+                    pkgs.nixos.iter().map(|p| p.attr.to_string()).collect();
+                *imp.installed_hm_attrs.borrow_mut() =
+                    pkgs.hm.iter().map(|p| p.attr.to_string()).collect();
+                *imp.installed_profile_attrs.borrow_mut() =
+                    pkgs.profile.iter().map(|p| p.attr.to_string()).collect();
+                imp.system_desktop_ids.replace(desktop_ids);
+
+                let window = app.main_window();
+                let pkgname_map = imp.pkgname_map.borrow();
+                let nixos_attrs = imp.installed_nixos_attrs.borrow();
+                let hm_attrs = imp.installed_hm_attrs.borrow();
+                let profile_attrs = imp.installed_profile_attrs.borrow();
+                let desktop_ids = imp.system_desktop_ids.borrow();
+                let unavailable = imp.unavailable_pkgnames.borrow();
+                window.explore_page().populate(
+                    &all_components,
+                    &nixos_attrs,
+                    &hm_attrs,
+                    &profile_attrs,
+                    &desktop_ids,
+                    &unavailable,
+                );
+                window.installed_page().populate(
+                    &pkgs.nixos,
+                    &pkgs.hm,
+                    &pkgs.profile,
+                    &pkgname_map,
+                );
+                window.search_page().set_pool(pool);
+
+                let nixos_attr_vec: Vec<String> = nixos_attrs.iter().cloned().collect();
+                let hm_attr_vec: Vec<String> = hm_attrs.iter().cloned().collect();
+                let profile_attr_vec: Vec<String> = profile_attrs.iter().cloned().collect();
+                window.updates_page().check_for_updates(
+                    md,
+                    &nixos_attr_vec,
+                    &hm_attr_vec,
+                    &profile_attr_vec,
+                    &pkgname_map,
+                );
+
+                window.show_content();
+                imp.views_populated.set(true);
+            });
         }
     }
 

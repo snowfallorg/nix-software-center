@@ -158,7 +158,12 @@ impl NscAppDetail {
             imp.installed_profile.set(installed_profile);
 
             let nix_installed = installed_nixos || installed_hm || installed_profile;
-            let desktop_only = !nix_installed && util::has_system_desktop_file(component);
+            let desktop_ids = gio::Application::default()
+                .and_downcast::<NscApplication>()
+                .map(|app| app.system_desktop_ids().borrow().clone())
+                .unwrap_or_default();
+            let desktop_only =
+                !nix_installed && util::has_system_desktop_file(component, &desktop_ids);
 
             let default_target = if desktop_only {
                 model.append("Other");
@@ -1162,6 +1167,7 @@ impl NscAppDetail {
             return;
         };
         *app.installed_profile_attrs().borrow_mut() = attrs;
+        app.refresh_system_desktop_ids();
 
         let window = app.main_window();
         let pkgname_map = app.pkgname_map().borrow();
@@ -1344,7 +1350,8 @@ impl NscAppDetail {
     }
 
     fn load_icon(imp: &imp::NscAppDetail, component: &libappstream::Component) {
-        util::load_component_icon(&imp.icon, component, &[128, 64, 48]);
+        let source = util::resolve_component_icon(component, &[128, 64, 48]);
+        util::load_icon_async(&imp.icon, source, 0, || 0);
     }
 }
 

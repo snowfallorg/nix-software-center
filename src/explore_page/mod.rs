@@ -31,11 +31,11 @@ impl ExplorePage {
 
     pub fn populate(
         &self,
-        _metadata: &libsnow::metadata::Metadata,
-        pool: &libappstream::Pool,
+        all_components: &[libappstream::Component],
         nixos_attrs: &HashSet<String>,
         hm_attrs: &HashSet<String>,
         profile_attrs: &HashSet<String>,
+        desktop_ids: &HashSet<String>,
         unavailable: &HashSet<String>,
     ) {
         let flow_box = &self.imp().flow_box;
@@ -44,12 +44,7 @@ impl ExplorePage {
             flow_box.remove(&child);
         }
 
-        let Some(cbox) = pool.components() else {
-            return;
-        };
-
-        let array = cbox.as_array();
-        let mut components: Vec<_> = array
+        let mut components: Vec<_> = all_components
             .iter()
             .filter(|c| {
                 !c.icons().is_empty()
@@ -63,12 +58,13 @@ impl ExplorePage {
         tracing::debug!(
             "Explore: {}/{} components match explore criteria",
             components.len(),
-            array.len()
+            all_components.len()
         );
         fastrand::shuffle(&mut components);
 
         for component in components.iter().take(12) {
-            let tile = NscAppTile::new(component, nixos_attrs, hm_attrs, profile_attrs);
+            let tile =
+                NscAppTile::new(component, nixos_attrs, hm_attrs, profile_attrs, desktop_ids);
             flow_box.append(&tile);
 
             let flow_child = tile

@@ -14,7 +14,7 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-const POPULATE_BATCH_SIZE: usize = 50;
+const BATCH_SIZE: usize = 50;
 
 impl SearchPage {
     pub fn refresh_badges(&self) {
@@ -40,7 +40,6 @@ impl SearchPage {
         let imp = self.imp();
 
         if query.is_empty() {
-            // Keep showing whatever results are already on screen
             return;
         }
 
@@ -91,17 +90,12 @@ impl SearchPage {
         glib::spawn_future_local(async move {
             let imp = page.imp();
 
-            if imp.search_generation.get() != generation {
-                return;
-            }
-
-            for chunk in components.chunks(POPULATE_BATCH_SIZE) {
+            for chunk in components.chunks(BATCH_SIZE) {
                 if imp.search_generation.get() != generation {
                     return;
                 }
-                for component in chunk {
-                    imp.model.append(component);
-                }
+                let position = imp.model.n_items();
+                imp.model.splice(position, 0, chunk);
                 glib::timeout_future(std::time::Duration::ZERO).await;
             }
         });

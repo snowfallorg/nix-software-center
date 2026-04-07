@@ -194,13 +194,26 @@ impl InstalledPage {
             match result {
                 Ok(()) => {
                     tracing::info!("Profile remove from installed page succeeded");
+                    let (sender, receiver) = async_channel::bounded(1);
+                    runtime::runtime().spawn(async move {
+                        let pkgs = tokio::task::spawn_blocking(|| {
+                            libsnow::profile::list::list().unwrap_or_default()
+                        })
+                        .await
+                        .unwrap_or_default();
+                        let _ = sender.send(pkgs).await;
+                    });
+                    let Ok(profile_pkgs) = receiver.recv().await else {
+                        return;
+                    };
+
                     let Some(app) = gio::Application::default().and_downcast::<NscApplication>()
                     else {
                         return;
                     };
-                    let profile_pkgs = libsnow::profile::list::list().unwrap_or_default();
                     *app.installed_profile_attrs().borrow_mut() =
                         profile_pkgs.iter().map(|p| p.attr.to_string()).collect();
+                    app.refresh_system_desktop_ids();
 
                     let window = app.main_window();
                     let pkgname_map = app.pkgname_map().borrow();

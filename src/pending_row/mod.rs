@@ -24,7 +24,8 @@ impl NscPendingRow {
                 imp.name_label.set_label(name.as_str());
             }
 
-            util::load_component_icon(&imp.icon, &component, &[48]);
+            let source = util::resolve_component_icon(&component, &[48]);
+            util::load_icon_async(&imp.icon, source, 0, || 0);
             imp.component.replace(Some(component));
         }
 

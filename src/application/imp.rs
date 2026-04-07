@@ -22,6 +22,7 @@ pub struct NscApplication {
     pub installed_hm_attrs: RefCell<HashSet<String>>,
     pub installed_profile_attrs: RefCell<HashSet<String>>,
     pub profile_ops_in_flight: RefCell<HashSet<String>>,
+    pub system_desktop_ids: RefCell<HashSet<String>>,
     pub nixos_configured: Cell<bool>,
     pub hm_configured: Cell<bool>,
     pub views_populated: Cell<bool>,
