@@ -36,7 +36,7 @@
         pkgs: system: {
           default = pkgs.callPackage ./. {
             inherit pkgs;
-            appstream-data = nixos-appstream-data.packages.${system}.appstream-data-all;
+            nixos-appstream-data = nixos-appstream-data.packages.${system}.appstream-data-all;
           };
         }
       );
